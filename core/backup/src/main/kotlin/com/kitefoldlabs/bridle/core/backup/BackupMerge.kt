@@ -28,8 +28,10 @@ import java.util.Base64
  * - **Identities are matched, never created.** A backup identity maps to an existing identity
  *   with the same public key (type and base64, ignoring the comment); otherwise it is reported as
  *   [ImportIssue.MissingIdentity].
- * - **Trusted host keys are never replaced.** A known host whose key differs from the trusted one
- *   is reported as [ImportIssue.KnownHostKeyConflict] and the existing key stays.
+ * - **Trusted host keys are never replaced or joined.** Once this device trusts a host (host +
+ *   port), a backup key for it that is not already trusted, whether of the same or of another
+ *   type, is reported as [ImportIssue.KnownHostKeyConflict] and only the existing key stays. This
+ *   matches the TOFU verifier, which treats an unknown key type for a known host as changed.
  * - **Imported data passes the same validation as user input**, and known-host fingerprints are
  *   recomputed from the key; invalid entities are reported and skipped.
  */
@@ -66,9 +68,12 @@ private class Planner(
     }
 
     private fun planIdentities() {
-        val byKey = existing.identities.associateBy({ publicKeyId(it.publicKeyOpenSsh) }, { it.id })
+        val byKey =
+            existing.identities
+                .mapNotNull { identity -> publicKeyId(identity.publicKeyOpenSsh)?.let { it to identity.id } }
+                .toMap()
         backup.identities.forEach { identity ->
-            val match = byKey[publicKeyId(identity.publicKeyOpenSsh)]
+            val match = publicKeyId(identity.publicKeyOpenSsh)?.let(byKey::get)
             when {
                 identity.id in identityIds || identity.id in missingIdentityIds -> Unit
                 match != null -> identityIds[identity.id] = match
@@ -108,7 +113,11 @@ private class Planner(
         val byName = existing.groups.associateBy({ groupKey(it.name) }, { it.id }).toMutableMap()
         val planned = mutableListOf<Group>()
         backup.groups.forEach { group ->
-            val problem = Validators.label(group.name)
+            val problem =
+                Validators.all(
+                    Validators.label(group.name),
+                    group.defaultUsername?.let(Validators::username) ?: Validation.Valid,
+                )
             val match = byName[groupKey(group.name)]
             when {
                 problem is Validation.Invalid -> issues += ImportIssue.Invalid(EntityKind.GROUP, group.name, problem)
@@ -164,7 +173,7 @@ private class Planner(
     /**
      * Resolves jump hosts and orders [pending] so that each host's provisional jump host is
      * inserted before it. Cycles (including a host jumping through itself) are broken by clearing
-     * the jump host of the first host that cannot be placed.
+     * the jump host of one host *on* the cycle; hosts that merely jump into a cycle keep theirs.
      */
     private fun orderByJumpHost(pending: List<Host>): List<Host> {
         val remaining =
@@ -182,7 +191,7 @@ private class Planner(
                     host.jumpHostId.let { it == null || !ImportPlan.isProvisional(it) || it in placed }
                 }
             val next =
-                ready ?: remaining.first().let { stuck ->
+                ready ?: onCycle(remaining).let { stuck ->
                     issues += ImportIssue.ReferenceCleared(EntityKind.HOST, stuck.label, "jumpHostId")
                     stuck.copy(jumpHostId = null)
                 }
@@ -191,6 +200,18 @@ private class Planner(
             ordered += next
         }
         return ordered
+    }
+
+    /**
+     * A host on a jump-host cycle among [stuck]. Every host in [stuck] waits for another host in
+     * [stuck], so following jump hosts from any of them must revisit one, which is on the cycle.
+     */
+    private fun onCycle(stuck: List<Host>): Host {
+        val byId = stuck.associateBy<Host, EntityId?> { it.id }
+        val visited = mutableSetOf<EntityId>()
+        var host = stuck.first()
+        while (visited.add(host.id)) host = byId.getValue(host.jumpHostId)
+        return host
     }
 
     private fun planProfiles(): List<LaunchProfile> {
@@ -259,8 +280,8 @@ private class Planner(
     }
 
     private fun planKnownHosts(): List<KnownHost> {
-        val trusted = existing.knownHosts.associateByTo(mutableMapOf(), ::knownHostKey)
-        val planned = mutableListOf<KnownHost>()
+        val onDevice = existing.knownHosts.groupBy(::hostPortKey)
+        val planned = mutableMapOf<Triple<String, Int, String>, KnownHost>()
         backup.knownHosts.forEach { candidate ->
             when (val checked = KnownHostCheck.check(candidate)) {
                 is KnownHostCheck.Result.Bad -> {
@@ -269,13 +290,13 @@ private class Planner(
                 }
                 is KnownHostCheck.Result.Good -> {
                     val accepted = checked.knownHost
-                    val current = trusted[knownHostKey(accepted)]
+                    // Like TofuHostKeyVerifier: once this device trusts a host, a key of any
+                    // other type (or value) for it is a conflict, never an addition.
+                    val trusted = onDevice[hostPortKey(accepted)] ?: listOfNotNull(planned[knownHostKey(accepted)])
+                    val current = trusted.firstOrNull { it.keyType == accepted.keyType } ?: trusted.firstOrNull()
                     when {
-                        current == null -> {
-                            trusted[knownHostKey(accepted)] = accepted
-                            planned += accepted
-                        }
-                        current.publicKeyBase64 == accepted.publicKeyBase64 ->
+                        current == null -> planned[knownHostKey(accepted)] = accepted
+                        current.keyType == accepted.keyType && current.publicKeyBase64 == accepted.publicKeyBase64 ->
                             issues +=
                                 ImportIssue.Duplicate(
                                     EntityKind.KNOWN_HOST,
@@ -286,7 +307,7 @@ private class Planner(
                                 ImportIssue.KnownHostKeyConflict(
                                     host = current.host,
                                     port = current.port,
-                                    keyType = current.keyType,
+                                    keyType = accepted.keyType,
                                     existingFingerprint = current.fingerprintSha256,
                                     backupFingerprint = accepted.fingerprintSha256,
                                 )
@@ -294,7 +315,7 @@ private class Planner(
                 }
             }
         }
-        return planned
+        return planned.values.toList()
     }
 
     /** The new id of a profile's or port forward's host, or null (reported) if it is not imported. */
@@ -332,16 +353,19 @@ private class Planner(
     private fun knownHostKey(knownHost: KnownHost) =
         Triple(knownHost.host.lowercase(), knownHost.port, knownHost.keyType)
 
+    private fun hostPortKey(knownHost: KnownHost) = knownHost.host.lowercase() to knownHost.port
+
     private fun forwardKey(forward: PortForward) =
         listOf(forward.hostId, forward.type, forward.bindPort, forward.destHost?.lowercase(), forward.destPort)
 
-    /** `type base64`, without the comment. */
+    /** `type base64`, without the comment; null for a line without both, which matches nothing. */
     private fun publicKeyId(line: String) =
         line
             .trim()
             .split(Regex("\\s+"))
             .take(2)
-            .joinToString(" ")
+            .takeIf { it.size == 2 }
+            ?.joinToString(" ")
 }
 
 /** Integrity checks for an imported [KnownHost]; the stored fingerprint is never taken on trust. */
