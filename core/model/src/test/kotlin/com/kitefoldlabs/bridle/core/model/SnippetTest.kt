@@ -45,7 +45,7 @@ class SnippetTest {
 
     @Test
     fun `text without variables renders unchanged`() =
-        runBlocking {
+        runBlocking<Unit> {
             checkAll(Arb.string(0..80)) { body ->
                 val clean = body.replace("{", "")
                 Snippet(name = "p", body = clean).render(emptyMap()) shouldBe clean

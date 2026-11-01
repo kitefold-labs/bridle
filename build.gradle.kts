@@ -13,6 +13,7 @@ plugins {
 val coveredModules =
     listOf(
         ":core:model",
+        ":core:ssh",
     )
 
 dependencies {

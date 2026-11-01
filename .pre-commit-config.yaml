@@ -38,6 +38,11 @@ repos:
 
   - repo: local
     hooks:
+      - id: test-bodies
+        name: tests must return Unit (JUnit skips non-void tests)
+        entry: python3 scripts/check_test_bodies.py
+        language: system
+        files: /src/(test|androidTest)/.*\.kt$
       - id: ktlint
         name: ktlint (Gradle)
         entry: ./gradlew ktlintCheck --quiet

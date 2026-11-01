@@ -158,10 +158,12 @@ interface SshConnection : Closeable {
   replacing the key requires an explicit action.
 - **ProxyJump:** connect to the jump host, open `direct-tcpip` to the target,
   and run the second SSH transport over that stream. This can chain.
-- **Exec environment:** non-interactive exec shells often have a minimal
-  `PATH` (nvm, Homebrew and `~/.local/bin` are missing). Exec commands are
-  wrapped in `"$SHELL" -lc '<cmd>'`, and we probe once per host with
-  `command -v tmux claude`.
+- **Exec environment:** the user's login shell may be bash, zsh or fish, and
+  non-interactive exec shells often have a minimal `PATH` (nvm, Homebrew and
+  `~/.local/bin` are missing). Multi-line operations therefore run as
+  `sh -s` with the POSIX script on stdin (`SshConnection.runScript`), so the
+  login shell only ever parses `sh -s`. Scripts extend `PATH` with the common
+  install locations, and we probe once per host with `command -v tmux claude`.
 - **ShellQuote:** a single audited function single-quotes every interpolated
   value. Session names are validated against `[A-Za-z0-9_.-]{1,64}`. It is
   covered by unit and property-based tests.
