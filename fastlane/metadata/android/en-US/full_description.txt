@@ -15,7 +15,7 @@
 
 <p><b>Keys that never leave the device</b></p>
 <ul>
-<li>Generate Ed25519, ECDSA P-256 or RSA keys in the Android Keystore (hardware-backed where available), optionally requiring your fingerprint for each use.</li>
+<li>Generate ECDSA (P-256, P-384), RSA or, on Android 13+ devices that support it, Ed25519 keys in the Android Keystore (hardware-backed where available), optionally requiring a biometric check for each use.</li>
 <li>Import existing OpenSSH keys; they are stored encrypted.</li>
 <li>Trust-on-first-use host key verification with a blocking warning when a key changes.</li>
 </ul>
@@ -23,7 +23,7 @@
 <p><b>Also included</b></p>
 <ul>
 <li>SFTP file browser with uploads, downloads, rename, chmod and a small text editor.</li>
-<li>Local and dynamic (SOCKS) port forwards, started automatically per host.</li>
+<li>Local and dynamic (SOCKS) port forwards, optionally started automatically when you connect.</li>
 <li>Snippets with variables, app lock, screenshot blocking.</li>
 <li>Encrypted backup file (Argon2id + AES-256-GCM) to move your setup to a new phone. Private keys are never included.</li>
 </ul>
@@ -32,4 +32,4 @@
 
 <p>No accounts, no ads, no analytics, no servers. Bridle connects only to the hosts you add. Crash reports are opt-in: you review the text and file it yourself as a GitHub issue.</p>
 
-<p>Bridle is not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic.</p>
+<p>Bridle is not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.</p>

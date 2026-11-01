@@ -1,1 +1,1 @@
-Free SSH client for running, watching and restarting Claude Code in tmux.
+Open-source SSH client to run, watch and restart Claude Code in tmux.

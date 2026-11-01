@@ -1,8 +1,10 @@
 name: Release
 
 # Builds the release APK and AAB for a version tag and attaches them, with SHA-256 checksums, to
-# a draft GitHub Release. Signing is skipped (unsigned artifacts) unless the repository has the
-# BRIDLE_SIGNING_* secrets; see docs/release.md. Publishing the draft is a manual step.
+# a draft GitHub Release. Signing is skipped (unsigned artifacts) unless the `release` environment
+# has the BRIDLE_SIGNING_* secrets; see docs/release.md. Publishing the draft is a manual step.
+# A manual run from a tag behaves like the tag push; from a branch it only uploads the build as a
+# workflow artifact (and is refused if the environment only allows tags).
 on:
   push:
     tags: ["v*"]
@@ -11,13 +13,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  build:
     name: Build release artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    permissions:
-      contents: write # create the draft release
+    # Holds the signing secrets; restrict it to `v*` tags and add required reviewers.
+    environment: release
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -41,6 +47,7 @@ jobs:
           KEYSTORE_B64: ${{ secrets.BRIDLE_SIGNING_KEYSTORE_B64 }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
+            umask 077
             printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "BRIDLE_SIGNING_STOREFILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
@@ -52,21 +59,42 @@ jobs:
           BRIDLE_SIGNING_KEYALIAS: ${{ secrets.BRIDLE_SIGNING_KEYALIAS }}
           BRIDLE_SIGNING_KEYPASSWORD: ${{ secrets.BRIDLE_SIGNING_KEYPASSWORD }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease --no-build-cache --stacktrace
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
       - name: Collect artifacts and checksums
         run: |
+          # Tag name for tag builds, short commit otherwise. AGP names the APK
+          # app-release.apk when it signed it and app-release-unsigned.apk when it did not.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then name="$GITHUB_REF_NAME"; else name="${GITHUB_SHA::12}"; fi
+          suffix=""
+          [ -f app/build/outputs/apk/release/app-release.apk ] || suffix="-unsigned"
           mkdir dist
-          cp app/build/outputs/apk/release/*.apk dist/
-          cp app/build/outputs/bundle/release/*.aab dist/
-          rm -f "$RUNNER_TEMP/release.jks"
+          cp app/build/outputs/apk/release/app-release*.apk "dist/Bridle-$name$suffix.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/Bridle-$name$suffix.aab"
           (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
-      - name: Create draft release
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Bridle $TAG" --generate-notes
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-artifacts
           retention-days: 30
           path: dist/
+          if-no-files-found: error
+
+  draft-release:
+    name: Create draft release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # only this job, which runs no project code, can write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Bridle $TAG" --generate-notes
