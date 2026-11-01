@@ -97,7 +97,8 @@ connection to it:
 
 - while a terminal tab to the host is open, including in the background (the *Bridle is
   connected* notification shows this), status is checked about every 45 seconds, and every
-  5 seconds while Bridle is on screen;
+  5 seconds while Bridle is on screen (less often, up to every 5 minutes, while checks on a host
+  keep failing);
 - while the Sessions tab is showing the host.
 
 When you close your tabs (or tap **Disconnect all**), notifications stop. Android may also stop

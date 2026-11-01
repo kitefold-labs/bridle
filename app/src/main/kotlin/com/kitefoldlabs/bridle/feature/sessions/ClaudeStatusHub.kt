@@ -49,6 +49,8 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /** Whether the user can see the app (any activity started), which sets how often hosts are polled. */
 class AppVisibility(
@@ -240,17 +242,19 @@ class ClaudeStatusHub
                         )
                     launch { monitor.events.collect { notify(it) } }
                     var reprobe = true
+                    var failures = 0
                     while (true) {
-                        poll(tmux, monitor, reprobe)
-                        reprobe = awaitNextRound()
+                        failures = if (poll(tmux, monitor, reprobe)) 0 else failures + 1
+                        reprobe = awaitNextRound(failures)
                     }
                 }
 
+            /** One round; false if it failed. */
             private suspend fun poll(
                 tmux: TmuxController,
                 monitor: ClaudeStatusMonitor,
                 reprobe: Boolean,
-            ) {
+            ): Boolean =
                 try {
                     val useHelper = settings.settings.first().useHelperByDefault
                     claudeSessions =
@@ -278,39 +282,44 @@ class ClaudeStatusHub
                             )
                         }
                     }
+                    true
                 } catch (e: CancellationException) {
                     throw e
                 } catch (
                     @Suppress("TooGenericExceptionCaught") e: Exception,
                 ) {
                     status.update { it.copy(loaded = true, error = e.describe()) }
+                    false
                 }
-            }
 
+            /** The last lines of up to [MAX_PREVIEWS] sessions, fetched in one round trip. */
             private suspend fun previews(
                 tmux: TmuxController,
                 sessions: List<SessionSummary>,
-            ): Map<String, String> =
-                sessions.take(MAX_PREVIEWS).associate { summary ->
-                    val name = summary.session.name
-                    val screen =
-                        try {
-                            tmux.preview(name, PREVIEW_LINES)
-                        } catch (_: RemoteCommandException) {
-                            "" // the session ended since it was listed
-                        }
-                    name to lastLines(screen)
-                }
+            ): Map<String, String> {
+                val names = sessions.take(MAX_PREVIEWS).map { it.session.name }
+                val screens =
+                    try {
+                        tmux.previews(names, PREVIEW_LINES)
+                    } catch (_: RemoteCommandException) {
+                        emptyMap() // tmux stopped since it listed them: no previews this round
+                    }
+                // A session Bridle can't target (or that ended since it was listed) has no preview.
+                return names.associateWith { lastLines(screens[it].orEmpty()) }
+            }
 
             /**
              * Waits out the poll interval, ending early when a refresh is asked for (returns true:
              * re-probe) or the app is shown or hidden. A refresh is only taken when it ends the wait,
-             * so none is lost.
+             * so none is lost. After [failures] failed rounds in a row the wait doubles each time, up
+             * to [MAX_BACKOFF], so a host that keeps failing (tmux gone, a stuck server) is not hit
+             * every 5 seconds.
              */
-            private suspend fun awaitNextRound(): Boolean =
+            private suspend fun awaitNextRound(failures: Int): Boolean =
                 coroutineScope {
                     val visible = visibility.isVisible.value
-                    val interval = if (visible) PollMode.FOREGROUND.interval else PollMode.BACKGROUND.interval
+                    val interval =
+                        backoff(if (visible) PollMode.FOREGROUND.interval else PollMode.BACKGROUND.interval, failures)
                     val flipped = async { visibility.isVisible.first { it != visible } }
                     try {
                         withTimeoutOrNull(interval) {
@@ -334,6 +343,17 @@ class ClaudeStatusHub
             const val MAX_PREVIEWS: Int = 12
 
             private const val CLAUDE = "claude"
+
+            /** The longest wait between rounds while a host keeps failing. */
+            val MAX_BACKOFF: Duration = 5.minutes
+
+            private const val MAX_DOUBLINGS = 6
+
+            /** [interval] doubled for each of [failures] (up to [MAX_BACKOFF]). */
+            fun backoff(
+                interval: Duration,
+                failures: Int,
+            ): Duration = (interval * (1 shl failures.coerceIn(0, MAX_DOUBLINGS))).coerceAtMost(MAX_BACKOFF)
 
             /** The settings toggle that governs notifications about [state], if any. */
             fun notificationEvent(state: ClaudeState): NotificationEvent? =

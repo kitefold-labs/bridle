@@ -41,6 +41,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -92,7 +93,9 @@ class ClaudeStatusHubTest {
     fun `observing a host reports its connection, capabilities, sessions and previews`() =
         runBlocking<Unit> {
             host.helper = "bridle-helper 1"
-            host.sessions = listOf(FakeSession("api", command = "claude"), FakeSession("logs"))
+            // "my notes" was made outside Bridle: tmux allows the name, Bridle can't target it.
+            host.sessions =
+                listOf(FakeSession("api", command = "claude"), FakeSession("logs"), FakeSession("my notes"))
             host.helperStates = state("api", "working", 10)
             host.screens = mapOf("api" to "one\n\n  two  \nthree\nfour\n\n")
             val id = world.addHost()
@@ -101,13 +104,17 @@ class ClaudeStatusHubTest {
             val status = seen.last()
             status.connection.shouldBeInstanceOf<HostConnectionState.Connected>()
             status.probe!!.helperVersion shouldBe 1
-            status.sessions.map { it.session.name }.toSet() shouldBe setOf("api", "logs")
+            status.sessions.map { it.session.name }.toSet() shouldBe setOf("api", "logs", "my notes")
             status.sessions
                 .first { it.session.name == "api" }
                 .claude!!
                 .source shouldBe StatusSource.HOOKS
-            status.previews shouldBe mapOf("api" to "  two\nthree\nfour", "logs" to "")
+            status.previews shouldBe mapOf("api" to "  two\nthree\nfour", "logs" to "", "my notes" to "")
             status.error shouldBe null
+            // Every preview in one round trip, not one exec per session.
+            val captures = host.scriptsContaining("capture-pane")
+            captures.first() shouldContain "'=api:'"
+            captures.first() shouldContain "'=logs:'"
             job.cancel()
             awaitUntil { runBlocking { world.connections.activeHosts() }.isEmpty() }
         }
@@ -295,5 +302,10 @@ class ClaudeStatusHubTest {
         IllegalStateException().describe() shouldBe "IllegalStateException"
         ClaudeStatusHub.lastLines("") shouldBe ""
         ClaudeStatusHub.lastLines("a\nb\nc\nd") shouldBe "b\nc\nd"
+        ClaudeStatusHub.backoff(5.seconds, 0) shouldBe 5.seconds
+        ClaudeStatusHub.backoff(5.seconds, 1) shouldBe 10.seconds
+        ClaudeStatusHub.backoff(5.seconds, 3) shouldBe 40.seconds
+        ClaudeStatusHub.backoff(45.seconds, 2) shouldBe 180.seconds
+        ClaudeStatusHub.backoff(45.seconds, 40) shouldBe ClaudeStatusHub.MAX_BACKOFF
     }
 }

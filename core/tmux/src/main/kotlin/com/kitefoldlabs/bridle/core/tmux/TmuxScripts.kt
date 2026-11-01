@@ -30,6 +30,7 @@ public object TmuxScripts {
         "command -v tmux >/dev/null 2>&1 || { echo 'tmux is not installed' >&2; exit $NO_TMUX_EXIT; }"
 
     private val keyName = Regex("^(?:[CMS]-)*[A-Za-z0-9]+$|^[!-~]$")
+    private val captureMarker = Regex("^@@[A-Za-z0-9_]+@@$")
 
     private val sessionFormat =
         listOf("session_name", "session_created", "session_attached", "session_activity", "session_windows")
@@ -71,6 +72,31 @@ public object TmuxScripts {
         requireValid(Validators.sessionName(session))
         require(lines in 1..MAX_PREVIEW_LINES) { "lines must be in 1..$MAX_PREVIEW_LINES" }
         return script(REQUIRE_TMUX, tmux("capture-pane", "-p", "-J", "-t", pane(session), "-S", "-$lines"))
+    }
+
+    /**
+     * The last [lines] lines of the active pane of each of [sessions], in one round trip (status
+     * polling would otherwise open a channel per session). Each capture follows a line of
+     * [marker], a space and the session name; a session that vanished has an empty capture.
+     * [marker] should be unpredictable (see [TmuxController.previews]), so pane text cannot fake
+     * another session's capture.
+     */
+    public fun capturePanes(
+        sessions: List<String>,
+        lines: Int,
+        marker: String,
+    ): String {
+        sessions.forEach { requireValid(Validators.sessionName(it)) }
+        require(lines in 1..MAX_PREVIEW_LINES) { "lines must be in 1..$MAX_PREVIEW_LINES" }
+        require(captureMarker.matches(marker)) { "Invalid marker: $marker" }
+        val captures =
+            sessions.flatMap { session ->
+                listOf(
+                    "echo ${ShellQuote.quote("$marker $session")}",
+                    "${tmux("capture-pane", "-p", "-J", "-t", pane(session), "-S", "-$lines")} 2>/dev/null || true",
+                )
+            }
+        return script(listOf(REQUIRE_TMUX) + captures)
     }
 
     /**

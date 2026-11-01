@@ -160,10 +160,7 @@ class ScriptedHost : SshConnection {
                     if (failPreview) {
                         return ExecResult(1, "", "can't find session")
                     } else {
-                        screens.entries
-                            .firstOrNull { "=${it.key}:" in script }
-                            ?.value
-                            .orEmpty()
+                        captures(script)
                     }
                 "bridle-helper' list" in script || "bridle-helper list" in script -> helperStates
                 "echo restarted" in script -> "restarted\n"
@@ -171,6 +168,21 @@ class ScriptedHost : SshConnection {
                 else -> ""
             }
         return ExecResult(0, out, "")
+    }
+
+    /** One pane's [screens] entry, or for a batched capture each `<marker> <session>` line followed by its screen. */
+    private fun captures(script: String): String {
+        val batched = Regex("""echo '(@@\w+@@) (\S+)'""").findAll(script).toList()
+        if (batched.isEmpty()) {
+            return screens.entries
+                .firstOrNull { "=${it.key}:" in script }
+                ?.value
+                .orEmpty()
+        }
+        return batched.joinToString("") { match ->
+            val (marker, session) = match.destructured
+            "$marker $session\n${screens[session].orEmpty()}\n"
+        }
     }
 
     override suspend fun openShell(

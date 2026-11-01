@@ -6,9 +6,11 @@ import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -23,6 +25,7 @@ import kotlin.time.Duration
 class FixedResult(
     private val result: ExecResult,
 ) : SshConnection {
+    val scripts = mutableListOf<String>()
     override val state = MutableStateFlow(ConnectionState.CONNECTED)
 
     override suspend fun exec(
@@ -33,7 +36,10 @@ class FixedResult(
     override suspend fun runScript(
         script: String,
         timeout: Duration,
-    ) = result
+    ): ExecResult {
+        scripts += script
+        return result
+    }
 
     override suspend fun openShell(
         pty: PtySpec,
@@ -249,6 +255,36 @@ class TmuxUnitTest {
         helper("hook").first shouldBe 2
         helper("bogus").first shouldBe 2
     }
+
+    @Test
+    fun `batched captures target each session exactly and split on the marker`() {
+        val marker = "@@BRIDLE_CAPTURE_00ff@@"
+        val script = TmuxScripts.capturePanes(listOf("api", "web"), 12, marker)
+        script shouldContain "echo '$marker api'\ntmux capture-pane -p -J -t '=api:' -S -12 2>/dev/null || true"
+        script shouldContain "-t '=web:'"
+        shouldThrow<IllegalArgumentException> { TmuxScripts.capturePanes(listOf("api", "my session"), 12, marker) }
+        shouldThrow<IllegalArgumentException> { TmuxScripts.capturePanes(listOf("api"), 0, marker) }
+        shouldThrow<IllegalArgumentException> { TmuxScripts.capturePanes(listOf("api"), 12, "'; reboot; '") }
+
+        val output = "noise before\n$marker api\none\ntwo\n$marker web\n$marker docs\n> \n"
+        TmuxParsers.parseCaptures(output, marker) shouldBe
+            mapOf("api" to "one\ntwo\n", "web" to "", "docs" to "> \n\n")
+        // A pane that prints a marker it can't know is just text.
+        TmuxParsers.parseCaptures("$marker api\n@@BRIDLE_CAPTURE_1234@@ web\n", marker) shouldBe
+            mapOf("api" to "@@BRIDLE_CAPTURE_1234@@ web\n\n")
+    }
+
+    @Test
+    fun `controller batches previews and skips names it cannot target`() =
+        runBlocking<Unit> {
+            val host = FixedResult(ExecResult(0, "", ""))
+            val tmux = TmuxController(host)
+            tmux.previews(listOf("my session", "a.b")) shouldBe emptyMap()
+            host.scripts.shouldBeEmpty()
+            tmux.previews(listOf("api", "my session"), lines = 5) shouldBe emptyMap()
+            host.scripts.single() shouldContain "-t '=api:' -S -5"
+            host.scripts.single() shouldNotContain "my session"
+        }
 
     @Test
     fun `parser edge cases`() {
