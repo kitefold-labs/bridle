@@ -5,12 +5,14 @@ import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -314,6 +316,30 @@ class SettingsScreenTest {
         rule.runOnIdle { backup.exportTo(Uri.parse("content://docs/orphan")) }
         waitForText("so nothing was saved")
         documents.deleted shouldContain "content://docs/orphan"
+    }
+
+    @Test
+    fun `typed passphrases are never put in the saved instance state`() {
+        val vm =
+            BackupViewModel(
+                data.backup,
+                documents,
+                Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
+                Dispatchers.Default,
+            ) {
+                0L
+            }
+        val restoration = StateRestorationTester(rule)
+        restoration.setContent { TestHost(results, uris) { BackupSection(vm) } }
+        rule.onNodeWithText("Export encrypted backup").performClick()
+        val typed = "a long passphrase"
+        rule.onAllNodes(hasSetTextAction())[0].performTextInput(typed)
+        val masked = hasSetTextAction() and hasText("•".repeat(typed.length))
+        rule.onNode(masked).assertExists()
+        // Saving and restoring state, as when Android recreates the activity or the process.
+        restoration.emulateSavedInstanceStateRestore()
+        rule.onNodeWithText("Choose a long passphrase", substring = true).assertExists() // still open
+        rule.onAllNodes(masked).assertCountEquals(0)
     }
 
     @Test
