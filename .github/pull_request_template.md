@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] Tests added/updated; `./gradlew check koverVerify` passes (≥ 95% lines and branches)
+- [ ] Tests added/updated; `./gradlew check koverVerifyBridle` passes (≥ 95% lines and branches)
 - [ ] No new coverage exclusions (or justified below)
 - [ ] Remote commands use `ShellQuote` + `Validators`; no secrets in logs/errors
 - [ ] Docs/tutorials updated if behaviour changed

@@ -1,11 +1,13 @@
 pluginManagement {
     includeBuild("build-logic")
     repositories {
-        google {
-            content {
+        exclusiveContent {
+            forRepository { google() }
+            filter {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("androidx.*")
                 includeGroupByRegex("com\\.google\\.android.*")
+                includeGroup("com.google.testing.platform")
             }
         }
         mavenCentral()
@@ -16,11 +18,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google {
-            content {
+        exclusiveContent {
+            forRepository { google() }
+            filter {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("androidx.*")
                 includeGroupByRegex("com\\.google\\.android.*")
+                includeGroup("com.google.testing.platform")
             }
         }
         mavenCentral()
@@ -35,3 +39,4 @@ include(":core:tmux")
 include(":core:session")
 include(":core:terminal")
 include(":core:backup")
+include(":core:security")
