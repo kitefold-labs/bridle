@@ -195,27 +195,55 @@ interface SshConnection : Closeable {
 
 ## 6. Keys & security (`:core:security`)
 
-- **Generation:** `KeyPairGenerator("EC", "AndroidKeyStore")` with P-256,
-  using StrongBox when available and the TEE otherwise. Ed25519 is offered
-  only when `FEATURE_HARDWARE_KEYSTORE` is at version 200 or higher
-  (KeyMint Curve25519). RSA-3072 with `rsa-sha2-256/512` is available for old
-  servers.
-- **Signing:** a `KeyStoreSigner` gives the SSH library a signature callback.
-  The private key object stays opaque. **The first spike validates this**:
-  sshj prefers BouncyCastle for signatures, so we route Keystore keys through
-  the platform provider ourselves.
+- **Generation:** `KeyPairGenerator("EC", "AndroidKeyStore")` with P-256 by
+  default (`PURPOSE_SIGN`, one alias per identity: `bridle-key-<uuid>`). P-256
+  keys use StrongBox when available; if StrongBox refuses the key, generation
+  falls back to the TEE. P-384 is also offered (TEE only). Ed25519 is offered
+  only on Android 13+ when `FEATURE_HARDWARE_KEYSTORE` is at version 200 or
+  higher (KeyMint Curve25519). RSA-3072 (PKCS#1 padding, SHA-256/512 only, so
+  `rsa-sha2-256/512` but never SHA-1 `ssh-rsa`) is available for old servers.
+- **Signing:** `KeystoreKeyManager.signer()` returns a `JcaSshKeySigner` with no
+  explicit provider, so the JCA picks `AndroidKeyStore` for the opaque private
+  key; sshj only ever sees the public key (`SignerAuthMethod`).
 - **Import:** the user pastes an OpenSSH private key or picks one with the
   Storage Access Framework, in OpenSSH or PEM format: Ed25519, ECDSA or RSA,
-  with or without a passphrase. The passphrase is asked for once to decrypt the
-  key and is then discarded. The key bytes are re-encrypted with Tink AEAD
-  (AES-256-GCM); the Tink keyset is wrapped by a Keystore master key. At
-  connect time the key is decrypted into memory for the signature, then the
-  buffers are cleared. Biometric gating uses the master key's user-auth
-  setting. Imported keys can never be exported again, and the UI labels them
-  "software key" as opposed to "hardware key".
+  with or without a passphrase (DSA, FIDO `sk-*` keys and PuTTY files are
+  rejected). The passphrase is a `CharArray`, used once to decrypt the key and
+  then zeroed. The key bytes (PKCS#8) are re-encrypted with Tink AEAD
+  (AES-256-GCM); the associated data is the identity's public-key blob, so a
+  ciphertext can't be swapped onto another identity. The Tink keyset is wrapped
+  by a Keystore master key (`android-keystore://bridle_master_key`); if the
+  Keystore is unusable the vault refuses to store keys rather than accept Tink's
+  cleartext-keyset fallback. The caller persists the returned ciphertext with
+  the identity. At connect time the key is decrypted into memory for each
+  signature, then the buffers are cleared (best effort). Imported keys can never
+  be exported again, and the UI labels them "software key" as opposed to
+  "hardware key".
 - **User auth:** optional per key. Either "require biometric, valid for N
   minutes" (good for reconnects) or "every signature" (BiometricPrompt with a
-  `CryptoObject(Signature)`).
+  `CryptoObject`). The Keystore enforces it in both cases, so a patched or
+  hooked app process can't skip the prompt:
+  - Hardware keys are generated with `setUserAuthenticationRequired`. Per-use
+    keys sign through a `CryptoObject(Signature)`; when a time-bound unlock has
+    expired, signing throws `UserNotAuthenticatedException`, and `GatedSigner`
+    prompts and retries once.
+  - Imported keys that require auth get their own Keystore RSA-OAEP *wrapping
+    key* (`bridle-wrap-<uuid>`, `PURPOSE_DECRYPT`, same auth parameters). The
+    PKCS#8 bytes are encrypted with a random AES-256-GCM data key, the data key
+    is wrapped with the wrapping key's public half (so importing never
+    prompts), and the result is sealed by the vault's Tink AEAD as before
+    (format `2`, header bound into the associated data). Signing unwraps the
+    data key in the Keystore: per-use keys prompt with a `CryptoObject(Cipher)`
+    for the unwrapping cipher, time-bound keys prompt when the Keystore reports
+    the window expired. A per-key wrapping key is used because an auth-bound
+    master key would lock the whole vault, not one key. Deleting the identity
+    must call `ImportedKeyVault.delete` to remove its wrapping key; a biometric
+    enrolment change invalidates it, and the key must be imported again.
+  - The prompt is app-enforced in exactly two cases: the plain (no
+    `CryptoObject`) prompt that renews a time-bound window, where the
+    Keystore still refuses the key operation without it; and an imported key
+    stored without a wrapping key (format `1`) whose identity was later set to
+    require auth, which is gated by Bridle until the key is imported again.
 - **Public key UX:** show the `ecdsa-sha2-nistp256 AAAA… comment` line, with
   copy, share and QR. **Install on host** logs in once with a password and
   runs an idempotent append to `~/.ssh/authorized_keys` with the right
