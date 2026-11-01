@@ -6,10 +6,10 @@ Step-by-step guides for using the app.
 
 1. [First connection](tutorials/01-first-connection.md): create a key, add a
    host, install the key, connect.
-2. [Claude in tmux](tutorials/02-claude-in-tmux.md): Launch Profiles, attach,
-   restart with `--continue`, notifications.
-3. [The terminal on a phone](tutorials/03-terminal-on-a-phone.md): the
-   extra-keys bar, compose box, paste, zoom and selection.
+2. [Claude in tmux](tutorials/02-claude-in-tmux.md): Launch Profiles, the
+   terminal's key bar and compose box, attach, restart with `--continue`.
+3. [Claude status and notifications](tutorials/03-claude-status-notifications.md):
+   the Sessions screen, status badges, the host helper, Approve / Deny.
 4. [Files and port forwards](tutorials/04-files-and-forwards.md): SFTP,
    transfers, the editor, local and SOCKS forwards.
 5. [Backups and a new phone](tutorials/05-backup-and-new-phone.md):
