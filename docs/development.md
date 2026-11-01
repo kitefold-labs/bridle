@@ -66,7 +66,8 @@ Commit hooks are fast: hygiene checks, secret scanning, ktlint. The pre-push hoo
 | `:core:session` | JVM | Shared per-host connections and reconnects, terminal tabs, Claude status monitor |
 | `:core:terminal` | JVM | Key encoding, bracketed-paste sanitising, key-bar layouts, compose history |
 | `:core:backup` | JVM | Encrypted configuration backups, import merge planning, scrubbed crash reports |
-| `:core:*` / `:feature:*` (Android) | Android | Keystore, Room, terminal UI, screens, service |
+| `:core:data` | Android | Room database, repositories, known-hosts store, backup import/export, DataStore settings |
+| `:core:*` / `:feature:*` (Android) | Android | Keystore, terminal UI, screens, service |
 
 Logic lives in JVM modules wherever possible: they are fast to test and easy to cover. Android
 modules stay thin.
