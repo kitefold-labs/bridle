@@ -95,6 +95,10 @@ public class AndroidKeyStoreBackend(
             throw KeyGenerationException("Keystore key generation failed", e)
         } catch (e: ProviderException) {
             throw KeyGenerationException("Keystore key generation failed", e)
+        } catch (e: IllegalStateException) {
+            // How the Keystore reports a key that needs user authentication on a device with no
+            // screen lock, or a per-use key with no biometric enrolled.
+            throw KeyGenerationException("Keystore key generation failed", e)
         }
     }
 

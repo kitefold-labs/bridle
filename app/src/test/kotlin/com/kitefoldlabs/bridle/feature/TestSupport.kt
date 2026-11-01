@@ -46,7 +46,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.security.KeyPair
 import java.security.KeyPairGenerator
-import java.security.KeyStoreException
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.spec.ECGenParameterSpec
@@ -102,7 +101,9 @@ class SoftwareBackend(
 ) : KeyStoreBackend {
     val keys = linkedMapOf<String, KeyPair>()
     var failGeneration = false
-    var failDelete = false
+
+    /** Thrown by [delete] when set. */
+    var deleteFailure: Exception? = null
 
     override fun generateKeyPair(
         alias: String,
@@ -119,7 +120,7 @@ class SoftwareBackend(
     override fun publicKey(alias: String): PublicKey? = keys[alias]?.public
 
     override fun delete(alias: String) {
-        if (failDelete) throw KeyStoreException("locked")
+        deleteFailure?.let { throw it }
         keys.remove(alias)
     }
 

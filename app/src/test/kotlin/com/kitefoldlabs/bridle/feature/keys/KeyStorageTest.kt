@@ -41,6 +41,8 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.security.GeneralSecurityException
+import java.security.KeyStoreException
+import java.security.ProviderException
 import java.security.Signature
 import javax.crypto.Cipher
 
@@ -121,17 +123,37 @@ class KeyStorageTest {
                 )
             }
             backend.keys.size shouldBe 0
+            // An imported key that can't be saved doesn't leave its Keystore wrapping key behind.
+            shouldThrow<IllegalArgumentException> {
+                library.import(TestKeys.pkcs8Pem().toCharArray(), null, " ", UserAuthPolicy.PerUse)
+            }
+            wrapping.keys.size shouldBe 0
         }
 
     @Test
-    fun `keystore errors while deleting are tolerated`() =
+    fun `keystore errors while deleting are tolerated, and the orphan removed later`() =
         runBlocking<Unit> {
-            val id = library.generate("Pixel", KeyAlgorithm.ECDSA_P256, UserAuthPolicy.None)
-            backend.failDelete = true
-            library.delete(env.data.identities.get(id)!!)
-            env.data.identities
-                .get(id)
-                .shouldBeNull()
+            for (failure in listOf(KeyStoreException("locked"), ProviderException("keystore daemon died"))) {
+                val id = library.generate("Pixel", KeyAlgorithm.ECDSA_P256, UserAuthPolicy.None)
+                backend.deleteFailure = failure
+                library.delete(env.data.identities.get(id)!!)
+                env.data.identities
+                    .get(id)
+                    .shouldBeNull()
+                backend.deleteFailure = null
+            }
+            backend.keys.size shouldBe 2 // left behind for now
+            // The app died between generating a key and saving it.
+            keystore.createIdentity("never saved")
+            val kept = library.generate("Kept", KeyAlgorithm.ECDSA_P256, UserAuthPolicy.None)
+            val other = library.generate("Other", KeyAlgorithm.ECDSA_P256, UserAuthPolicy.None)
+            library.delete(env.data.identities.get(other)!!)
+            backend.keys.keys shouldBe
+                setOf(
+                    env.data.identities
+                        .get(kept)!!
+                        .keystoreAlias,
+                )
         }
 
     @Test

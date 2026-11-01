@@ -10,14 +10,22 @@ import com.kitefoldlabs.bridle.core.security.KeyFileInfo
 import com.kitefoldlabs.bridle.core.security.KeystoreKeyManager
 import com.kitefoldlabs.bridle.core.security.UserAuthPolicy
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.GeneralSecurityException
+import java.security.ProviderException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Creates, imports and deletes identities, keeping the Keystore, the imported-key vault and the
  * database in step. Key operations run on the I/O dispatcher (RSA generation takes seconds).
+ *
+ * Generating and deleting are serialised: deleting also removes Keystore keys that no identity
+ * refers to (left behind when the app died between generating a key and saving it, or when an
+ * earlier delete failed), and must not mistake a key being generated for one of those.
  */
 @Singleton
 class KeyLibrary
@@ -27,6 +35,8 @@ class KeyLibrary
         private val keystore: KeystoreKeyManager,
         private val vault: ImportedKeyVault,
     ) {
+        private val keystoreLock = Mutex()
+
         /** Algorithms this device can generate, default first. */
         fun availableAlgorithms(): List<KeyAlgorithm> = keystore.availableAlgorithms()
 
@@ -41,15 +51,17 @@ class KeyLibrary
             userAuth: UserAuthPolicy,
         ): EntityId =
             withContext(Dispatchers.IO) {
-                val identity = keystore.createIdentity(label, algorithm, userAuth)
-                try {
-                    identities.insert(identity)
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") e: Exception,
-                ) {
-                    // Don't leave an unreachable key behind in the Keystore.
-                    keystore.delete(identity)
-                    throw e
+                keystoreLock.withLock {
+                    val identity = keystore.createIdentity(label, algorithm, userAuth)
+                    try {
+                        identities.insert(identity)
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") e: Exception,
+                    ) {
+                        // Don't leave an unreachable key behind in the Keystore.
+                        keystore.delete(identity)
+                        throw e
+                    }
                 }
             }
 
@@ -75,12 +87,21 @@ class KeyLibrary
         ): EntityId =
             withContext(Dispatchers.IO) {
                 val imported = vault.import(keyText, passphrase, label, comment = null, userAuth = userAuth)
-                identities.insert(imported.identity, imported.encryptedKey)
+                try {
+                    identities.insert(imported.identity, imported.encryptedKey)
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    // Don't leave the key's Keystore wrapping key behind.
+                    deleteQuietly { vault.delete(imported.identity, imported.encryptedKey) }
+                    throw e
+                }
             }
 
         /**
          * Deletes [identity] and its Keystore entry: the signing key of a hardware key, or the
-         * wrapping key of an imported key that requires user authentication.
+         * wrapping key of an imported key that requires user authentication. The identity is
+         * deleted even if the Keystore fails; its hardware key is then removed by a later delete.
          */
         suspend fun delete(identity: Identity) {
             withContext(Dispatchers.IO) {
@@ -92,17 +113,31 @@ class KeyLibrary
                     } else {
                         null
                     }
-                identities.delete(identity.id)
-                try {
+                keystoreLock.withLock {
+                    identities.delete(identity.id)
                     when {
-                        identity.source == KeySource.KEYSTORE -> keystore.delete(identity)
-                        encrypted != null -> vault.delete(identity, encrypted)
+                        identity.source == KeySource.KEYSTORE -> deleteQuietly { keystore.delete(identity) }
+                        encrypted != null -> deleteQuietly { vault.delete(identity, encrypted) }
                     }
-                } catch (ignored: GeneralSecurityException) {
-                    // The entry is unreachable either way; nothing refers to it any more.
-                } catch (ignored: IllegalArgumentException) {
-                    // A stored public key that no longer parses: no wrapping key can be identified.
+                    val remaining = identities.observeAll().first()
+                    deleteQuietly { keystore.orphanedAliases(remaining).forEach(keystore::deleteAlias) }
                 }
+            }
+        }
+
+        /**
+         * Runs a Keystore deletion, ignoring its failure: the entry is unreachable either way, as
+         * nothing refers to it any more.
+         */
+        private inline fun deleteQuietly(delete: () -> Unit) {
+            try {
+                delete()
+            } catch (ignored: GeneralSecurityException) {
+                // KeyStoreException and the like.
+            } catch (ignored: ProviderException) {
+                // The Keystore daemon failing; Android reports that as a RuntimeException.
+            } catch (ignored: IllegalArgumentException) {
+                // A stored public key that no longer parses: no wrapping key can be identified.
             }
         }
     }
