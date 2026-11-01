@@ -91,37 +91,62 @@ host-helper/              POSIX sh helper + hook installer (shipped as an app as
 
 ## 4. Data model (Room)
 
+`:core:data` holds one Room database (`bridle.db`, schema version 1, exported to
+`core/data/schemas/` and committed). Tables mirror the `:core:model` types; repositories map
+between them, so the domain model carries no persistence annotations. Enums are stored by
+name; `tags` and `env` are sorted JSON text.
+
 ```kotlin
-Host(id, label, hostname, port=22, username, identityId?, jumpHostId?,
-     groupId?, tags, color, keepAliveSec=30, defaultTmuxSession?, // null = plain shell
-     startupCommand?, env: Map, terminalProfileId?, lastConnectedAt)
+hosts(id, label, hostname, port=22, username,
+      identityId? → identities  ON DELETE SET NULL,
+      jumpHostId? → hosts       ON DELETE SET NULL,
+      groupId?    → host_groups ON DELETE SET NULL,
+      tags: Set, color?, favorite, keepAliveSeconds=30,
+      defaultTmuxSession?,       // null = plain shell
+      startupCommand?, env: Map, lastConnectedAt?)
 
-Identity(id, alias, source /*KEYSTORE|IMPORTED*/,
-         keystoreAlias?,                 // KEYSTORE: hardware key handle
-         encryptedKeyFile?,              // IMPORTED: AEAD ciphertext of the OpenSSH key
-         algorithm /*ECDSA_P256|ED25519|RSA_3072|…*/,
-         publicKeyOpenSsh, requireUserAuth, authValiditySec, createdAt)
+identities(id, alias, source /*KEYSTORE|IMPORTED*/,
+           keystoreAlias? UNIQUE,     // KEYSTORE: hardware key handle
+           algorithm /*ECDSA_P256|ECDSA_P384|ECDSA_P521|ED25519|RSA*/,
+           publicKeyOpenSsh, requireUserAuth, authValiditySeconds, createdAt,
+           encryptedPrivateKey? BLOB) // IMPORTED: AEAD ciphertext, never loaded by list queries
 
-KnownHost(host, port, keyType, publicKey, fingerprintSha256, addedAt, lastSeenAt)
+known_hosts(host, port, keyType, publicKeyBase64, fingerprintSha256, addedAt, lastSeenAt)
+           // PRIMARY KEY (host, port, keyType); host lower-cased, IPv6 brackets stripped
 
-Group(id, name, color, defaultIdentityId?, defaultUsername?)
+host_groups(id, name, color?, defaultIdentityId? → identities ON DELETE SET NULL, defaultUsername?)
 
-LaunchProfile(id, hostId, name, sessionName, workingDir, command,
-              restartMode /*RESPAWN_CONTINUE|RESPAWN_FRESH|SEND_KEYS*/,
-              restartCommand?, env: Map, mode /*SHELL_HOSTED|DIRECT*/,
-              icon, pinned)
+launch_profiles(id, hostId → hosts ON DELETE CASCADE, name, sessionName, workingDir, command,
+                restartMode /*RESPAWN_CONTINUE|RESPAWN_FRESH|SEND_KEYS*/,
+                restartCommand?, env: Map, mode /*SHELL_HOSTED|DIRECT*/, pinned)
 
-Snippet(id, name, body, variables: List<Var>, packageId?, runMode /*PASTE|EXEC*/)
+snippets(id, name, body, runMode /*PASTE|EXEC*/, packageName?)  // variables are parsed from body
 
-PortForward(id, hostId, type /*LOCAL|DYNAMIC|REMOTE*/, bindPort, destHost?, destPort?, autoStart)
-TerminalProfile(id, fontFamily, fontSize, theme, cursorStyle, keyBarLayoutId)
-KeyBarLayout(id, rows: List<List<KeySpec>>)        // Termux-style, JSON-encoded
+port_forwards(id, hostId → hosts ON DELETE CASCADE, type /*LOCAL|DYNAMIC*/,
+              bindPort, destHost?, destPort?, autoStart)
+
+compose_history(hostId → hosts ON DELETE CASCADE, position, text)
+               // PRIMARY KEY (hostId, position); 0 = most recent, one row per entry
 ```
+
+Every foreign-key column is indexed. Writes never use `REPLACE` on referenced rows (it deletes
+first and would fire the cascades); updates use `@Upsert` or `@Update`. A trusted host key is
+never overwritten by an insert: replacing one is an explicit, separate operation.
+
+Terminal appearance and app preferences are not tables: they live in a DataStore
+(`bridle_settings.preferences_pb`) as the `Settings` type: theme (system / light / dark /
+dynamic), terminal font size and font id, the key-bar layout (Termux-style JSON, validated
+with `KeyBarLayout.parse`, falling back to the default), Backspace mode, app lock, FLAG_SECURE,
+keep-screen-on, notifications (master switch plus one toggle per event), crash-report opt-in,
+and whether to use bridle-helper.
 
 **The database holds no plaintext secrets.** Generated private keys live
 only in the Keystore. Imported keys are stored only as ciphertext, encrypted
 with a key that never leaves the Keystore. Passwords are typed once, used only
-to install a key, and never stored.
+to install a key, and never stored. The one exception is user-typed text: compose-box history
+records what the user submitted, which may include something secret. It is kept per host,
+deleted with the host, never exported in backups, and can be cleared per entry, per host or
+entirely.
 The DB is excluded from Android cloud backup (`dataExtractionRules`). Users
 back up with an explicit, passphrase-encrypted export instead.
 
