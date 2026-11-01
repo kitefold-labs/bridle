@@ -18,10 +18,10 @@ import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -30,9 +30,13 @@ import com.kitefoldlabs.bridle.R
 import kotlinx.coroutines.launch
 
 /**
- * Shows [content], covered by a lock screen while app lock is on and the app is locked. The
- * content stays composed underneath (so navigation state survives) but is hidden from touch and
- * accessibility services until the user unlocks.
+ * Shows [content] only while the app is unlocked (or app lock is off), and a lock screen instead.
+ *
+ * While locked the content is not composed at all. Covering it is not enough: dialogs, menus and
+ * the keyboard are separate windows that would stay above the lock screen, and a focused text
+ * field or terminal would still receive key presses. Its saveable state (the navigation back
+ * stack, open dialogs, scroll positions) is kept by a [rememberSaveableStateHolder] and restored
+ * on unlock; ViewModels are unaffected.
  */
 @Composable
 fun AppLockGate(
@@ -43,16 +47,17 @@ fun AppLockGate(
     val screen by viewModel.screen.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_START) @DontMemoize { viewModel.onForeground() }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) @DontMemoize { viewModel.onBackground() }
-    val covered = screen != LockScreen.UNLOCKED
+    val saved = rememberSaveableStateHolder()
     Box(Modifier.fillMaxSize()) {
-        Box(if (covered) Modifier.clearAndSetSemantics {} else Modifier) { content() }
         when (screen) {
             LockScreen.PENDING -> Surface(Modifier.fillMaxSize()) {}
             LockScreen.LOCKED -> LockScreenContent(unlocker, @DontMemoize { viewModel.unlock() })
-            LockScreen.UNLOCKED -> Unit
+            LockScreen.UNLOCKED -> saved.SaveableStateProvider(CONTENT_KEY, content)
         }
     }
 }
+
+private const val CONTENT_KEY = "app"
 
 @Composable
 private fun LockScreenContent(

@@ -2,9 +2,12 @@ package com.kitefoldlabs.bridle.feature.settings
 
 import android.app.Application
 import androidx.activity.ComponentActivity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -57,6 +60,38 @@ class GatesUiTest {
         rule.onNodeWithText("Unlock").performClick()
         waitForText("secret content")
         rule.onNodeWithText("Bridle is locked").assertDoesNotExist()
+    }
+
+    @Test
+    fun `relocking removes the app, dialogs included, and unlocking restores its saved state`() {
+        runBlocking { data.settings.setAppLockEnabled(true) }
+        var now = 0L
+        val lock = AppLock(timeoutMillis = 1_000) { now }.apply { unlock() }
+        val answers = ArrayDeque(listOf(false, true))
+        val vm = AppLockViewModel(data.settings, lock) { true }
+        rule.setContent {
+            AppLockGate(vm, unlocker = { answers.removeFirst() }) {
+                var open by rememberSaveable { mutableStateOf(false) }
+                if (open) {
+                    AlertDialog(onDismissRequest = {}, confirmButton = {}, text = { Text("dialog secret") })
+                } else {
+                    Button(onClick = { open = true }) { Text("open dialog") }
+                }
+            }
+        }
+        waitForText("open dialog")
+        rule.onNodeWithText("open dialog").performClick()
+        waitForText("dialog secret")
+        rule.runOnIdle {
+            vm.onBackground()
+            now = 5_000
+            vm.onForeground()
+        }
+        waitForText("Bridle is locked")
+        // A dialog is its own window: an overlay could not have covered it.
+        rule.onNodeWithText("dialog secret").assertDoesNotExist()
+        rule.onNodeWithText("Unlock").performClick()
+        waitForText("dialog secret")
     }
 
     @Test
