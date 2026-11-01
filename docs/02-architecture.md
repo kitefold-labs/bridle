@@ -27,7 +27,7 @@ flowchart LR
     TMUX["tmux server"]
     CLAUDE["claude / any CLI"]
     HELPER["(optional) helper script<br/>+ Claude Code hooks"]
-    STATE[("~/.local/state/&lt;app&gt;/sessions/*.json")]
+    STATE[("~/.local/state/bridle/sessions/*.json")]
     SSHD --> TMUX --> CLAUDE
     CLAUDE -. hooks .-> HELPER --> STATE
   end
@@ -63,6 +63,8 @@ Key ideas:
 | Build | Gradle KTS, version catalog, convention plugins |
 | Quality | ktlint/detekt, Android Lint, JUnit5, Turbine, Robolectric, Compose UI tests, Testcontainers (sshd) |
 | SDK | minSdk 28 (StrongBox APIs); target the latest SDK Play requires |
+| App id / namespace | `com.kitefoldlabs.bridle` |
+| Licensing | Apache-2.0. Dependencies must be Apache-2.0-compatible (Apache, MIT, BSD); no GPL code, which rules out copying from the Termux app itself. A license-report Gradle check runs in CI |
 
 ## 3. Module layout
 
@@ -94,7 +96,10 @@ Host(id, label, hostname, port=22, username, identityId?, jumpHostId?,
      groupId?, tags, color, keepAliveSec=30, defaultTmuxSession?, // null = plain shell
      startupCommand?, env: Map, terminalProfileId?, lastConnectedAt)
 
-Identity(id, alias, keystoreAlias, algorithm /*ECDSA_P256|ED25519|RSA_3072*/,
+Identity(id, alias, source /*KEYSTORE|IMPORTED*/,
+         keystoreAlias?,                 // KEYSTORE: hardware key handle
+         encryptedKeyFile?,              // IMPORTED: AEAD ciphertext of the OpenSSH key
+         algorithm /*ECDSA_P256|ED25519|RSA_3072|…*/,
          publicKeyOpenSsh, requireUserAuth, authValiditySec, createdAt)
 
 KnownHost(host, port, keyType, publicKey, fingerprintSha256, addedAt, lastSeenAt)
@@ -113,8 +118,10 @@ TerminalProfile(id, fontFamily, fontSize, theme, cursorStyle, keyBarLayoutId)
 KeyBarLayout(id, rows: List<List<KeySpec>>)        // Termux-style, JSON-encoded
 ```
 
-**The database holds no secrets.** Private keys live only in the Keystore.
-Passwords are typed once, used only to install a key, and never stored.
+**The database holds no plaintext secrets.** Generated private keys live
+only in the Keystore. Imported keys are stored only as ciphertext, encrypted
+with a key that never leaves the Keystore. Passwords are typed once, used only
+to install a key, and never stored.
 The DB is excluded from Android cloud backup (`dataExtractionRules`). Users
 back up with an explicit, passphrase-encrypted export instead.
 
@@ -170,6 +177,15 @@ interface SshConnection : Closeable {
   The private key object stays opaque. **The first spike validates this**:
   sshj prefers BouncyCastle for signatures, so we route Keystore keys through
   the platform provider ourselves.
+- **Import:** the user pastes an OpenSSH private key or picks one with the
+  Storage Access Framework, in OpenSSH or PEM format: Ed25519, ECDSA or RSA,
+  with or without a passphrase. The passphrase is asked for once to decrypt the
+  key and is then discarded. The key bytes are re-encrypted with Tink AEAD
+  (AES-256-GCM); the Tink keyset is wrapped by a Keystore master key. At
+  connect time the key is decrypted into memory for the signature, then the
+  buffers are cleared. Biometric gating uses the master key's user-auth
+  setting. Imported keys can never be exported again, and the UI labels them
+  "software key" as opposed to "hardware key".
 - **User auth:** optional per key. Either "require biometric, valid for N
   minutes" (good for reconnects) or "every signature" (BiometricPrompt with a
   `CryptoObject(Signature)`).
@@ -178,9 +194,10 @@ interface SshConnection : Closeable {
   runs an idempotent append to `~/.ssh/authorized_keys` with the right
   permissions. Users can also copy the key into a host they already reach some
   other way (for example `ssh-copy-id` from a laptop, or Tailscale SSH).
-- **New phone means new keys** (Keystore keys are non-exportable). To make
-  this painless: "Add this device's key to all hosts" runs the install step
-  over any existing connection, and hosts can list several identities.
+- **New phone means new hardware keys** (Keystore keys are non-exportable).
+  To make this painless: "Add this device's key to all hosts" runs the install
+  step over any existing connection, and hosts can list several identities.
+  Users who prefer portability can import their own key instead.
 - **App protections:** optional biometric app lock; optional FLAG_SECURE on
   terminal screens; clipboard copies marked sensitive (`EXTRA_IS_SENSITIVE`);
   terminal scrollback is never written to disk.
@@ -257,7 +274,7 @@ All agentless. Every operation is one `exec` on the shared connection.
 
 A single readable POSIX `sh` script, version-stamped and checksummed. With
 the user's consent the app installs it over SFTP to
-`~/.local/share/<app>/helper`. It needs no root and no daemon.
+`~/.local/share/bridle/helper`. It needs no root and no daemon.
 
 ```
 helper version
@@ -270,7 +287,7 @@ helper uninstall
 - Hooks used: `SessionStart`, `UserPromptSubmit` (→ working), `Notification`
   (→ waiting_permission / idle_input), `Stop` (→ idle), `SessionEnd`
   (→ exited). Each writes
-  `~/.local/state/<app>/sessions/<tmux-session-or-claude-session>.json`
+  `~/.local/state/bridle/sessions/<tmux-session-or-claude-session>.json`
   atomically (write to a temp file, then `mv`) with
   `{state, cwd, session_id, tmux_session, ts, message}`.
 - The app reads state through `helper list --json`. It polls every 5s while
@@ -279,9 +296,9 @@ helper uninstall
   transitions.
 - Notification actions (Approve / Deny / Open) run `tmux send-keys` over the
   live connection.
-- Push while disconnected is deferred. The hook could POST to
-  ntfy/UnifiedPush, or to an FCM relay that we would have to operate, which
-  has privacy and cost implications for a public app.
+- **Push while disconnected is out of scope by decision.** Bridle has no
+  server and no third-party push service. Notifications only arrive while a
+  connection is open, and the hook script never makes network calls.
 
 ## 10. SFTP (`:feature:sftp`)
 
@@ -305,9 +322,11 @@ helper uninstall
   work lives in tmux, nothing is lost if the OS kills the service.
 - **Doze/battery:** we never hold wake locks. If the OS kills the connection,
   the app reconnects when the user returns.
-- **Large screens:** adaptive layouts (list-detail for hosts and sessions),
-  split terminal panes on tablets and foldables, and DeX/ChromeOS keyboard and
-  mouse support.
+- **Phone first:** layouts are designed for one-handed portrait use, with the
+  key bar and compose box reachable by thumb, and landscape for wide output.
+  Basic hardware-keyboard input works from Phase 1. Adaptive tablet/foldable
+  layouts and split panes come later; screens are built as single panes that
+  can later be composed into list-detail layouts.
 - **Accessibility:** all chrome is accessible. The terminal exposes its
   visible text to TalkBack as a best effort.
 - **Privacy:** no analytics by default. Crash reporting is opt-in and scrubbed

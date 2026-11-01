@@ -28,5 +28,7 @@ blocks us.
 ## Consequences
 
 - We write ProxyJump and ssh_config import ourselves. Both are small.
+- Imported keys use sshj's own OpenSSH/PEM parsers (`OpenSSHKeyV1KeyFile`,
+  `PKCS8KeyFile`) after Tink decrypts them, so we write no key-format code.
 - Everything above `SshEngine` stays library-agnostic, so swapping libraries
   costs about a week.

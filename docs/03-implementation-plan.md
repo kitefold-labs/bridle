@@ -22,7 +22,8 @@ them.
       `termlib` runs Claude Code, `htop`, `vim` and `tmux` in a demo app.
       Checks IME input, Ctrl combinations, bracketed paste, resize while
       Claude streams output, and scrolling performance.
-- [ ] Settle the app name and package id; write the ADRs.
+- [ ] Use app id `com.kitefoldlabs.bridle`; add Apache-2.0 headers and a
+      license-report check in CI; finalize the ADRs.
 
 **Exit:** both spikes pass, or we switch to the fallback library.
 
@@ -32,6 +33,9 @@ them.
       export (copy, share, QR), optional biometric requirement per key.
 - [ ] `:feature:keys`: identity list; **Install key on host** with a one-time
       password.
+- [ ] **Key import:** paste or pick an OpenSSH/PEM key (Ed25519, ECDSA, RSA,
+      with or without a passphrase), re-encrypted with Tink AEAD under a
+      Keystore-wrapped keyset and labeled "software key".
 - [ ] `:feature:hosts`: CRUD, groups, tags, favorites, search, recents.
 - [ ] Known hosts: TOFU dialog, mismatch block screen, management list.
 - [ ] `SessionService` + `ConnectionManager`: multiplexed connections,
@@ -42,7 +46,7 @@ them.
       `tmux new-session -A -s <name>`, so reconnects reattach automatically.
 - [ ] App lock (biometric), FLAG_SECURE toggle.
 
-**Exit:** you can create a key, install it on a host, connect over Tailscale
+**Exit:** you can create a key (or import one), install it on a host, connect over Tailscale
 or a public IP, run Claude in tmux, lock the phone, switch networks, and come
 back to the same session.
 
@@ -85,8 +89,8 @@ back to the same session.
 - [ ] Local notifications on state changes while connected, with Approve /
       Deny / Open actions.
 - [ ] Port forwarding (local and dynamic) with auto-start per host.
-- [ ] Encrypted backup export/import.
-- [ ] Tablet, foldable and hardware-keyboard polish; split panes.
+- [ ] Encrypted backup export/import. This is also how configuration moves to
+      a new phone, since there is no sync.
 
 ## Phase 5 — Public release hardening (weeks 16–18)
 
@@ -100,13 +104,17 @@ back to the same session.
 - [ ] Closed testing track. New personal developer accounts must run a closed
       test before production; at last check this was 12 testers for 14 days,
       so verify the current rule. Opt-in crash reporting.
+- [ ] Open-source release: public repo, CONTRIBUTING, issue templates,
+      reproducible release builds; publish signed APKs on GitHub Releases.
+      F-Droid is optional and would need a build without proprietary
+      dependencies (we plan none).
 - [ ] Security review: ShellQuote fuzzing, host-key flows, logging audit
       (no secrets or terminal content in logs).
 
 ## Later backlog
 
-Push notifications while disconnected (ntfy/UnifiedPush or an FCM relay),
-Mosh transport, FIDO2 security keys, E2E-encrypted sync, tmux control mode
+Tablet, foldable and hardware-keyboard polish with split panes,
+Mosh transport, FIDO2 security keys, tmux control mode
 with native tabs, agent forwarding, Wear OS approve action, git-worktree-aware
 Launch Profiles, multi-host snippet broadcast.
 
@@ -128,25 +136,29 @@ Launch Profiles, multi-host snippet broadcast.
 | SSH library can't sign with Keystore keys cleanly | Spike A in week 1; `SshEngine` seam; MINA SSHD fallback |
 | `termlib` gaps (paste/IME) or rendering bugs with Claude's TUI | Spike B; `TerminalSurface` seam; Termux `terminal-view` fallback; contribute fixes upstream |
 | FGS policy rejection on Play | Work lives in tmux, so the service is a convenience, not a requirement; justify `specialUse`; minimize service lifetime |
-| Users lose access with a new phone (non-exportable keys) | Multi-identity hosts, "add this device's key to all hosts", clear onboarding copy; reconsider key import (open question) |
+| Users lose access with a new phone (non-exportable keys) | Multi-identity hosts, "add this device's key to all hosts", key import for users who want portable keys, encrypted config export |
+| A GPL dependency slips in and conflicts with Apache-2.0 | License-report check fails CI on GPL/AGPL/unknown licenses; no code copied from the Termux app (only its Apache-2.0 libraries) |
 | Exec `PATH` differs from interactive shell | Login-shell wrapping, per-host probe, user-editable command paths |
 | Claude CLI flags/UX change | Restart commands are profile data, not hard-coded; quick commands are editable |
 
-## Open questions for you
+## Resolved decisions
 
-1. **Name & package id**: what is the app called, and what's the
-   publisher/package (e.g. `com.<you>.<app>`)?
-2. **Business model & license**: free and open source (Apache-2.0/GPL), free
-   with a paid tier, or paid up front? This affects whether sync is planned
-   and what license our dependencies need.
-3. **Key import**: you chose Keystore-only keys, but Play Store users will
-   expect to import existing OpenSSH keys. Should we add import (stored
-   encrypted with a Keystore-wrapped key) in Phase 2, or stay hardware-only
-   on principle?
-4. **Push when disconnected**: is it acceptable to depend on a third-party
-   push service (ntfy/UnifiedPush) or to run our own small FCM relay? Or
-   should notifications be "while connected" only?
-5. **Other agents**: should Launch Profiles ship with presets for Codex CLI,
-   aider, etc., or stay Claude-first?
-6. **Device focus**: phone-only at first, or should tablets/foldables and
-   hardware keyboards be first-class from Phase 1?
+| Question | Decision |
+|----------|----------|
+| Name & package | **Bridle** by Kitefold Labs; `com.kitefoldlabs.bridle` |
+| Business model & license | Free, Apache-2.0, no paid tiers, ads, accounts or backend |
+| Key import | Yes: Phase 1, encrypted under a Keystore-wrapped key |
+| Push when disconnected | No; notifications only while connected |
+| Other agent presets | No; Claude-first (profiles still accept any command) |
+| Device focus | Phone first; tablet/foldable later |
+
+## Remaining open questions
+
+1. **Repository & signing:** will the code stay in `nkoenig/terminal`, or
+   move to a Kitefold Labs GitHub org (for example `kitefoldlabs/bridle`)?
+   Who holds the Play upload key?
+2. **F-Droid:** do you want an F-Droid listing in addition to Play and GitHub
+   Releases?
+3. **Crash reporting:** opt-in reports need somewhere to go. Is
+   "share report via email/GitHub issue" (no server) enough, or do you want a
+   hosted service?

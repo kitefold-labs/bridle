@@ -2,8 +2,8 @@
 
 ## 1. Problem
 
-Long-running agent CLIs (Claude Code, Codex CLI, aider) and other jobs run on
-Linux workstations and servers. From a phone you want to:
+Claude Code sessions and other long-running jobs run on Linux workstations
+and servers. From a phone you want to:
 
 1. Reach the machine quickly and safely, over Tailscale or a public IP.
 2. Start one of these tools **detached**, so it survives the phone sleeping,
@@ -31,7 +31,11 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
 | Network | Tailscale/VPN and public IP | Strict host-key checking, keepalives, fast reconnect; ProxyJump is cheap to add |
 | Roaming | Reattaching to tmux is enough | No Mosh in v1; keep a transport seam so it can be added later |
 | Claude priority | Launch and restart in tmux | Launch Profiles + session browser are the core differentiator |
-| Keys | Generated in Keystore | Non-exportable keys; needs a good "install public key on host" flow |
+| Keys | Generated in Keystore, **plus import** of existing OpenSSH keys | Hardware keys are the default; imported keys are encrypted with a Keystore-wrapped key |
+| Notifications | Only while connected; no push | No backend, no FCM, no third-party push service |
+| Agents | Claude-first | Profiles take any command, but the only presets are for Claude Code |
+| Devices | Phone first | Tablet, foldable and hardware-keyboard polish moves to the later backlog |
+| Name / license | **Bridle** by Kitefold Labs; Apache-2.0; free | Every dependency must be Apache-2.0-compatible (no GPL); no monetization or accounts |
 | Distribution | Public Play Store | FGS policy, privacy/data safety, onboarding, accessibility, closed testing |
 | Extras | SFTP | File browser in phase 3 |
 
@@ -47,7 +51,8 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
 - E2E-encrypted **cloud vault sync**, which is the core of its business model.
 - **Take:** separate identities from hosts, snippets, groups, SFTP, port
   forwarding, extra-keys bar, workspaces (for us these are Launch Profiles).
-  **Skip for v1:** autocomplete, team vaults, cloud sync.
+  **Skip:** autocomplete, team vaults, cloud sync. Bridle is free and has no
+  backend or accounts.
 
 ### JuiceSSH (Android)
 - Identities separate from connections, connection groups, a pop-up extra-keys
@@ -72,8 +77,9 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
 - Blink: ssh_config-style host definitions, Mosh, smart keys, gestures, and a
   keyboard-first UX on tablets.
 - Prompt: "Clips" (snippets), Mosh and Eternal Terminal, Panic Sync.
-- **Take:** an ssh_config import/export mental model, gesture vocabulary, and
-  hardware-keyboard polish for tablets, foldables and DeX/ChromeOS.
+- **Take:** an ssh_config import/export mental model and gesture vocabulary.
+  Their tablet and hardware-keyboard polish is a reference for later, after
+  the phone experience is done.
 
 ### Claude-specific tools (2026)
 - **ServerCC** (iOS): runs Claude Code/Codex over SSH with persistent tmux
@@ -95,6 +101,9 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
 - Keystore key generation (ECDSA P-256 by default, Ed25519 where the hardware
   supports it, RSA-3072 for legacy hosts). Export the public key by copy,
   share sheet or QR.
+- **Key import:** paste or pick an OpenSSH private key (Ed25519, ECDSA, RSA,
+  passphrase-protected or not), stored encrypted with a Keystore-wrapped
+  key and optionally gated by biometrics.
 - **Install key on host:** one-time password login that appends the public key
   to `authorized_keys`. The password is never stored.
 - Host-key verification: trust on first use (TOFU) with fingerprint display;
@@ -135,11 +144,15 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
   from the phone's browser.
 - Encrypted backup export/import of hosts, profiles and snippets. Keys are
   never included.
-- Tablet, foldable and hardware-keyboard polish; split-screen.
 
 **Later**
-- Push notifications while disconnected (UnifiedPush/ntfy or an FCM relay).
-- Mosh; FIDO2 security keys (NFC/USB); E2E-encrypted sync; tmux control
-  mode (`-CC`) mapping tmux windows to native tabs; agent forwarding;
-  a Wear OS "approve" tile; git-worktree-aware Launch Profiles (one Claude
-  per worktree).
+- Tablet, foldable and hardware-keyboard polish; split panes; DeX/ChromeOS.
+- Mosh; FIDO2 security keys (NFC/USB); tmux control mode (`-CC`) mapping
+  tmux windows to native tabs; agent forwarding; a Wear OS "approve" tile;
+  git-worktree-aware Launch Profiles (one Claude per worktree).
+
+**Out of scope (by decision)**
+- Push notifications while disconnected, and any Bridle-operated server.
+- Cloud sync or accounts. Encrypted export/import is the way to move
+  configuration between devices.
+- Built-in presets for agents other than Claude Code.
