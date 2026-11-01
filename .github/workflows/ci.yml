@@ -44,8 +44,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install tmux (integration tests drive a real tmux server)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
-      - name: Build, lint, test, verify >=95% coverage, check licenses
-        run: ./gradlew check koverVerifyBridle koverXmlReportBridle koverHtmlReportBridle checkLicense --stacktrace
+      - name: Build, lint, test, verify >=95% coverage
+        run: ./gradlew check koverVerifyBridle koverXmlReportBridle koverHtmlReportBridle --stacktrace
+      # The license-report plugin resolves every project's classpath from a root task, which
+      # Gradle 9 only allows without parallel execution or the configuration cache.
+      - name: Check dependency licenses (Apache-2.0 compatible)
+        run: ./gradlew checkLicense --no-configuration-cache --no-parallel --stacktrace
       - name: Coverage summary
         if: always()
         run: python3 scripts/coverage_summary.py build/reports/kover/reportBridle.xml >> "$GITHUB_STEP_SUMMARY"
