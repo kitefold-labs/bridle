@@ -17,6 +17,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.kitefoldlabs.bridle.MainActivity
 import com.kitefoldlabs.bridle.R
+import com.kitefoldlabs.bridle.feature.sessions.ClaudeStatusHub
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -30,6 +31,8 @@ import javax.inject.Inject
 class SessionService : LifecycleService() {
     @Inject lateinit var coordinator: SessionCoordinator
 
+    @Inject lateinit var statusHub: ClaudeStatusHub
+
     private val networkCallback =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
@@ -40,6 +43,8 @@ class SessionService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
+        // Claude status notifications for hosts with open tabs, for as long as the service runs.
+        lifecycleScope.launch { statusHub.followOpenTabs() }
         lifecycleScope.launch {
             coordinator.tabs.collect { tabs ->
                 if (tabs.isEmpty()) {

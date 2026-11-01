@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.ui.nav
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -9,46 +10,50 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
+/** Route of the full-screen terminal destination (shown without the bottom bar). */
+const val TERMINAL_ROUTE: String = "terminal"
 
 /**
  * App navigation. [screens] supplies each top-level destination's content, so feature screens are
- * plugged in from one place and the scaffold can be tested on its own.
+ * plugged in from one place and the scaffold can be tested on its own. [terminal] is the
+ * full-screen terminal destination (given a callback that goes back); it is brought up each time
+ * [showTerminal] emits.
  */
 @Composable
-fun BridleNavHost(screens: Map<TopLevel, @Composable () -> Unit> = emptyMap()) {
+fun BridleNavHost(
+    screens: Map<TopLevel, @Composable () -> Unit> = emptyMap(),
+    terminal: @Composable (onBack: () -> Unit) -> Unit = {},
+    showTerminal: Flow<Unit> = emptyFlow(),
+) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
+    LaunchedEffect(nav, showTerminal) {
+        showTerminal.collect { nav.navigate(TERMINAL_ROUTE) { launchSingleTop = true } }
+    }
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                TopLevel.entries.forEach { dest ->
-                    NavigationBarItem(
-                        selected = current == dest.route,
-                        onClick = {
-                            nav.navigate(dest.route) {
-                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(dest.icon, contentDescription = null) },
-                        label = { Text(stringResource(dest.label)) },
-                    )
-                }
-            }
-        },
+        bottomBar = { if (current != TERMINAL_ROUTE) BottomBar(nav, current) },
     ) { padding ->
-        NavHost(nav, startDestination = TopLevel.HOSTS.route, modifier = Modifier.padding(padding)) {
+        // Consumed so screens that pad for insets themselves (the terminal) don't pad twice.
+        NavHost(
+            nav,
+            startDestination = TopLevel.HOSTS.route,
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+        ) {
             TopLevel.entries.forEach { dest ->
                 composable(dest.route) {
                     val screen = screens[dest]
@@ -61,6 +66,30 @@ fun BridleNavHost(screens: Map<TopLevel, @Composable () -> Unit> = emptyMap()) {
                     }
                 }
             }
+            composable(TERMINAL_ROUTE) { terminal { nav.popBackStack() } }
+        }
+    }
+}
+
+@Composable
+private fun BottomBar(
+    nav: NavHostController,
+    current: String?,
+) {
+    NavigationBar {
+        TopLevel.entries.forEach { dest ->
+            NavigationBarItem(
+                selected = current == dest.route,
+                onClick = {
+                    nav.navigate(dest.route) {
+                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = { Icon(dest.icon, contentDescription = null) },
+                label = { Text(stringResource(dest.label)) },
+            )
         }
     }
 }

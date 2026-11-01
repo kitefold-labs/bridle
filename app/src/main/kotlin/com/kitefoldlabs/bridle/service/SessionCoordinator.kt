@@ -17,7 +17,10 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** An open terminal tab. [attachment] carries the UI's emulator so it outlives the screen. */
+/**
+ * An open terminal tab. [attachment] carries the UI's emulator so it outlives the screen; if it is
+ * [AutoCloseable] it is closed with the tab.
+ */
 data class TerminalTab(
     val id: String,
     val hostId: EntityId,
@@ -43,7 +46,14 @@ class SessionCoordinator
         /** True while any tab is open (drives the foreground service). */
         val hasActiveWork: Boolean get() = mutableTabs.value.isNotEmpty()
 
-        /** Opens a tab on [hostId]. The [sink] (emulator) is owned by the tab from now on. */
+        /**
+         * Opens a tab on [hostId]. The [sink] (emulator) is owned by the tab from now on.
+         * [onCreated] runs before the session starts, so the emulator's replies to the remote
+         * side's first queries (tmux and Claude Code ask for terminal attributes) can be wired to
+         * it without losing any.
+         *
+         * @throws IllegalArgumentException if [attach] names an invalid tmux session.
+         */
         suspend fun openTab(
             hostId: EntityId,
             title: String,
@@ -51,9 +61,17 @@ class SessionCoordinator
             sink: TerminalSink,
             size: PtySpec = PtySpec(),
             attachment: Any? = null,
+            onCreated: (TerminalSession) -> Unit = {},
         ): TerminalTab {
             val lease = connections.acquire(hostId)
-            val session = TerminalSession(lease, attach, sink, scope, size)
+            val session =
+                try {
+                    TerminalSession(lease, attach, sink, scope, size)
+                } catch (e: IllegalArgumentException) {
+                    lease.close()
+                    throw e
+                }
+            onCreated(session)
             val tab = TerminalTab(UUID.randomUUID().toString(), hostId, title, session, attachment)
             mutableTabs.update { it + tab }
             session.start()
@@ -65,15 +83,20 @@ class SessionCoordinator
         fun closeTab(id: String) {
             val tab = tab(id) ?: return
             mutableTabs.update { tabs -> tabs.filterNot { it.id == id } }
-            tab.session.close()
+            tab.close()
         }
 
         /** Closes every tab and connection ("Disconnect all"). */
         suspend fun disconnectAll() {
             val all = mutableTabs.value
             mutableTabs.value = emptyList()
-            all.forEach { it.session.close() }
+            all.forEach { it.close() }
             connections.closeAll()
+        }
+
+        private fun TerminalTab.close() {
+            session.close()
+            (attachment as? AutoCloseable)?.close()
         }
 
         /**

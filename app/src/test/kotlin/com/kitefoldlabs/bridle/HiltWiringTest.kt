@@ -65,7 +65,10 @@ class HiltWiringTest {
     fun `receiver injects and handles disconnect all`() =
         runBlocking<Unit> {
             coordinator.openTab(42, "x", AttachSpec.Shell, { _, _ -> })
-            SessionActionReceiver().onReceive(context, Intent(SessionActionReceiver.ACTION_DISCONNECT_ALL))
+            // Delivered by the framework (not by calling onReceive), so goAsync() has a result to finish.
+            val disconnect = Intent(context, SessionActionReceiver::class.java)
+            context.sendBroadcast(disconnect.setAction(SessionActionReceiver.ACTION_DISCONNECT_ALL))
+            ShadowLooper.idleMainLooper()
             repeat(100) {
                 if (coordinator.tabs.value.isNotEmpty()) Thread.sleep(10)
             }

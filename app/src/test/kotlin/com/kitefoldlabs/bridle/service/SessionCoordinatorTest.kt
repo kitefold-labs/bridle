@@ -6,12 +6,14 @@ import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.session.HostConnector
+import com.kitefoldlabs.bridle.core.session.TerminalSession
 import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.DuplexStream
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +98,33 @@ class SessionCoordinatorTest {
             coordinator.tab("missing") shouldBe null
             coordinator.closeTab("missing")
             coordinator.closeTab(tab.id)
+            coordinator.tabs.value shouldBe emptyList()
+        }
+
+    private class Closeable : AutoCloseable {
+        var closed = 0
+
+        override fun close() {
+            closed++
+        }
+    }
+
+    @Test
+    fun `tabs are wired before their session starts and close their attachment`() =
+        runBlocking<Unit> {
+            var created: TerminalSession? = null
+            val first = Closeable()
+            val tab = coordinator.openTab(1, "a", AttachSpec.Shell, { _, _ -> }, attachment = first) { created = it }
+            created shouldBe tab.session
+            coordinator.closeTab(tab.id)
+            first.closed shouldBe 1
+            val second = Closeable()
+            coordinator.openTab(1, "b", AttachSpec.Shell, { _, _ -> }, attachment = second)
+            coordinator.disconnectAll()
+            second.closed shouldBe 1
+            shouldThrow<IllegalArgumentException> {
+                coordinator.openTab(1, "bad", AttachSpec.Tmux("bad name"), { _, _ -> })
+            }
             coordinator.tabs.value shouldBe emptyList()
         }
 
