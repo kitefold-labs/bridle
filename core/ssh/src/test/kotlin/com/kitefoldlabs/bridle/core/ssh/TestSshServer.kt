@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.core.ssh
 
 import org.apache.sshd.common.config.keys.KeyUtils
+import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
 import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
@@ -9,6 +10,7 @@ import org.apache.sshd.server.command.CommandFactory
 import org.apache.sshd.server.forward.AcceptAllForwardingFilter
 import org.apache.sshd.server.shell.ProcessShellCommandFactory
 import org.apache.sshd.server.shell.ProcessShellFactory
+import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.nio.file.Path
 import java.security.KeyPair
 import java.security.KeyPairGenerator
@@ -45,6 +47,8 @@ class TestSshServer(
                 }
             shellFactory = ProcessShellFactory("sh", "env", "HOME=$home", "/bin/sh", "-i")
             forwardingFilter = AcceptAllForwardingFilter.INSTANCE
+            subsystemFactories = listOf(SftpSubsystemFactory())
+            fileSystemFactory = VirtualFileSystemFactory(home)
             start()
         }
 
