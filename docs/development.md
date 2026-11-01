@@ -58,8 +58,11 @@ Commit hooks are fast: hygiene checks, secret scanning, ktlint. The pre-push hoo
 | Module | Kind | Responsibility |
 |--------|------|----------------|
 | `:core:model` | JVM | Domain types, validation, snippet templates |
-| `:core:ssh` | JVM | SSH engine (sshj), host-key trust, shell quoting, ssh_config import, reconnect policy |
+| `:core:ssh` | JVM | SSH engine (sshj), host-key trust, shell quoting, ssh_config import, SFTP, port forwarding |
 | `:core:tmux` | JVM | tmux command builders/parsers, launch/restart orchestration, helper protocol |
+| `:core:session` | JVM | Shared per-host connections and reconnects, terminal tabs, Claude status monitor |
+| `:core:terminal` | JVM | Key encoding, bracketed-paste sanitising, key-bar layouts, compose history |
+| `:core:backup` | JVM | Encrypted configuration backups, import merge planning, scrubbed crash reports |
 | `:core:*` / `:feature:*` (Android) | Android | Keystore, Room, terminal UI, screens, service |
 
 Logic lives in JVM modules wherever possible: they are fast to test and easy to cover. Android
