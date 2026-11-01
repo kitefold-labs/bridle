@@ -63,6 +63,7 @@ Commit hooks are fast: hygiene checks, secret scanning, ktlint. The pre-push hoo
 | `:core:tmux` | JVM | tmux command builders/parsers, launch/restart orchestration, helper protocol |
 | `:core:session` | JVM | Shared per-host connections and reconnects, terminal tabs, Claude status monitor |
 | `:core:terminal` | JVM | Key encoding, bracketed-paste sanitising, key-bar layouts, compose history |
+| `:core:terminal-ui` | Android | `TerminalEngine` (termlib adapter), output coalescing, terminal screen state, key bar, compose box, status banner |
 | `:core:backup` | JVM | Encrypted configuration backups, import merge planning, scrubbed crash reports |
 | `:core:data` | Android | Room database, repositories, known-hosts store, backup import/export, DataStore settings |
 | `:core:*` / `:feature:*` (Android) | Android | Keystore, terminal UI, screens, service |

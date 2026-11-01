@@ -57,7 +57,7 @@ Key ideas:
 | DI | Hilt |
 | Persistence | Room (structured data), Proto DataStore (preferences) |
 | SSH | **sshj** behind `SshEngine`; fallback Apache MINA SSHD (ADR-0001) |
-| Terminal | **ConnectBot `termlib`** (libvterm, Compose) behind `TerminalSurface`; fallback Termux `terminal-view` (ADR-0002) |
+| Terminal | **ConnectBot `termlib`** (libvterm, Compose) behind `TerminalEngine`; fallback Termux `terminal-view` (ADR-0002) |
 | Crypto | Android Keystore / StrongBox; BiometricPrompt; Tink for backup-file encryption |
 | Serialization | kotlinx.serialization |
 | Build | Gradle KTS, version catalog, convention plugins |
@@ -76,7 +76,8 @@ Key ideas:
 :core:ssh        (JVM)    SshEngine interface + sshj impl, ConnectionManager, known-hosts,
                           ProxyJump, keepalive/reconnect policy, ShellQuote
 :core:tmux       (JVM)    TmuxController: command builders + output parsers
-:core:terminal            TerminalSurface interface + termlib adapter, key bar,
+:core:terminal   (JVM)    key encoding, bracketed paste, key-bar layouts, compose history
+:core:terminal-ui         TerminalEngine interface + termlib adapter, key bar,
                           compose box, gesture handling
 :core:ui                  design system, shared components
 :feature:hosts            host list/editor, groups, ssh_config import
@@ -239,16 +240,25 @@ interface SshConnection : Closeable {
   terminal screens; clipboard copies marked sensitive (`EXTRA_IS_SENSITIVE`);
   terminal scrollback is never written to disk.
 
-## 7. Terminal layer (`:core:terminal`)
+## 7. Terminal layer (`:core:terminal`, `:core:terminal-ui`)
 
 ```kotlin
-interface TerminalSurface {           // implemented by the termlib adapter
-  fun feed(bytes: ByteArray)          // remote → emulator
-  val input: Flow<ByteArray>          // keys/IME → remote
-  val size: StateFlow<TermSize>       // → PTY window-change
-  fun setProfile(p: TerminalProfile)
+interface TerminalEngine {                   // TermlibEngine adapts termlib
+  fun feed(bytes: ByteArray, offset: Int, length: Int)  // remote → emulator
+  var onRemoteInput: ((ByteArray) -> Unit)?  // query replies, termlib's own keyboard → remote
+  val size: StateFlow<TerminalGridSize>      // → PTY window-change (debounced)
+  val title: StateFlow<String>
+  val isBracketedPasteEnabled: Boolean       // drives BracketedPaste
+  val isApplicationCursorKeys: Boolean       // drives KeyEncoder
+  @Composable fun Content(host: TerminalViewHost, …)
 }
 ```
+
+`EngineSink` is the session's `TerminalSink`: it copies each read and hands
+batches to the engine on a background executor (one feed per batch, with
+back-pressure), so a full-screen Claude Code redraw costs a few feeds, not one
+main-thread post per read. `TerminalScreenState` wires a session, an engine and
+an `InputDispatcher` together for one screen.
 
 - A **TerminalSession** pairs one emulator with one `ShellChannel` and lives in
   the service, not in a ViewModel. It survives rotation and switching

@@ -150,7 +150,7 @@ Launch Profiles, multi-host snippet broadcast.
 | Risk | Mitigation |
 |------|------------|
 | SSH library can't sign with Keystore keys cleanly | Spike A in week 1; `SshEngine` seam; MINA SSHD fallback |
-| `termlib` gaps (paste/IME) or rendering bugs with Claude's TUI | Spike B; `TerminalSurface` seam; Termux `terminal-view` fallback; contribute fixes upstream |
+| `termlib` gaps (paste/IME) or rendering bugs with Claude's TUI | Spike B; `TerminalEngine` seam; Termux `terminal-view` fallback; contribute fixes upstream |
 | FGS policy rejection on Play | Work lives in tmux, so the service is a convenience, not a requirement; justify `specialUse`; minimize service lifetime |
 | Users lose access with a new phone (non-exportable keys) | Multi-identity hosts, "add this device's key to all hosts", key import for users who want portable keys, encrypted config export |
 | A GPL dependency slips in and conflicts with Apache-2.0 | License-report check fails CI on GPL/AGPL/unknown licenses; no code copied from the Termux app (only its Apache-2.0 libraries) |
