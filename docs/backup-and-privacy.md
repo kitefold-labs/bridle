@@ -40,8 +40,9 @@ everything else.
      and body; a Launch Profile on host and tmux session; a known host on host, port and key
      type.
    - **Host key conflicts.** If the backup trusts a *different* key for a host this phone
-     already trusts, the phone's key is kept and both fingerprints are shown. Bridle never
-     replaces a trusted host key silently.
+     already trusts, the phone's key is kept and both fingerprints are shown. That includes a key
+     of another type (say ECDSA where the phone trusts Ed25519): Bridle never replaces a trusted
+     host key silently, and never adds a second one behind your back either.
    - **Missing keys.** Hosts that used a key which isn't on this phone are imported without a
      key, and Bridle lists which hosts need one. Generate a new key (or import your own) and use
      **Add this device's key to all hosts** to install it. If you import the *same* key you
@@ -106,14 +107,16 @@ Bridle replaces:
 | IPv4 and IPv6 addresses | `<ip>` |
 | `user@host` | `<user>@<host>` |
 | Email addresses | `<email>` |
-| File paths (`/home/…`, `/Users/…`, `/data/user/…`, `/storage/…`, `~/…` and other absolute paths) | `<path>` |
+| File paths (`/home/…`, `/Users/…`, `/data/user/…`, `/storage/…`, `~/…`, `./…`, `../…`, other absolute paths, Windows and network paths) | `<path>` |
 | URLs | `<url>` |
 | `SHA256:` and MD5 key fingerprints | `<fingerprint>` |
-| Long hex or base64 strings (possible keys or tokens) | `<redacted>` |
+| Long hex or base64 strings (possible keys or tokens), also as `key=value` | `<redacted>` |
 | The names, hostnames and usernames from your own configuration | `<redacted>` |
 
 Terminal content is never part of a report. Scrubbing errs on the side of removing too much: a
-file name may show up as `<host>`. Please still read the report before you submit it. If you
+file name may show up as `<host>`. It works on the *shape* of text, so some things can't be
+recognised: a short password, a single-word host name that isn't in your configuration, or a
+folder name with a space in it. Please still read the report before you submit it. If you
 spot something private that was missed, delete it and
 [tell us privately](../SECURITY.md) so we can fix the scrubber.
 

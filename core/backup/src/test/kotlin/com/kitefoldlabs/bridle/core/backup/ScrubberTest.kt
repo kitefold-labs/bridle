@@ -62,6 +62,20 @@ class ScrubberTest {
             "e.g. version 1.2 or v1.2.3 | e.g. version 1.2 or v1.2.3",
             "Foo::class and a / b | Foo::class and a / b",
             "IllegalArgumentExceptionHandler | IllegalArgumentExceptionHandler",
+            "addr_10.0.0.1 down | addr_<ip> down",
+            "bind v10.0.0.1 | bind v<ip>",
+            "seen ...10.0.0.1 | seen ...<ip>",
+            "run 1.2.3.4.5.6 | run <ip>",
+            "via my_host.example.com | via <host>",
+            "to ...devbox.lan | to ...<host>",
+            "at @devbox.lan or -devbox.lan | at @<host> or -<host>",
+            "via bücher.example.com | via <host>",
+            "token=ghp_abcdefghijklmnopqrstuvwxyz0123 | token=<redacted>",
+            "sum=0123456789abcdef0123456789abcdef | sum=<redacted>",
+            "mail nate%40example.com | mail <email>",
+            "share \\\\fileserver\\share\\x | share <path>",
+            "open ../secret/key.pem | open <path>",
+            "run ./deploy.sh now | run <path> now",
         ],
     )
     fun `replaces sensitive shapes`(
@@ -141,6 +155,27 @@ class ScrubberTest {
             neverLeaks(Arb.pattern("[A-Za-z0-9+/]{40,80}={0,2}"))
             neverLeaks(Arb.pattern("[A-Za-z+/]{10,20}[0-9][A-Za-z0-9+/]{10,20}"))
             neverLeaks(Arb.pattern("[0-9a-f]{32,64}"))
+        }
+
+    @Test
+    fun `never leaks addresses, hostnames or tokens glued to punctuation`() =
+        runBlocking<Unit> {
+            val glue = Arb.element("_", "=", ".", "...", "@", "-", "[", "<", "/", "a", "v", ":", "#", "%")
+            val label = Arb.pattern("[a-z][a-z0-9_-]{0,10}[a-z0-9]")
+            val secrets =
+                listOf(
+                    Arb.list(Arb.int(0..255), 4..4).map { it.joinToString(".") },
+                    Arb.bind(Arb.list(label, 1..3), Arb.element("com", "lan", "ts.net")) { l, t ->
+                        l.joinToString(".") + "." + t
+                    },
+                    Arb.pattern("[A-Za-z_]{10,20}[0-9][A-Za-z0-9_]{10,20}"),
+                    Arb.pattern("[0-9a-f]{32,64}"),
+                )
+            secrets.forEach { secret ->
+                checkAll(200, secret, glue, separators) { value, before, after ->
+                    scrub("key$before$value$after end") shouldNotContain value
+                }
+            }
         }
 
     @Test
