@@ -80,7 +80,14 @@ class SessionCoordinator
                     lease.close()
                     throw e
                 }
-            onCreated(session)
+            try {
+                onCreated(session)
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
+                session.close() // releases the lease too
+                throw e
+            }
             val tab = TerminalTab(UUID.randomUUID().toString(), hostId, title, session, attachment, sink)
             mutableTabs.update { it + tab }
             session.start()
@@ -101,11 +108,6 @@ class SessionCoordinator
             mutableTabs.value = emptyList()
             all.forEach { it.release() }
             connections.closeAll()
-        }
-
-        private fun TerminalTab.close() {
-            session.close()
-            (attachment as? AutoCloseable)?.close()
         }
 
         /**

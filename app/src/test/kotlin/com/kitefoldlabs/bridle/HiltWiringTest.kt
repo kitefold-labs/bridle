@@ -82,6 +82,30 @@ class HiltWiringTest {
     }
 
     @Test
+    fun `the service stops for its newest start, even when the tabs closed before it arrived`() =
+        runBlocking<Unit> {
+            val first = coordinator.openTab(42, "x", AttachSpec.Shell, { _, _ -> })
+            val controller = Robolectric.buildService(SessionService::class.java).create().startCommand(0, 1)
+            ShadowLooper.idleMainLooper()
+            val shadow = shadowOf(controller.get())
+            val second = coordinator.openTab(42, "y", AttachSpec.Shell, { _, _ -> })
+            controller.startCommand(0, 2)
+            coordinator.closeTab(first.id)
+            coordinator.closeTab(second.id)
+            ShadowLooper.idleMainLooper()
+            // stopSelf(2): a start Android has handed out since would keep the service alive.
+            shadow.stopSelfId shouldBe 2
+
+            // A tab opened and closed again before its start arrived: nothing new for the tab
+            // collector to see, so the start itself must stop the service again.
+            coordinator.openTab(42, "z", AttachSpec.Shell, { _, _ -> }).also { coordinator.closeTab(it.id) }
+            controller.startCommand(0, 3)
+            ShadowLooper.idleMainLooper()
+            shadow.stopSelfId shouldBe 3
+            controller.destroy()
+        }
+
+    @Test
     fun `main activity follows the secure screen setting`() =
         runBlocking<Unit> {
             settings.setSecureScreenEnabled(true)

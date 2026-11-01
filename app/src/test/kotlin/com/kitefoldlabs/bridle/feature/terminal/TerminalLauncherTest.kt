@@ -7,6 +7,7 @@ import com.kitefoldlabs.bridle.connect.UnknownHostException
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
+import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.TestWorld
@@ -22,8 +23,11 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -135,6 +139,50 @@ class TerminalLauncherTest {
             world.coordinator.tabs.value shouldBe emptyList()
             shouldThrow<UnknownHostException> { launcher.openTerminal(999) }
             serviceStarts shouldBe 0
+        }
+
+    @Test
+    fun `any failure while opening releases the emulator and the connection`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            val engine = FakeEngine()
+            val refusing =
+                object : TerminalEngine by engine {
+                    override var onRemoteInput: ((ByteArray) -> Unit)?
+                        get() = null
+                        set(_) = error("emulator gone")
+                }
+            val failing =
+                TerminalLauncher(world.coordinator, world.data.hosts, { refusing }, { serviceStarts++ }, navigator)
+            shouldThrow<IllegalStateException> { failing.openTerminal(id) }
+            engine.closed shouldBe true
+            world.coordinator.tabs.value shouldBe emptyList()
+            serviceStarts shouldBe 0
+            awaitUntil { runBlocking { world.connections.activeHosts() }.isEmpty() }
+        }
+
+    @Test
+    fun `concurrent attaches to one session open one tab`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            val tabs = List(4) { scope.async { launcher.attachTmux(id, "api") } }.awaitAll()
+            tabs.toSet().size shouldBe 1
+            world.coordinator.tabs.value.size shouldBe 1
+        }
+
+    @Test
+    fun `reconnecting keeps the host leased and the tab count above zero`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            val tab = launcher.openTerminal(id, AttachSpec.Tmux("api"))
+            val counts = CopyOnWriteArrayList<Int>()
+            val watch = scope.launch { world.coordinator.tabs.collect { counts += it.size } }
+            awaitUntil { counts.isNotEmpty() }
+            val replaced = launcher.reconnect(tab.id)!!
+            awaitUntil { counts.last() == 1 && world.coordinator.tab(tab.id) == null }
+            watch.cancel()
+            counts.none { it == 0 } shouldBe true
+            world.coordinator.tabs.value shouldBe listOf(replaced)
         }
 
     @Test

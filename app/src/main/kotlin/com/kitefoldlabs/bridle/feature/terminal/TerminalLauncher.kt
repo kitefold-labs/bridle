@@ -18,6 +18,8 @@ import com.kitefoldlabs.bridle.service.TerminalTab
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,6 +38,8 @@ class TerminalLauncher
         private val service: SessionServiceStarter,
         private val navigator: TerminalNavigator,
     ) {
+        private val attaching = Mutex()
+
         /**
          * Opens a tab on [hostId] and shows it. [attach] defaults to the host's default tmux
          * session when it has one, and a plain login shell otherwise.
@@ -60,28 +64,36 @@ class TerminalLauncher
             hostId: EntityId,
             session: String,
             workingDir: String = "~",
-        ): TerminalTab {
-            val existing =
-                coordinator.tabs.value.firstOrNull { tab ->
-                    tab.hostId == hostId &&
-                        (tab.session.attach as? AttachSpec.Tmux)?.session == session &&
-                        tab.session.state.value !is TerminalState.Ended
+        ): TerminalTab =
+            // Serialised, so a double tap (or a notification tap racing an Attach) opens one tab.
+            attaching.withLock {
+                val existing =
+                    coordinator.tabs.value.firstOrNull { tab ->
+                        tab.hostId == hostId &&
+                            (tab.session.attach as? AttachSpec.Tmux)?.session == session &&
+                            tab.session.state.value !is TerminalState.Ended
+                    }
+                if (existing != null) {
+                    navigator.show(existing.id)
+                    existing
+                } else {
+                    openTerminal(hostId, AttachSpec.Tmux(session, workingDir))
                 }
-            if (existing != null) {
-                navigator.show(existing.id)
-                return existing
             }
-            return openTerminal(hostId, AttachSpec.Tmux(session, workingDir))
-        }
 
         /**
          * Replaces tab [tabId] (typically one that ended) with a fresh tab attached the same way.
          * Returns null if the tab is already gone.
+         *
+         * The new tab opens before the old one closes, so the host's shared connection keeps a
+         * lease throughout (no idle teardown) and the foreground service never sees zero tabs and
+         * stops in between.
          */
         suspend fun reconnect(tabId: String): TerminalTab? {
             val tab = coordinator.tab(tabId) ?: return null
+            val replacement = open(tab.hostId, tab.title, tab.session.attach)
             coordinator.closeTab(tabId)
-            return open(tab.hostId, tab.title, tab.session.attach)
+            return replacement
         }
 
         fun close(tabId: String) {
@@ -107,7 +119,10 @@ class TerminalLauncher
                         attachment = attachment,
                         onCreated = { session -> engine.sendRemoteInputTo(session.asTerminalConnection()) },
                     )
-                } catch (e: IllegalArgumentException) {
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Throwable,
+                ) {
+                    // Any failure, cancellation included: the emulator holds native memory.
                     attachment.close()
                     throw e
                 }

@@ -42,6 +42,9 @@ class SessionService : LifecycleService() {
 
     private var watchingTabs = false
 
+    /** The newest start request delivered; see [onStartCommand]. */
+    private var lastStartId = 0
+
     override fun onCreate() {
         super.onCreate()
         getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
@@ -55,6 +58,7 @@ class SessionService : LifecycleService() {
         startId: Int,
     ): Int {
         super.onStartCommand(intent, flags, startId)
+        lastStartId = startId
         // startForegroundService() requires startForeground() before the service may stop, even if
         // the last tab closed in the meantime; so go foreground first, then follow the tabs.
         goForeground(
@@ -63,18 +67,25 @@ class SessionService : LifecycleService() {
         )
         if (!watchingTabs) {
             watchingTabs = true
-            lifecycleScope.launch {
-                coordinator.tabs.collect { tabs ->
-                    if (tabs.isEmpty()) {
-                        ServiceCompat.stopForeground(this@SessionService, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                        stopSelf()
-                    } else {
-                        goForeground(tabs.size)
-                    }
-                }
-            }
+            lifecycleScope.launch { coordinator.tabs.collect(::follow) }
+        } else {
+            // The tabs may all have closed before this start arrived, and the collector has
+            // nothing new to report then: check here, or the service would stay in the foreground.
+            follow(coordinator.tabs.value)
         }
         return START_NOT_STICKY
+    }
+
+    private fun follow(tabs: List<TerminalTab>) {
+        if (tabs.isEmpty()) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            // Only if no start arrived since: a tab opened right after the last one closed has
+            // already called startForegroundService(), and stopping before that start is handled
+            // would crash the app ("did not then call startForeground"). It stops on that start.
+            stopSelf(lastStartId)
+        } else {
+            goForeground(tabs.size)
+        }
     }
 
     override fun onDestroy() {
