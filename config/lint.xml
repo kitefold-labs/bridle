@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shared Android Lint configuration. Suppressions must be scoped and justified. -->
+<lint>
+    <!-- BouncyCastle (pulled in by sshj) ships a test-only trust-all X509TrustManager inside
+         bcpkix. Bridle never installs it; our own TLS use goes through the platform trust store. -->
+    <issue id="TrustAllX509TrustManager">
+        <ignore path="**/bcpkix-jdk18on-*.jar" />
+    </issue>
+</lint>

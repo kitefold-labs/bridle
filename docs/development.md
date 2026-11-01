@@ -8,7 +8,7 @@ organised. For the *why*, read [02-architecture.md](02-architecture.md).
 | Tool | Version | Notes |
 |------|---------|-------|
 | JDK | 21 | Temurin recommended. Bytecode targets Java 17. |
-| Android SDK | API 36 platform | Needed for the Android modules only. Set `ANDROID_HOME` or `local.properties`. |
+| Android SDK | platform `android-37`, build-tools 36.1+ | Set `ANDROID_HOME` or `sdk.dir` in `local.properties`. AGP downloads missing packages if licences are accepted. |
 | Python | 3.10+ | For `pre-commit` and helper scripts. |
 | tmux | 3.0+ | `:core:tmux` integration tests drive a real tmux server. |
 
@@ -77,9 +77,20 @@ modules stay thin.
 - Secrets never go in logs, exceptions, crash reports or the database (see `SECURITY.md`).
 - Commits: imperative subject (≤ 72 chars), body explaining *why*.
 
+## Toolchain
+
+Gradle 9.8.2 (wrapper, checksum-pinned), Android Gradle Plugin 9.5 with built-in Kotlin,
+Kotlin 2.4, KSP2, Hilt, Compose (BOM), Room, Robolectric for Android unit tests. Every plugin is
+declared once in the root `build.gradle.kts` (`apply false`) so they share a classloader; the
+convention plugins in `build-logic` (`bridle.jvm.library`, `bridle.android.library`,
+`bridle.android.application`, `bridle.android.compose`, `bridle.hilt`, `bridle.quality`) hold all
+shared configuration. Android unit tests run for the `debug` variant only; Android Lint runs
+with warnings as errors (`config/lint.xml` holds the few scoped, justified suppressions).
+
 ## Working behind a restricted network
 
 If Maven Central rate-limits you, point Gradle at a mirror with a user-level init script (do not
 commit it), e.g. `~/.gradle/init.d/mirror.gradle` adding
 `https://maven-central.storage-download.googleapis.com/maven2/` ahead of the default
-repositories.
+repositories. Robolectric downloads its Android framework jars separately; point it at a mirror
+with `bridle.robolectric.repoUrl=<url>` in `~/.gradle/gradle.properties`.

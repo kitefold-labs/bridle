@@ -1,7 +1,15 @@
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 
 plugins {
+    // Declared here (not applied) so AGP, the Kotlin plugins, KSP and Hilt share one classloader;
+    // otherwise AGP's built-in Kotlin support can't see AGP classes from the Kotlin plugin.
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.hilt) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.license.report)
 }
