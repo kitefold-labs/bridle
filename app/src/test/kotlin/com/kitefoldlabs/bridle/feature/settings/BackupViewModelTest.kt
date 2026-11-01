@@ -128,6 +128,10 @@ class BackupViewModelTest {
         vm.state.value.result
             .shouldBeInstanceOf<BackupResult.Failed>()
         vm.startExport()
+        vm.submitExportPassphrase(passphrase.toCharArray(), passphrase.toCharArray())
+        vm.exportTo(uri("nomessage"))
+        eventually { vm.state.value.result == BackupResult.Failed("IOException") }
+        vm.startExport()
         vm.cancelExport()
         vm.state.value.exportDialog shouldBe false
         vm.startExport()

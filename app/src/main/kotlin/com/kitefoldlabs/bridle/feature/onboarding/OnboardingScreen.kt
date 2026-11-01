@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -32,7 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import kotlinx.coroutines.launch
@@ -45,7 +45,7 @@ import kotlinx.coroutines.launch
 fun OnboardingGate(
     onGenerateKey: () -> Unit,
     onAddHost: () -> Unit,
-    viewModel: OnboardingViewModel = hiltViewModel(),
+    viewModel: OnboardingViewModel,
     content: @Composable () -> Unit,
 ) {
     val visible by viewModel.visible.collectAsStateWithLifecycle()
@@ -53,15 +53,15 @@ fun OnboardingGate(
         Box(if (visible) Modifier.clearAndSetSemantics {} else Modifier) { content() }
         if (visible) {
             OnboardingScreen(
-                onGenerateKey = {
+                onGenerateKey = @DontMemoize {
                     viewModel.finish()
                     onGenerateKey()
                 },
-                onAddHost = {
+                onAddHost = @DontMemoize {
                     viewModel.finish()
                     onAddHost()
                 },
-                onSkip = viewModel::finish,
+                onSkip = @DontMemoize { viewModel.finish() },
             )
         }
     }

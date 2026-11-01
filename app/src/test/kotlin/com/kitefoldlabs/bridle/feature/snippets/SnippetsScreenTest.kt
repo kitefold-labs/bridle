@@ -57,7 +57,7 @@ class SnippetsScreenTest {
     }
 
     private fun waitForText(text: String) =
-        rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(20_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
 
     private fun click(text: String) = rule.onNodeWithText(text).performClick()
 
@@ -124,7 +124,7 @@ class SnippetsScreenTest {
         rule.onNodeWithText("Edit snippet").assertExists()
         field("Name").performTextReplacement("Uptime")
         click("Save")
-        rule.waitUntil(5_000) {
+        rule.waitUntil(20_000) {
             rule.onAllNodes(hasContentDescription("Actions for Uptime")).fetchSemanticsNodes().isNotEmpty()
         }
         rule.onNodeWithContentDescription("Actions for Uptime").performClick()

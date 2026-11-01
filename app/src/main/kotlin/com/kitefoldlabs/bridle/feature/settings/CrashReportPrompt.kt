@@ -14,6 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,7 +24,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -84,11 +84,13 @@ class CrashReportViewModel
             mutable.value = CrashPrompt.Review(current.report)
         }
 
-        /** The issue URL for the report with the user's [notes]; the report is then discarded. */
-        fun file(notes: String): String? {
-            val current = mutable.value ?: return null
+        /** The issue URL for [report] with the user's [notes]; the report is then discarded. */
+        fun file(
+            report: CrashReport,
+            notes: String,
+        ): String {
             discard()
-            return reporter.issueUrl(current.report, notes.trim())
+            return reporter.issueUrl(report, notes.trim())
         }
 
         /** Deletes the report without filing it. */
@@ -99,7 +101,7 @@ class CrashReportViewModel
     }
 
 @Composable
-fun CrashReportPrompt(viewModel: CrashReportViewModel = hiltViewModel()) {
+fun CrashReportPrompt(viewModel: CrashReportViewModel) {
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
     when (val current = prompt) {
         null -> Unit
@@ -155,7 +157,7 @@ private fun ReviewDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { viewModel.file(notes)?.let(uriHandler::openUri) }) {
+            TextButton(onClick = @DontMemoize { uriHandler.openUri(viewModel.file(report, notes)) }) {
                 Text(stringResource(R.string.crash_open_issue))
             }
         },

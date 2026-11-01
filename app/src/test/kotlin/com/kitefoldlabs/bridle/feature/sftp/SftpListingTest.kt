@@ -59,6 +59,7 @@ class SftpListingTest {
         SftpListing.parseOctal("64") shouldBe null
         SftpListing.parseOctal("07555") shouldBe null
         SftpListing.parseOctal("648") shouldBe null
+        SftpListing.parseOctal("6/4") shouldBe null
         SftpListing.parseOctal("rwx") shouldBe null
     }
 

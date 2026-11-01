@@ -100,12 +100,11 @@ class AppLockAndCrashTest {
                     .crashReportingOptIn
             }
         }
-        val url = vm.file("  tapped connect  ")!!
+        val url = vm.file(vm.prompt.value!!.report, "  tapped connect  ")
         url shouldStartWith "https://github.com/"
         url shouldContain "tapped"
         vm.prompt.value.shouldBeNull()
         reporter.pending().shouldBeNull()
-        vm.file("again").shouldBeNull()
         vm.accept()
         vm.prompt.value.shouldBeNull()
     }

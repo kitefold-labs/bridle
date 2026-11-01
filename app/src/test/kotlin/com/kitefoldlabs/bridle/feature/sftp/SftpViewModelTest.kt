@@ -16,6 +16,7 @@ import com.kitefoldlabs.bridle.feature.FakeDocuments
 import com.kitefoldlabs.bridle.feature.FakeSftpSession
 import com.kitefoldlabs.bridle.feature.FakeSftpSession.Companion.HOME
 import com.kitefoldlabs.bridle.feature.connections
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -332,6 +333,36 @@ class SftpViewModelTest {
             .last()
             .status shouldBe TransferStatus.CANCELLED
         documents.deleted shouldBe listOf("content://docs/slow.md")
+    }
+
+    @Test
+    fun `edge cases`() {
+        shouldThrow<IllegalStateException> { SftpViewModel(SavedStateHandle(), manager, queue) }
+        sftp.link("$HOME/dangling", "$HOME/gone")
+        val vm = viewModel()
+        vm.activate(vm.entry("dangling"))
+        vm.state.value.notice
+            .shouldBeInstanceOf<SftpNotice.Failed>()
+        vm.consumeNotice()
+
+        // An upload that finishes after the user moved to another folder doesn't refresh it.
+        sftp.transferGate = CompletableDeferred()
+        documents.inputs["content://docs/x"] = "x".toByteArray()
+        vm.upload(listOf(Uri.parse("content://docs/x")))
+        vm.open("$HOME/src")
+        sftp.transferGate!!.complete(Unit)
+        vm.transfers.value
+            .single()
+            .status shouldBe TransferStatus.DONE
+        vm.state.value.entries shouldBe emptyList()
+
+        vm.open(HOME)
+        vm.openEditor(vm.entry("notes.md"))
+        clear(vm)
+        vm.save()
+        vm.open(HOME)
+        vm.state.value.editor!!
+            .saving shouldBe false
     }
 
     @Test

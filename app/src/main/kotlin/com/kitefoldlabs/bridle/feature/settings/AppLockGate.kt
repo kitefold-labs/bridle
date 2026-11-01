@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -22,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,19 +36,19 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun AppLockGate(
-    viewModel: AppLockViewModel = hiltViewModel(),
-    unlocker: Unlocker = rememberBiometricUnlocker(),
+    viewModel: AppLockViewModel,
+    unlocker: Unlocker,
     content: @Composable () -> Unit,
 ) {
     val screen by viewModel.screen.collectAsStateWithLifecycle()
-    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.onForeground() }
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onBackground() }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) @DontMemoize { viewModel.onForeground() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) @DontMemoize { viewModel.onBackground() }
     val covered = screen != LockScreen.UNLOCKED
     Box(Modifier.fillMaxSize()) {
         Box(if (covered) Modifier.clearAndSetSemantics {} else Modifier) { content() }
         when (screen) {
             LockScreen.PENDING -> Surface(Modifier.fillMaxSize()) {}
-            LockScreen.LOCKED -> LockScreenContent(unlocker, viewModel::unlock)
+            LockScreen.LOCKED -> LockScreenContent(unlocker, @DontMemoize { viewModel.unlock() })
             LockScreen.UNLOCKED -> Unit
         }
     }
@@ -60,7 +60,7 @@ private fun LockScreenContent(
     onUnlocked: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val attempt: () -> Unit = { scope.launch { if (unlocker.unlock()) onUnlocked() } }
+    val attempt: () -> Unit = @DontMemoize { scope.launch { if (unlocker.unlock()) onUnlocked() } }
     LaunchedEffect(Unit) { attempt() }
     Surface(Modifier.fillMaxSize()) {
         Column(

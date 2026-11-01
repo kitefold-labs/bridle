@@ -15,6 +15,7 @@ import com.kitefoldlabs.bridle.feature.FakeConnection
 import com.kitefoldlabs.bridle.feature.connections
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -169,6 +170,11 @@ class ForwardsTest {
                 vm.state.value.statuses
                     .isEmpty()
         }
+    }
+
+    @Test
+    fun `the host id is required`() {
+        shouldThrow<IllegalStateException> { ForwardsViewModel(SavedStateHandle(), data.portForwards, forwards) }
     }
 
     @Test

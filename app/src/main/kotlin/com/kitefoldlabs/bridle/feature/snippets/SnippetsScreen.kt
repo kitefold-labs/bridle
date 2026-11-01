@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +69,7 @@ fun SnippetsScreen(
     val snackbar = remember { SnackbarHostState() }
     val notice = state.notice?.let { stringResource(noticeText(it)) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(state.notice) {
+    LaunchedEffect(state.notice) @DontMemoize {
         if (notice != null) {
             viewModel.consumeNotice()
             // Not in this effect: consuming the notice restarts it, which would dismiss the snackbar.
@@ -177,7 +178,7 @@ private fun SnippetRow(
                 }
             }
         },
-        modifier = Modifier.clickable(role = Role.Button) { viewModel.startRun(snippet) },
+        modifier = Modifier.clickable(role = Role.Button) @DontMemoize { viewModel.startRun(snippet) },
     )
 }
 
@@ -187,7 +188,7 @@ private fun SnippetEditorDialog(
     viewModel: SnippetsViewModel,
 ) {
     AlertDialog(
-        onDismissRequest = viewModel::cancelDraft,
+        onDismissRequest = @DontMemoize { viewModel.cancelDraft() },
         title = { Text(stringResource(if (draft.id == 0L) R.string.snippets_add else R.string.snippets_edit)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -273,13 +274,13 @@ private fun SnippetRunDialog(
 ) {
     val exec = run.snippet.runMode == SnippetRunMode.EXEC
     AlertDialog(
-        onDismissRequest = viewModel::closeRun,
+        onDismissRequest = @DontMemoize { viewModel.closeRun() },
         title = { Text(run.snippet.name) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 run.snippet.variables.forEach { variable ->
                     OutlinedTextField(
-                        value = run.values[variable.name].orEmpty(),
+                        value = run.values.getValue(variable.name),
                         onValueChange = { viewModel.setValue(variable.name, it) },
                         label = { Text(variable.name) },
                         singleLine = true,

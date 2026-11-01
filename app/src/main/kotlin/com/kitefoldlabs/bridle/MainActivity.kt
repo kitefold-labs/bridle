@@ -23,6 +23,7 @@ class MainActivity : FragmentActivity() {
                     mapOf(
                         TopLevel.SETTINGS to { SettingsRoute() },
                     ),
+                routes = {},
             )
         }
     }

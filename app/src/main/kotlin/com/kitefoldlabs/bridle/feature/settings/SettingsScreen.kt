@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -64,7 +65,7 @@ fun SettingsScreen(
             ) { CircularProgressIndicator() }
         else -> SettingsList(current, viewModel, backup, onPage = { page = it })
     }
-    BackHandler(enabled = page != SettingsPage.MAIN && keyBar == null) { page = SettingsPage.MAIN }
+    BackHandler(enabled = page != SettingsPage.MAIN && keyBar == null) @DontMemoize { page = SettingsPage.MAIN }
 }
 
 @Composable
@@ -238,14 +239,14 @@ private fun SettingsChoiceDialog(
         SettingsChoice.THEME ->
             ChoiceDialog(R.string.settings_theme, ThemeMode.entries, settings.theme, {
                 stringResource(themeLabel(it))
-            }, viewModel::setTheme, onDismiss)
+            }, @DontMemoize { viewModel.setTheme(it) }, onDismiss)
         SettingsChoice.FONT ->
             ChoiceDialog(
                 R.string.settings_font,
                 TerminalFont.entries,
                 TerminalFont.of(settings.fontFamilyId),
                 { stringResource(fontLabel(it)) },
-                viewModel::setFont,
+                @DontMemoize { viewModel.setFont(it) },
                 onDismiss,
             )
         SettingsChoice.KEY_BAR ->
@@ -254,7 +255,7 @@ private fun SettingsChoiceDialog(
                 KeyBarPreset.entries,
                 KeyBarPreset.of(settings.keyBarLayout),
                 { stringResource(presetLabel(it)) },
-                viewModel::setKeyBarPreset,
+                @DontMemoize { viewModel.setKeyBarPreset(it) },
                 onDismiss,
             )
         SettingsChoice.BACKSPACE ->
@@ -263,7 +264,7 @@ private fun SettingsChoiceDialog(
                 BackspaceMode.entries,
                 settings.backspaceMode,
                 { stringResource(backspaceLabel(it)) },
-                viewModel::setBackspaceMode,
+                @DontMemoize { viewModel.setBackspaceMode(it) },
                 onDismiss,
             )
     }

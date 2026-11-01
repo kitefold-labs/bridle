@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,7 +75,7 @@ fun SftpScreen(
     val snackbar = remember { SnackbarHostState() }
     val noticeText = state.notice?.let { noticeText(it) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(state.notice) {
+    LaunchedEffect(state.notice) @DontMemoize {
         if (noticeText != null) {
             viewModel.consumeNotice()
             // Not in this effect: consuming the notice restarts it, which would dismiss the snackbar.
@@ -82,11 +83,11 @@ fun SftpScreen(
         }
     }
     val upload =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) @DontMemoize { uris ->
             viewModel.upload(uris)
         }
     val download =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MIME_BINARY)) { uri ->
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MIME_BINARY)) @DontMemoize { uri ->
             viewModel.downloadTo(uri)
         }
     LaunchedEffect(state.pendingDownload) {
@@ -233,7 +234,7 @@ private fun FileList(
 ) {
     PullToRefreshBox(
         isRefreshing = state.loading,
-        onRefresh = viewModel::refresh,
+        onRefresh = @DontMemoize { viewModel.refresh() },
         modifier = Modifier.fillMaxSize(),
     ) {
         val files = state.visible
@@ -247,7 +248,7 @@ private fun FileList(
                             Modifier.clickable(
                                 onClickLabel = stringResource(R.string.sftp_parent_folder),
                                 role = Role.Button,
-                                onClick = { viewModel.open(Sftp.parent(state.path.orEmpty())) },
+                                onClick = @DontMemoize { viewModel.open(Sftp.parent(state.path.orEmpty())) },
                             ),
                     )
                 }
@@ -296,7 +297,7 @@ private fun FileRow(
                 FileMenu(file, menu, onDismiss = { menu = false }, viewModel = viewModel, onDialog = onDialog)
             }
         },
-        modifier = Modifier.clickable(role = Role.Button) { viewModel.activate(file) },
+        modifier = Modifier.clickable(role = Role.Button) @DontMemoize { viewModel.activate(file) },
     )
 }
 
@@ -314,7 +315,7 @@ private fun FileMenu(
         action: () -> Unit,
     ) = DropdownMenuItem(
         text = { Text(stringResource(label)) },
-        onClick = {
+        onClick = @DontMemoize {
             onDismiss()
             action()
         },

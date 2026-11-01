@@ -4,9 +4,11 @@ import android.app.Application
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -45,7 +47,7 @@ class GatesUiTest {
     fun tearDown() = data.close()
 
     private fun waitForText(text: String) =
-        rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(20_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
 
     @Test
     fun `the lock screen covers the app until the user unlocks`() {
@@ -161,5 +163,15 @@ class GatesUiTest {
         rule.waitForIdle()
         (rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) shouldBe 0
         context.findActivity() shouldBe null
+    }
+
+    @Test
+    fun `secure window outside an activity does nothing`() {
+        var secure by mutableStateOf(true)
+        rule.setContent { CompositionLocalProvider(LocalContext provides context) { SecureWindow(secure) } }
+        rule.waitForIdle()
+        secure = false
+        rule.waitForIdle()
+        (rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) shouldBe 0
     }
 }

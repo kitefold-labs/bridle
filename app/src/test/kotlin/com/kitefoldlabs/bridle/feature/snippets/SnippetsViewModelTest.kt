@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.feature.FakeConnection
 import com.kitefoldlabs.bridle.feature.connections
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +79,7 @@ class SnippetsViewModelTest {
             .map { it.name } shouldBe listOf("unit", "lines")
         vm.saveDraft()
         eventually { vm.state.value.snippets.size == 1 }
-        vm.state.value.notice shouldBe SnippetNotice.SAVED
+        eventually { vm.state.value.notice == SnippetNotice.SAVED }
         vm.consumeNotice()
         vm.state.value.draft
             .shouldBeNull()
@@ -97,6 +98,16 @@ class SnippetsViewModelTest {
                 .single()
                 .packageName == "ops"
         }
+        vm.edit(
+            vm.state.value.snippets
+                .single(),
+        )
+        vm.state.value.draft!!
+            .packageName shouldBe "ops"
+        vm.cancelDraft()
+        shouldThrow<IllegalStateException> {
+            SnippetsViewModel(SavedStateHandle(), data.snippets, connections({ connection }), Optional.empty())
+        }
 
         vm.create()
         vm.cancelDraft()
@@ -114,7 +125,7 @@ class SnippetsViewModelTest {
             vm.state.value.snippets
                 .isEmpty()
         }
-        vm.state.value.notice shouldBe SnippetNotice.DELETED
+        eventually { vm.state.value.notice == SnippetNotice.DELETED }
     }
 
     @Test

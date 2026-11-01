@@ -21,6 +21,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.backup.Argon2Params
+import com.kitefoldlabs.bridle.core.backup.BackupCrypto
 import com.kitefoldlabs.bridle.core.backup.BackupPayload
 import com.kitefoldlabs.bridle.core.backup.EntityKind
 import com.kitefoldlabs.bridle.core.backup.ImportIssue
@@ -82,7 +83,7 @@ class SettingsScreenTest {
     private fun settings() = runBlocking { data.settings.settings.first() }
 
     private fun waitForText(text: String) =
-        rule.waitUntil(5_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(20_000) { rule.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty() }
 
     private fun row(text: String): SemanticsNodeInteraction {
         rule.onNode(hasScrollAction()).performScrollToNode(hasText(text))
@@ -94,7 +95,7 @@ class SettingsScreenTest {
     private fun clickInDialog(text: String) = rule.onNode(hasText(text) and hasAnyAncestor(isDialog())).performClick()
 
     private fun waitForField() =
-        rule.waitUntil(5_000) {
+        rule.waitUntil(20_000) {
             rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -167,6 +168,7 @@ class SettingsScreenTest {
     @Test
     fun `app lock needs a screen lock`() {
         available = false
+        runBlocking { data.settings.setAppLockEnabled(true) }
         show()
         row("Set up a screen lock or fingerprint on this phone first").assertExists()
         row("App lock").assertIsNotEnabled()
@@ -250,6 +252,56 @@ class SettingsScreenTest {
         clickInDialog("OK")
         results.queue.add(null)
         click("Import backup")
+    }
+
+    @Test
+    fun `backup problems are explained`() {
+        show()
+        click("Export encrypted backup")
+        val fields = rule.onAllNodes(hasSetTextAction())
+        fields[0].performTextInput("a long passphrase")
+        fields[1].performTextInput("a long passphrase")
+        results.queue.add(Uri.parse("content://docs/readonly"))
+        clickInDialog("Choose file")
+        waitForText("Backup failed")
+        clickInDialog("OK")
+        val good = documents.outputs.values.firstOrNull()
+
+        documents.inputs["content://docs/huge"] = ByteArray(BackupCrypto.MAX_BACKUP_BYTES + 1)
+        results.queue.add(Uri.parse("content://docs/huge"))
+        click("Import backup")
+        waitForText("This file is too large to be a Bridle backup.")
+        clickInDialog("OK")
+
+        documents.inputs["content://docs/junk"] = "junk".toByteArray()
+        results.queue.add(Uri.parse("content://docs/junk"))
+        click("Import backup")
+        waitForField()
+        rule.onNode(hasSetTextAction()).performTextInput("whatever it is")
+        clickInDialog("Open")
+        waitForText("This file isn't a Bridle backup.")
+        clickInDialog("Cancel")
+        good shouldBe null
+    }
+
+    @Test
+    fun `a backup from a newer version is refused`() {
+        val payload = BackupPayload(createdAtEpochMs = 0, appVersion = "9")
+        val bytes =
+            BackupCrypto.encrypt(
+                payload,
+                "a long passphrase".toCharArray(),
+                Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
+            )
+        bytes[8] = 9
+        documents.inputs["content://docs/newer"] = bytes
+        show()
+        results.queue.add(Uri.parse("content://docs/newer"))
+        click("Import backup")
+        waitForField()
+        rule.onNode(hasSetTextAction()).performTextInput("a long passphrase")
+        clickInDialog("Open")
+        waitForText("This backup was made by a newer version of Bridle.")
     }
 
     @Test

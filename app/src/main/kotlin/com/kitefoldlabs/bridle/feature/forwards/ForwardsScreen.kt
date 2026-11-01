@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,21 +128,22 @@ private fun forwardLabel(forward: PortForward): String =
             stringResource(
                 R.string.forwards_local_label,
                 forward.bindPort,
-                forward.destHost.orEmpty(),
-                forward.destPort ?: 0,
+                "${forward.destHost}",
+                "${forward.destPort}",
             )
         PortForwardType.DYNAMIC -> stringResource(R.string.forwards_dynamic_label, forward.bindPort)
     }
 
 @Composable
-private fun statusText(status: ForwardStatus?): String =
-    when (status?.phase) {
-        null -> stringResource(R.string.forwards_stopped)
+private fun statusText(status: ForwardStatus?): String {
+    if (status == null) return stringResource(R.string.forwards_stopped)
+    return when (status.phase) {
         ForwardStatus.Phase.STARTING -> stringResource(R.string.forwards_starting)
         ForwardStatus.Phase.RUNNING ->
             pluralStringResource(R.plurals.forwards_running, status.connections, status.connections)
         ForwardStatus.Phase.FAILED -> stringResource(R.string.forwards_failed, status.error.orEmpty())
     }
+}
 
 @Composable
 private fun ForwardRow(
@@ -201,7 +203,7 @@ private fun ForwardEditorDialog(
 ) {
     val local = draft.type == PortForwardType.LOCAL
     AlertDialog(
-        onDismissRequest = viewModel::cancelDraft,
+        onDismissRequest = @DontMemoize { viewModel.cancelDraft() },
         title = { Text(stringResource(if (draft.id == 0L) R.string.forwards_add else R.string.forwards_edit)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -259,7 +261,7 @@ private fun DestinationFields(
 ) {
     OutlinedTextField(
         value = draft.destHost,
-        onValueChange = { host ->
+        onValueChange = @DontMemoize { host ->
             viewModel.updateDraft {
                 it.copy(
                     destHost = host,
@@ -273,7 +275,8 @@ private fun DestinationFields(
         supportingText = { Text(stringResource(R.string.forwards_dest_host_help)) },
         singleLine = true,
     )
-    PortField(draft.destPort, R.string.forwards_dest_port, ForwardField.DEST_PORT in draft.errors) { port ->
+    val portError = ForwardField.DEST_PORT in draft.errors
+    PortField(draft.destPort, R.string.forwards_dest_port, portError) @DontMemoize { port ->
         viewModel.updateDraft { it.copy(destPort = port, errors = it.errors - ForwardField.DEST_PORT) }
     }
 }

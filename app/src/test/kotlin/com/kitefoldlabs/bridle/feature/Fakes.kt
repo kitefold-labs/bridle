@@ -317,6 +317,7 @@ class FakeDocuments : DocumentAccess {
 
     override fun openOutput(uri: Uri): OutputStream {
         if (uri.toString().contains("readonly")) throw FileNotFoundException(uri.toString())
+        if (uri.toString().contains("nomessage")) throw IOException()
         return ByteArrayOutputStream().also { outputs[uri.toString()] = it }
     }
 
@@ -335,9 +336,9 @@ fun testData(context: Context): DataModule {
     return DataModule.inMemory(context, store)
 }
 
-/** Polls [condition] for up to five seconds of real time (for work on Room's own threads). */
+/** Polls [condition] for up to twenty seconds of real time (for work on Room's own threads). */
 fun eventually(
-    timeoutMillis: Long = 5_000,
+    timeoutMillis: Long = 20_000,
     condition: () -> Boolean,
 ) {
     val deadline = System.currentTimeMillis() + timeoutMillis

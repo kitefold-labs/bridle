@@ -22,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +42,7 @@ internal fun SftpEditor(
     snackbar: SnackbarHostState,
 ) {
     var confirmDiscard by remember { mutableStateOf(false) }
-    val close = { if (editor.dirty) confirmDiscard = true else viewModel.closeEditor() }
+    val close = @DontMemoize { if (editor.dirty) confirmDiscard = true else viewModel.closeEditor() }
     BackHandler(onBack = close)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -113,7 +114,7 @@ private fun BinaryWarning(
 @Composable
 private fun ConflictDialog(viewModel: SftpViewModel) {
     AlertDialog(
-        onDismissRequest = viewModel::dismissConflict,
+        onDismissRequest = @DontMemoize { viewModel.dismissConflict() },
         title = { Text(stringResource(R.string.sftp_conflict_title)) },
         text = { Text(stringResource(R.string.sftp_conflict_message)) },
         confirmButton = {

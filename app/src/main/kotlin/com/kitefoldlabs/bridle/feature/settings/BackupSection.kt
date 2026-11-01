@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,12 +37,14 @@ import com.kitefoldlabs.bridle.core.backup.BackupCrypto
 internal fun BackupSection(viewModel: BackupViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val save =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BACKUP_MIME)) { uri ->
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BACKUP_MIME)) @DontMemoize { uri ->
             viewModel.exportTo(uri)
         }
     val open =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> viewModel.importFrom(uri) }
-    LaunchedEffect(state.pickExportFile) {
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) @DontMemoize { uri ->
+            viewModel.importFrom(uri)
+        }
+    LaunchedEffect(state.pickExportFile) @DontMemoize {
         if (state.pickExportFile) {
             viewModel.exportPickerShown()
             save.launch(state.suggestedName)
@@ -51,7 +54,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
         SectionHeader(R.string.settings_backup)
         ClickRow(
             stringResource(R.string.backup_export),
-            viewModel::startExport,
+            @DontMemoize { viewModel.startExport() },
             stringResource(R.string.backup_export_summary),
         )
         ClickRow(stringResource(R.string.backup_import), {
@@ -67,10 +70,10 @@ internal fun BackupSection(viewModel: BackupViewModel) {
         MessageDialog(
             stringResource(R.string.backup_import_failed),
             stringResource(importProblemText(problem)),
-            viewModel::dismissResult,
+            @DontMemoize { viewModel.dismissResult() },
         )
     }
-    state.result?.let { ResultDialog(it, viewModel::dismissResult) }
+    state.result?.let { ResultDialog(it, @DontMemoize { viewModel.dismissResult() }) }
 }
 
 @Composable
@@ -81,7 +84,7 @@ private fun ExportDialog(
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     AlertDialog(
-        onDismissRequest = viewModel::cancelExport,
+        onDismissRequest = @DontMemoize { viewModel.cancelExport() },
         title = { Text(stringResource(R.string.backup_export)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,7 +129,7 @@ private fun ImportPassphraseDialog(
     var passphrase by remember { mutableStateOf("") }
     val problem = state.importProblem
     AlertDialog(
-        onDismissRequest = viewModel::cancelImport,
+        onDismissRequest = @DontMemoize { viewModel.cancelImport() },
         title = { Text(stringResource(R.string.backup_import)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -181,7 +184,7 @@ internal fun ImportReviewDialog(
 ) {
     val plan = review.plan
     AlertDialog(
-        onDismissRequest = viewModel::cancelImport,
+        onDismissRequest = @DontMemoize { viewModel.cancelImport() },
         title = { Text(stringResource(R.string.backup_review_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

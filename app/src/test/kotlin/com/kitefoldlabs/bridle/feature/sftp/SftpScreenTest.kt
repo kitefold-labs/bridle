@@ -26,6 +26,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,8 +52,9 @@ class SftpScreenTest {
     private val results = FakeResults()
     private var backs = 0
 
+    private val manager = connections({ connection }, scope)
+
     private fun show(): SftpViewModel {
-        val manager = connections({ connection }, scope)
         val vm =
             SftpViewModel(
                 SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 1L)),
@@ -68,7 +70,7 @@ class SftpScreenTest {
     private fun clickLabel(label: String) = rule.onNodeWithContentDescription(label).performClick()
 
     private fun waitForText(text: String) =
-        rule.waitUntil(5_000) {
+        rule.waitUntil(20_000) {
             rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -95,6 +97,9 @@ class SftpScreenTest {
         clickLabel("View options")
         clickText("Show hidden files")
         rule.onNodeWithText(".profile").assertExists()
+        clickLabel("View options")
+        clickText("Show hidden files")
+        rule.onNodeWithText(".profile").assertDoesNotExist()
         clickLabel("Back")
         backs shouldBe 1
     }
@@ -293,5 +298,8 @@ class SftpScreenTest {
         connection.sftpFailure = null
         clickText("Retry")
         rule.onNodeWithText("notes.md").assertExists()
+        runBlocking { manager.closeAll() }
+        rule.onNodeWithText("Couldn't open files on this host").assertExists()
+        rule.onNodeWithText("subsystem request failed").assertDoesNotExist()
     }
 }

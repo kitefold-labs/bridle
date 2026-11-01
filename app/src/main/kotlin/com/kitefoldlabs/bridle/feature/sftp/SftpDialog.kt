@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,9 +59,14 @@ internal fun SftpDialogs(
 ) {
     when (dialog) {
         SftpDialog.NewFolder ->
-            TextInputDialog(R.string.sftp_new_folder, R.string.sftp_name, "", onDismiss) { viewModel.mkdir(it) }
+            TextInputDialog(
+                R.string.sftp_new_folder,
+                R.string.sftp_name,
+                "",
+                onDismiss,
+            ) @DontMemoize { viewModel.mkdir(it) }
         is SftpDialog.Rename ->
-            TextInputDialog(R.string.sftp_rename, R.string.sftp_name, dialog.file.name, onDismiss) {
+            TextInputDialog(R.string.sftp_rename, R.string.sftp_name, dialog.file.name, onDismiss) @DontMemoize {
                 viewModel.rename(dialog.file, it)
             }
         is SftpDialog.Permissions ->
@@ -70,7 +76,7 @@ internal fun SftpDialogs(
                 initial = SftpListing.octal(dialog.file.permissions),
                 onDismiss = onDismiss,
                 keyboardType = KeyboardType.Number,
-            ) { viewModel.chmod(dialog.file, it) }
+            ) @DontMemoize { viewModel.chmod(dialog.file, it) }
         is SftpDialog.Delete -> DeleteDialog(dialog, viewModel, onDismiss)
         SftpDialog.Transfers -> TransfersDialog(transfers, viewModel, onDismiss)
     }
@@ -144,7 +150,7 @@ private fun TransferRow(
             }
         }
         if (transfer.isActive) {
-            IconButton(onClick = { onCancel(transfer.id) }) {
+            IconButton(onClick = @DontMemoize { onCancel(transfer.id) }) {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = stringResource(R.string.sftp_cancel_transfer, transfer.name),

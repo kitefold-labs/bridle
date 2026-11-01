@@ -78,6 +78,8 @@ class SettingsViewModelTest {
         s.notificationsEnabled shouldBe false
         (NotificationEvent.CONNECTION_LOST in s.notificationEvents) shouldBe false
         s.useHelperByDefault shouldBe false
+        vm.setAppLock(false)
+        eventually { !vm.current().appLockEnabled }
     }
 
     @Test

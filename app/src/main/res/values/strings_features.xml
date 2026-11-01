@@ -90,7 +90,7 @@
     <string name="forwards_edit">Edit port forward</string>
     <string name="forwards_explanation">Forwards listen on this phone\'s loopback address (127.0.0.1) only, so apps on this phone can use them but other devices on your network can\'t.</string>
     <string name="forwards_empty">No port forwards yet.</string>
-    <string name="forwards_local_label">localhost:%1$d → %2$s:%3$d</string>
+    <string name="forwards_local_label">localhost:%1$d → %2$s:%3$s</string>
     <string name="forwards_dynamic_label">SOCKS proxy on localhost:%1$d</string>
     <string name="forwards_stopped">Stopped</string>
     <string name="forwards_starting">Starting…</string>
