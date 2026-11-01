@@ -10,13 +10,12 @@ plugins {
 // Coverage: every module's Kover data is merged here and gated at >= 95% line AND branch
 // coverage of handwritten code. Only generated code is excluded (see docs/development.md).
 // ---------------------------------------------------------------------------------------------
+// Every module with a build file is covered automatically, so a new module can't silently skip
+// the gate.
 val coveredModules =
-    listOf(
-        ":core:model",
-        ":core:ssh",
-        ":core:tmux",
-        ":core:session",
-    )
+    rootProject.subprojects
+        .filter { it.buildFile.exists() }
+        .map { it.path }
 
 dependencies {
     coveredModules.forEach { kover(project(it)) }
@@ -29,7 +28,12 @@ kover {
     reports {
         filters {
             excludes {
-                annotatedBy("*Generated*", "androidx.compose.ui.tooling.preview.Preview")
+                annotatedBy(
+                    "javax.annotation.processing.Generated",
+                    "javax.annotation.Generated",
+                    "dagger.internal.DaggerGenerated",
+                    "androidx.compose.ui.tooling.preview.Preview",
+                )
                 classes(
                     "*.BuildConfig",
                     "*.R",
