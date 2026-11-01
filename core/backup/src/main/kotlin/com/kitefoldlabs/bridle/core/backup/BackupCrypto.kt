@@ -8,6 +8,7 @@ import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import javax.crypto.AEADBadTagException
@@ -243,7 +244,8 @@ public object BackupCrypto {
             throw MalformedBackupException("unreadable contents")
         }
 
-    private fun deriveKey(
+    // Internal so tests can check the AAD binding independently of key derivation.
+    internal fun deriveKey(
         passphrase: CharArray,
         salt: ByteArray,
         params: Argon2Params,
@@ -268,9 +270,22 @@ public object BackupCrypto {
         return key
     }
 
-    /** UTF-8 encodes [chars] without creating a String, wiping the intermediate buffer. */
-    private fun utf8(chars: CharArray): ByteArray {
-        val buffer = StandardCharsets.UTF_8.encode(CharBuffer.wrap(chars))
+    /**
+     * UTF-8 encodes [chars] without creating a String, wiping the intermediate buffer. Same bytes
+     * as `String(chars).toByteArray(UTF_8)` (a lone surrogate becomes `?`). The buffer is sized
+     * for the worst case up front: `Charset.encode` starts smaller and grows by copying, which
+     * left unwiped copies of non-ASCII passphrases on the heap.
+     */
+    internal fun utf8(chars: CharArray): ByteArray {
+        val encoder =
+            StandardCharsets.UTF_8
+                .newEncoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE)
+        val buffer = ByteBuffer.allocate(chars.size * encoder.maxBytesPerChar().toInt())
+        encoder.encode(CharBuffer.wrap(chars), buffer, true)
+        encoder.flush(buffer)
+        buffer.flip()
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
         buffer.array().fill(0)

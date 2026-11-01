@@ -21,6 +21,10 @@ import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
+import javax.crypto.AEADBadTagException
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 class BackupCryptoTest {
     private fun pass(value: String = PASSPHRASE) = value.toCharArray()
@@ -95,6 +99,18 @@ class BackupCryptoTest {
     }
 
     @Test
+    fun `passphrases are encoded exactly like String UTF-8`() =
+        runBlocking<Unit> {
+            val samples = listOf("", "ascii only", "日本語のパスフレーズ".repeat(20), "🔑".repeat(30), "a\uD800b", "\uDC00")
+            samples.forEach { BackupCrypto.utf8(it.toCharArray()).toList() shouldBe it.toByteArray().toList() }
+            // Any UTF-16 units, including unpaired surrogates and supplementary characters.
+            checkAll(200, Arb.list(Arb.int(0..0xFFFF), 0..64)) { units ->
+                val chars = CharArray(units.size) { units[it].toChar() }
+                BackupCrypto.utf8(chars).toList() shouldBe String(chars).toByteArray(Charsets.UTF_8).toList()
+            }
+        }
+
+    @Test
     fun `rejects files that are not backups`() {
         shouldThrow<MalformedBackupException> { BackupCrypto.decrypt(ByteArray(0), pass()) }
         shouldThrow<MalformedBackupException> { BackupCrypto.decrypt("BRIDLE".toByteArray(), pass()) }
@@ -158,9 +174,32 @@ class BackupCryptoTest {
     fun `tampering with any header byte is detected`() {
         val bytes = encrypted()
         for (i in 0 until BackupCrypto.HEADER_BYTES) {
-            // Low bit flip keeps most parameters in range, so the AAD check itself is exercised.
+            // Low bit flip keeps most parameters in range. Note that it also changes the derived
+            // key or nonce, so this alone does not prove the AAD binding; see the next test.
             val tampered = bytes.copyOf().also { it[i] = (it[i].toInt() xor 1).toByte() }
             shouldThrow<BackupException> { BackupCrypto.decrypt(tampered, pass()) }
+        }
+    }
+
+    @Test
+    fun `the whole header is bound as additional authenticated data`() {
+        val bytes = encrypted()
+        val header = bytes.copyOfRange(0, BackupCrypto.HEADER_BYTES)
+        val key = BackupCrypto.deriveKey(pass(), bytes.copyOfRange(19, 35), FAST)
+
+        // Decrypts with the right key and nonce, so only the AAD can make it fail.
+        fun open(aad: ByteArray?): ByteArray {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val spec = GCMParameterSpec(BackupCrypto.TAG_BYTES * 8, bytes.copyOfRange(35, 47))
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), spec)
+            aad?.let { cipher.updateAAD(it) }
+            return cipher.doFinal(bytes, BackupCrypto.HEADER_BYTES, bytes.size - BackupCrypto.HEADER_BYTES)
+        }
+        String(open(header), Charsets.UTF_8) shouldContain "\"formatVersion\":1"
+        shouldThrow<AEADBadTagException> { open(null) }
+        shouldThrow<AEADBadTagException> { open(header.copyOf(BackupCrypto.HEADER_BYTES - 1)) }
+        for (i in header.indices) {
+            shouldThrow<AEADBadTagException> { open(header.copyOf().also { it[i] = (it[i].toInt() xor 1).toByte() }) }
         }
     }
 
