@@ -84,14 +84,11 @@ class CrashReportViewModel
             mutable.value = CrashPrompt.Review(current.report)
         }
 
-        /** The issue URL for [report] with the user's [notes]; the report is then discarded. */
-        fun file(
+        /** The issue URL for [report] with the user's [notes]. Call [discard] once it has been opened. */
+        fun issueUrl(
             report: CrashReport,
             notes: String,
-        ): String {
-            discard()
-            return reporter.issueUrl(report, notes.trim())
-        }
+        ): String = reporter.issueUrl(report, notes.trim())
 
         /** Deletes the report without filing it. */
         fun discard() {
@@ -129,6 +126,7 @@ private fun ReviewDialog(
     viewModel: CrashReportViewModel,
 ) {
     var notes by rememberSaveable { mutableStateOf("") }
+    var noBrowser by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     AlertDialog(
         onDismissRequest = {},
@@ -154,10 +152,17 @@ private fun ReviewDialog(
                     label = { Text(stringResource(R.string.crash_notes)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (noBrowser) Text(stringResource(R.string.crash_no_browser), color = MaterialTheme.colorScheme.error)
             }
         },
         confirmButton = {
-            TextButton(onClick = @DontMemoize { uriHandler.openUri(viewModel.file(report, notes)) }) {
+            // The report is only deleted once the issue page actually opened.
+            TextButton(
+                onClick = @DontMemoize {
+                    noBrowser = !uriHandler.tryOpen(viewModel.issueUrl(report, notes))
+                    if (!noBrowser) viewModel.discard()
+                },
+            ) {
                 Text(stringResource(R.string.crash_open_issue))
             }
         },

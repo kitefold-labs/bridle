@@ -35,7 +35,11 @@ class FakeResults : ActivityResultRegistry() {
 class FakeUris : UriHandler {
     val opened = mutableListOf<String>()
 
+    /** Behave like a phone with no browser: Compose's handler throws. */
+    var noBrowser = false
+
     override fun openUri(uri: String) {
+        if (noBrowser) throw IllegalArgumentException("Can't open $uri.")
         opened += uri
     }
 }

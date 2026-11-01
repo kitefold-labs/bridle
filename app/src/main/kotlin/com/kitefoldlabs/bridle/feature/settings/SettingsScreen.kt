@@ -222,7 +222,7 @@ private fun LazyListScope.about(onPage: (SettingsPage) -> Unit) {
         ClickRow(stringResource(R.string.settings_privacy_statement), { onPage(SettingsPage.PRIVACY) })
         ClickRow(
             stringResource(R.string.settings_source),
-            { uriHandler.openUri(Licences.SOURCE_URL) },
+            { uriHandler.tryOpen(Licences.SOURCE_URL) },
             Licences.SOURCE_URL,
         )
     }

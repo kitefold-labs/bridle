@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.feature.onboarding.OnboardingStore
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingViewModel
 import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
@@ -106,9 +107,11 @@ class AppLockAndCrashTest {
                     .crashReportingOptIn
             }
         }
-        val url = vm.file(vm.prompt.value!!.report, "  tapped connect  ")
+        val url = vm.issueUrl(vm.prompt.value!!.report, "  tapped connect  ")
         url shouldStartWith "https://github.com/"
         url shouldContain "tapped"
+        reporter.pending().shouldNotBeNull() // kept until the page has opened
+        vm.discard()
         vm.prompt.value.shouldBeNull()
         reporter.pending().shouldBeNull()
         vm.accept()

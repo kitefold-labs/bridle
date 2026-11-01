@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.feature.settings
 
+import android.content.ActivityNotFoundException
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -141,5 +143,19 @@ internal fun PageBar(
         actions = { actions() },
     )
 }
+
+/**
+ * Opens [uri] in the browser. Returns false instead of crashing when nothing can open links (no
+ * browser, or one disabled by a work profile): Compose's handler throws in that case.
+ */
+internal fun UriHandler.tryOpen(uri: String): Boolean =
+    try {
+        openUri(uri)
+        true
+    } catch (ignored: IllegalArgumentException) {
+        false
+    } catch (ignored: ActivityNotFoundException) {
+        false
+    }
 
 private const val DISABLED_ALPHA = 0.38f

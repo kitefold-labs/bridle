@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.feature.settings
 
 import android.app.Application
+import android.content.ActivityNotFoundException
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -9,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -25,6 +27,7 @@ import com.kitefoldlabs.bridle.feature.onboarding.OnboardingStore
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingViewModel
 import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -116,6 +119,11 @@ class GatesUiTest {
         rule.onNodeWithText("Review report").performClick()
         waitForText("IllegalStateException")
         rule.onNode(hasSetTextAction()).performTextInput("opened a tab")
+        uris.noBrowser = true
+        rule.onNodeWithText("Open GitHub issue").performClick()
+        waitForText("No app on this phone can open the GitHub page.")
+        reporter.pending() shouldNotBe null // not lost because the link failed
+        uris.noBrowser = false
         rule.onNodeWithText("Open GitHub issue").performClick()
         uris.opened.single() shouldStartWith "https://github.com/"
         rule.onNodeWithText("Bridle closed unexpectedly").assertDoesNotExist()
@@ -182,6 +190,17 @@ class GatesUiTest {
         waitForText("Add a host")
         rule.onNodeWithText("Add a host").performClick()
         hosts shouldBe 1
+    }
+
+    @Test
+    fun `links that nothing can open don't crash`() {
+        fun throwing(e: RuntimeException) =
+            object : UriHandler {
+                override fun openUri(uri: String) = throw e
+            }
+        throwing(IllegalArgumentException()).tryOpen("https://example.com") shouldBe false
+        throwing(ActivityNotFoundException()).tryOpen("https://example.com") shouldBe false
+        FakeUris().tryOpen("https://example.com") shouldBe true
     }
 
     @Test

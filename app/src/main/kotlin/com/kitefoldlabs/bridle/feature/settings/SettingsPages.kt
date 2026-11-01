@@ -76,7 +76,7 @@ internal fun LicencesPage(onBack: () -> Unit) {
                 ListItem(
                     headlineContent = { Text(licence.component) },
                     supportingContent = { Text(licence.licence) },
-                    modifier = Modifier.clickable(role = Role.Button) { uriHandler.openUri(licence.url) },
+                    modifier = Modifier.clickable(role = Role.Button) { uriHandler.tryOpen(licence.url) },
                 )
             }
         }
@@ -93,7 +93,7 @@ internal fun PrivacyPage(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stringResource(R.string.privacy_statement), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { uriHandler.openUri(Licences.PRIVACY_URL) }) {
+            TextButton(onClick = { uriHandler.tryOpen(Licences.PRIVACY_URL) }) {
                 Text(stringResource(R.string.privacy_full_policy))
             }
         }
