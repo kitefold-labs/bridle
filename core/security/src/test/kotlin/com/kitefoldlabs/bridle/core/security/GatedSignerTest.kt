@@ -18,6 +18,7 @@ import java.security.InvalidKeyException
 import java.security.PublicKey
 import java.security.Signature
 import java.security.SignatureException
+import javax.crypto.Cipher
 
 /** Signer that throws the queued exceptions before succeeding. */
 private class ScriptedSigner(
@@ -165,6 +166,8 @@ class GatedSignerTest {
         val jca = JcaSshKeySigner(pair.public, pair.private)
         GatedSigner(jca, gate, "r", appEnforcedValidityMillis = 0).sign("ecdsa-sha2-nistp256", byteArrayOf(1))
         gate.calls shouldBe 2
+        runBlocking { gate.authenticate("r", Cipher.getInstance("AES/GCM/NoPadding")) } shouldBe true
+        gate.calls shouldBe 3
         UserAuthenticationException().message shouldBe "User authentication was cancelled or failed"
     }
 }
