@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hosts, keys, known hosts and the connection dialogs. -->
+<resources>
+    <!-- Shared actions -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_choose_file">Choose file</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_create">Create</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_done">Done</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_ok">OK</string>
+    <string name="action_save">Save</string>
+    <string name="action_share">Share</string>
+
+    <!-- Validation -->
+    <string name="validation_blank">Required</string>
+    <string name="validation_too_long">Too long</string>
+    <string name="validation_illegal_characters">Contains characters that aren\'t allowed here</string>
+    <string name="validation_out_of_range">Out of range</string>
+
+    <!-- Connection state -->
+    <string name="connection_idle">Not connected</string>
+    <string name="connection_connecting">Connecting</string>
+    <string name="connection_reconnecting">Reconnecting</string>
+    <string name="connection_connected">Connected</string>
+    <string name="connection_failed">Connection failed</string>
+
+    <!-- Hosts list -->
+    <string name="hosts_title">Hosts</string>
+    <string name="hosts_add">Add host</string>
+    <string name="hosts_import">Import from ~/.ssh/config</string>
+    <string name="hosts_search">Search hosts</string>
+    <string name="hosts_empty">No hosts yet. Tap + to add one, or import your ~/.ssh/config.</string>
+    <string name="hosts_no_results">No hosts match your search.</string>
+    <string name="hosts_section_favorites">Favorites</string>
+    <string name="hosts_section_recent">Recent</string>
+    <string name="hosts_section_other">Other hosts</string>
+    <string name="hosts_section_results">Search results</string>
+    <string name="hosts_open_terminal">Open terminal</string>
+    <string name="hosts_more_actions">More actions for %1$s</string>
+    <string name="hosts_favorite">Add to favorites</string>
+    <string name="hosts_unfavorite">Remove from favorites</string>
+    <string name="hosts_delete_title">Delete %1$s?</string>
+    <string name="hosts_delete_text">Its launch profiles, port forwards and compose history are deleted too. Nothing on the server changes.</string>
+
+    <!-- Host editor -->
+    <string name="host_editor_add">Add host</string>
+    <string name="host_editor_edit">Edit host</string>
+    <string name="host_editor_not_found">This host no longer exists.</string>
+    <string name="host_editor_missing_reference">The key, jump host or group you picked was deleted. Pick another one.</string>
+    <string name="host_editor_label">Name</string>
+    <string name="host_editor_hostname">Host name or IP address</string>
+    <string name="host_editor_hostname_help">With Tailscale, use the machine\'s MagicDNS name (e.g. devbox or devbox.tailnet-name.ts.net) or its 100.x.y.z address.</string>
+    <string name="host_editor_port">Port</string>
+    <string name="host_editor_username">Username</string>
+    <string name="host_editor_section_auth">Authentication</string>
+    <string name="host_editor_identity">Key</string>
+    <string name="host_editor_identity_none">None (ask for a password)</string>
+    <string name="host_editor_section_session">Session</string>
+    <string name="host_editor_tmux">Default tmux session</string>
+    <string name="host_editor_tmux_help">Terminals attach to (or create) this tmux session, so work survives disconnects. Leave empty for a plain shell.</string>
+    <string name="host_editor_startup">Startup command</string>
+    <string name="host_editor_env">Environment variables</string>
+    <string name="host_editor_env_help">One NAME=value per line.</string>
+    <string name="host_editor_jump">Jump host (ProxyJump)</string>
+    <string name="host_editor_jump_none">None (connect directly)</string>
+    <string name="host_editor_keepalive">Keepalive interval (seconds)</string>
+    <string name="host_editor_keepalive_help">How often to check the connection is alive, 0 to 3600. 0 turns keepalives off.</string>
+    <string name="host_editor_section_organize">Organize</string>
+    <string name="host_editor_group">Group</string>
+    <string name="host_editor_group_none">No group</string>
+    <string name="host_editor_group_new">New group…</string>
+    <string name="host_editor_group_name">Group name</string>
+    <string name="host_editor_color">Color</string>
+    <string name="host_editor_tags">Tags</string>
+    <string name="host_editor_tags_help">Separate tags with commas.</string>
+    <string name="host_editor_favorite">Favorite</string>
+    <string name="color_none">None</string>
+    <string name="color_red">Red</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_green">Green</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_purple">Purple</string>
+
+    <!-- ssh_config import -->
+    <string name="ssh_import_title">Import ~/.ssh/config</string>
+    <string name="ssh_import_intro">Paste the contents of your ~/.ssh/config, or choose the file. Host blocks become hosts; private keys are never read from IdentityFile paths.</string>
+    <string name="ssh_import_paste">ssh config</string>
+    <string name="ssh_import_default_user">Default username</string>
+    <string name="ssh_import_default_user_help">Used for entries without a User line.</string>
+    <string name="ssh_import_preview">Preview</string>
+    <string name="ssh_import_edit">Edit text</string>
+    <string name="ssh_import_warnings">Skipped lines</string>
+    <string name="ssh_import_error_too_large">That file is too large to be an ssh config.</string>
+    <string name="ssh_import_error_read">Couldn\'t read that file.</string>
+    <string name="ssh_import_error_nothing">No importable Host entries were found.</string>
+    <string name="ssh_import_note_exists">A host with this name already exists.</string>
+    <string name="ssh_import_note_no_user">No User set: enter a default username.</string>
+    <string name="ssh_import_note_invalid">Its name, address or port isn\'t valid.</string>
+    <string name="ssh_import_note_identity_file">IdentityFile is ignored: import or generate the key under Keys, then pick it for this host.</string>
+    <string name="ssh_import_note_jump_unresolved">A ProxyJump hop couldn\'t be resolved; this host will connect directly.</string>
+    <string name="ssh_import_note_jump_shortened">Only part of the ProxyJump chain could be imported.</string>
+    <string name="ssh_import_note_jump_loop">The ProxyJump settings form a loop; this host will connect directly.</string>
+    <plurals name="ssh_import_button">
+        <item quantity="one">Import %d host</item>
+        <item quantity="other">Import %d hosts</item>
+    </plurals>
+    <plurals name="ssh_import_done">
+        <item quantity="one">Imported %d host.</item>
+        <item quantity="other">Imported %d hosts.</item>
+    </plurals>
+
+    <!-- Keys -->
+    <string name="keys_title">Keys</string>
+    <string name="keys_generate">Generate key</string>
+    <string name="keys_import">Import key</string>
+    <string name="keys_open">Show key</string>
+    <string name="keys_empty">No keys yet. Tap + to generate one in this phone\'s secure hardware, or import an existing key.</string>
+    <string name="keys_badge_hardware">Hardware key</string>
+    <string name="keys_badge_software">Software key</string>
+    <string name="keys_fingerprint_unknown">Fingerprint unavailable</string>
+    <string name="algorithm_ecdsa_p256" translatable="false">ECDSA P-256</string>
+    <string name="algorithm_ecdsa_p384" translatable="false">ECDSA P-384</string>
+    <string name="algorithm_ecdsa_p521" translatable="false">ECDSA P-521</string>
+    <string name="algorithm_ed25519" translatable="false">Ed25519</string>
+    <string name="algorithm_rsa" translatable="false">RSA</string>
+    <string name="key_label">Key name</string>
+    <string name="key_label_hint">e.g. Pixel</string>
+    <string name="key_auth">Require biometrics</string>
+    <string name="key_auth_none">No: sign whenever the phone is unlocked</string>
+    <string name="key_auth_timed">Yes, then stay unlocked for a while</string>
+    <string name="key_auth_every_use">Yes, for every connection</string>
+    <string name="key_auth_window">Stay unlocked for</string>
+    <plurals name="key_auth_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="key_generate_intro">The private key is created inside this phone\'s secure hardware and can never be copied out. You\'ll add its public key to your servers.</string>
+    <string name="key_generate_algorithm">Algorithm</string>
+    <string name="key_generate_button">Generate</string>
+    <string name="key_generate_failed">The key couldn\'t be generated. Try another algorithm.</string>
+    <string name="key_import_intro">Paste an OpenSSH or PEM private key (Ed25519, ECDSA or RSA), or choose the file. It is encrypted with a key kept in this phone\'s secure hardware and can\'t be exported again.</string>
+    <string name="key_import_paste">Private key</string>
+    <string name="key_import_button">Import</string>
+    <string name="key_import_passphrase_title">Passphrase required</string>
+    <string name="key_import_passphrase_text">This key is protected by a passphrase. It\'s used once to decrypt the key and isn\'t stored.</string>
+    <string name="key_import_passphrase">Passphrase</string>
+    <string name="key_import_wrong_passphrase">Wrong passphrase.</string>
+    <string name="key_import_error_empty">Paste a private key or choose a file.</string>
+    <string name="key_import_error_type">%1$s keys aren\'t supported. Use an Ed25519, ECDSA or RSA key.</string>
+    <string name="key_import_error_format">This key format isn\'t supported. Convert it to OpenSSH format first (PuTTY: puttygen key.ppk -O private-openssh -o key).</string>
+    <string name="key_import_error_malformed">This doesn\'t look like a private key. Check you copied the whole file, including the BEGIN and END lines.</string>
+    <string name="key_import_error_vault">This phone\'s secure key storage can\'t protect the key. If you asked for biometrics, check that a screen lock and a fingerprint or face are set up.</string>
+    <string name="key_import_error_too_large">That file is too large to be a private key.</string>
+    <string name="key_import_error_read">Couldn\'t read that file.</string>
+    <string name="key_hardware_explained">Stored in this phone\'s secure hardware. It can\'t be copied to another device.</string>
+    <string name="key_software_explained">Imported, and stored encrypted on this phone. Bridle can\'t export it again.</string>
+    <string name="key_fingerprint">Fingerprint</string>
+    <string name="key_public_key">Public key</string>
+    <string name="key_share_title">Share public key</string>
+    <string name="key_delete_title">Delete %1$s?</string>
+    <string name="key_delete_hardware">The key is erased from this phone\'s secure hardware and can\'t be recovered. Hosts using it will ask for a password until you pick another key.</string>
+    <string name="key_delete_software">The imported key is erased from this phone. Hosts using it will ask for a password until you pick another key.</string>
+    <string name="key_install_title">Install on host</string>
+    <string name="key_install_text">Logs in once with your password, adds this public key to ~/.ssh/authorized_keys and makes it the host\'s key. The password isn\'t stored.</string>
+    <string name="key_install_host">Host</string>
+    <string name="key_install_button">Install</string>
+    <string name="key_install_no_hosts">Add a host first, then install the key on it.</string>
+    <string name="key_install_running">Installing on %1$s…</string>
+    <string name="key_install_added">The key was added on %1$s. Future connections use it.</string>
+    <string name="key_install_present">%1$s already had this key. Future connections use it.</string>
+    <string name="key_install_error_auth">%1$s didn\'t accept the login. Check the username and password.</string>
+    <string name="key_install_error_unreachable">Couldn\'t reach %1$s. Check the address and that you\'re on the right network (e.g. Tailscale is connected).</string>
+    <string name="key_install_error_not_trusted">You didn\'t trust %1$s\'s host key, so nothing was installed.</string>
+    <string name="key_install_error_key_changed">%1$s\'s host key has changed, so nothing was installed.</string>
+    <string name="key_install_error_remote">%1$s couldn\'t update ~/.ssh/authorized_keys.</string>
+    <string name="key_install_error_missing">%1$s was deleted.</string>
+    <string name="key_install_error_other">Couldn\'t install the key on %1$s.</string>
+
+    <!-- Known hosts -->
+    <string name="known_hosts_title">Known hosts</string>
+    <string name="known_hosts_empty">No trusted host keys yet. Each server\'s key is saved the first time you trust it.</string>
+    <string name="known_hosts_forget">Forget</string>
+    <string name="known_hosts_forget_host">Forget the key of %1$s</string>
+    <string name="known_hosts_forget_title">Forget %1$s?</string>
+    <string name="known_hosts_forget_text">The next connection will show the server\'s fingerprint and ask you to trust it again.</string>
+
+    <!-- Connection dialogs -->
+    <string name="trust_title">Trust this host?</string>
+    <string name="trust_text">This is the first connection to %1$s. Check that the server\'s key fingerprint is:</string>
+    <string name="trust_how_to_check">On the server, run: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub (or the .pub file for this key type).</string>
+    <string name="trust_accept">Trust and connect</string>
+    <string name="password_title">Password for %1$s on %2$s</string>
+    <string name="password_text">Used for this login only and never stored.</string>
+    <string name="password_label">Password</string>
+    <string name="password_submit">Log in</string>
+    <string name="host_key_changed_title">Host key changed!</string>
+    <string name="host_key_changed_text">%1$s presented a different key from the one you trusted. Someone may be intercepting the connection (a man-in-the-middle attack), or the server was reinstalled or its keys were regenerated. The connection was blocked.</string>
+    <string name="host_key_changed_old">Previously trusted</string>
+    <string name="host_key_changed_new">Now presented (%1$s)</string>
+    <string name="host_key_changed_advice">Only forget the old key if you know why it changed, for example because you reinstalled the server. Check the new fingerprint on the server with ssh-keygen -lf.</string>
+    <string name="host_key_changed_keep_blocked">Keep blocked</string>
+    <string name="host_key_changed_forget">Forget old key</string>
+    <string name="host_key_changed_forget_confirm">The old key of %1$s is removed. The next connection shows the new fingerprint and asks you to trust it.</string>
+
+    <!-- Biometric prompt for keys that require it -->
+    <string name="biometric_title">Unlock key</string>
+    <string name="biometric_reason">Use %1$s to sign in</string>
+</resources>
