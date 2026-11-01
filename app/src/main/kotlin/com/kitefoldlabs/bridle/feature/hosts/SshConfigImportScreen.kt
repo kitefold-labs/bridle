@@ -145,12 +145,22 @@ private fun DefaultUsernameField(
     )
 }
 
+/** The parser's notes, at most [MAX_WARNINGS] of them: a hostile config can produce thousands. */
 @Composable
 private fun Warnings(warnings: List<String>) {
     if (warnings.isEmpty()) return
     Text(stringResource(R.string.ssh_import_warnings), style = MaterialTheme.typography.titleSmall)
-    warnings.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+    warnings.take(MAX_WARNINGS).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+    val more = warnings.size - MAX_WARNINGS
+    if (more > 0) {
+        Text(
+            pluralStringResource(R.plurals.ssh_import_more_warnings, more, more),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
 }
+
+internal const val MAX_WARNINGS = 20
 
 @Composable
 private fun ImportReview(
@@ -171,6 +181,9 @@ private fun LazyListScope.reviewItems(
     actions: SshImportActions,
 ) {
     item { DefaultUsernameField(state, actions) }
+    state.error?.let { error ->
+        item { Text(stringResource(error.message()), color = MaterialTheme.colorScheme.error) }
+    }
     items(plan.hosts.filter { it.fromConfig }, key = { it.key }) { planned ->
         PlannedRow(planned, planned.key in state.selected, actions)
     }
@@ -235,6 +248,7 @@ private fun SshImportError.message(): Int =
         SshImportError.TOO_LARGE -> R.string.ssh_import_error_too_large
         SshImportError.READ_FAILED -> R.string.ssh_import_error_read
         SshImportError.NOTHING_FOUND -> R.string.ssh_import_error_nothing
+        SshImportError.SAVE_FAILED -> R.string.ssh_import_error_save
     }
 
 private fun ImportNote.message(): Int =

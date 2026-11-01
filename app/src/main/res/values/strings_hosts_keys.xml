@@ -96,6 +96,11 @@
     <string name="ssh_import_error_too_large">That file is too large to be an ssh config.</string>
     <string name="ssh_import_error_read">Couldn\'t read that file.</string>
     <string name="ssh_import_error_nothing">No importable Host entries were found.</string>
+    <string name="ssh_import_error_save">Some hosts couldn\'t be saved (a jump host may have been deleted meanwhile). Edit the text and preview again.</string>
+    <plurals name="ssh_import_more_warnings">
+        <item quantity="one">…and %d more line.</item>
+        <item quantity="other">…and %d more lines.</item>
+    </plurals>
     <string name="ssh_import_note_exists">A host with this name already exists.</string>
     <string name="ssh_import_note_no_user">No User set: enter a default username.</string>
     <string name="ssh_import_note_invalid">Its name, address or port isn\'t valid.</string>

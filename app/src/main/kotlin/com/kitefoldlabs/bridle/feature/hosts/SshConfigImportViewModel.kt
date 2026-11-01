@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.feature.hosts
 
+import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,7 +18,7 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** Why the import screen can't go on. */
-enum class SshImportError { TOO_LARGE, READ_FAILED, NOTHING_FOUND }
+enum class SshImportError { TOO_LARGE, READ_FAILED, NOTHING_FOUND, SAVE_FAILED }
 
 data class SshImportUiState(
     val text: String = "",
@@ -142,8 +143,13 @@ class SshConfigImportViewModel
             if (current.busy || current.selected.isEmpty()) return
             mutableState.update { it.copy(busy = true) }
             viewModelScope.launch {
-                val count = plan.execute(current.selected, hosts)
-                mutableState.update { it.copy(busy = false, imported = count) }
+                try {
+                    val count = plan.execute(current.selected, hosts)
+                    mutableState.update { it.copy(busy = false, imported = count) }
+                } catch (ignored: SQLiteConstraintException) {
+                    // A saved host the plan links to (as jump host) was deleted meanwhile.
+                    mutableState.update { it.copy(busy = false, error = SshImportError.SAVE_FAILED) }
+                }
             }
         }
 

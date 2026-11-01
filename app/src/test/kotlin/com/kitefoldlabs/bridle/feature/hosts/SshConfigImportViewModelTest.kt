@@ -122,6 +122,19 @@ class SshConfigImportViewModelTest {
         }
 
     @Test
+    fun `a jump host deleted before the import is reported, not a crash`() =
+        runBlocking<Unit> {
+            val bastion = env.data.hosts.upsert(Host(label = "bastion", hostname = "b.example", username = "u"))
+            val vm = SshConfigImportViewModel(env.data.hosts, documents)
+            vm.setText("Host dev\n  HostName dev.example\n  User nate\n  ProxyJump bastion\n")
+            vm.parse()
+            vm.state.await { it.plan != null }
+            env.data.hosts.delete(bastion)
+            vm.import()
+            vm.state.await { it.error == SshImportError.SAVE_FAILED }.busy shouldBe false
+        }
+
+    @Test
     fun `loading a file parses it`() =
         runBlocking<Unit> {
             val vm = SshConfigImportViewModel(env.data.hosts, documents)

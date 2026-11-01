@@ -129,6 +129,14 @@ class SshConfigImportScreenTest {
     }
 
     @Test
+    fun `only the first warnings are listed`() {
+        show(SshImportUiState(warnings = (1..MAX_WARNINGS + 2).map { "warning $it" }))
+        rule.onNodeWithText("warning $MAX_WARNINGS").assertExists()
+        rule.onNodeWithText("warning ${MAX_WARNINGS + 1}").assertDoesNotExist()
+        rule.onNodeWithText("…and 2 more lines.").assertExists()
+    }
+
+    @Test
     fun `a cancelled file pick does nothing`() {
         show(SshImportUiState(), pickResult = null)
         rule.onNodeWithText("Choose file").performClick()
@@ -162,8 +170,9 @@ class SshConfigImportScreenTest {
         rule.onNodeWithText("Edit text").performClick()
         actions.calls shouldBe listOf("toggle:h3", "import", "edit")
 
-        update(SshImportUiState(plan = plan, selected = setOf("h3", "h4")))
+        update(SshImportUiState(plan = plan, selected = setOf("h3", "h4"), error = SshImportError.SAVE_FAILED))
         rule.onNodeWithText("Import 2 hosts").assertExists()
+        rule.onNodeWithText("Some hosts couldn't be saved", substring = true).assertExists()
         update(SshImportUiState(imported = 3))
         rule.onNodeWithText("Imported 3 hosts.").assertExists()
         rule.onNodeWithText("Done").performClick()
