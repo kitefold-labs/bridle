@@ -39,6 +39,16 @@ class AuthorizedKeysTest {
     }
 
     @Test
+    fun `a commented-out copy of the key does not count as present`() {
+        val (type, data) = line.split(" ")
+        Files.createDirectories(home.resolve(".ssh"))
+        val disabled = "# $type $data old\n  #$type $data\n"
+        home.resolve(".ssh/authorized_keys").writeText(disabled)
+        runLocally(AuthorizedKeys.installScript(line)) shouldContain AuthorizedKeys.ADDED_MARKER
+        home.resolve(".ssh/authorized_keys").readText() shouldBe "$disabled$line\n"
+    }
+
+    @Test
     fun `missing trailing newline is repaired before appending`() {
         Files.createDirectories(home.resolve(".ssh"))
         val other = OpenSshKeys.authorizedKeyLine(TestKeys.ec().public, "other")

@@ -20,9 +20,11 @@ public object AuthorizedKeys {
         val (type, data) = line.split(Regex("\\s+")).let { it[0] to it[1] }
         val q = ShellQuote.quote(line)
         // Presence is decided on key type + data, so the same key with another comment (or with
-        // options such as from="…") is not added twice.
+        // options such as from="…") is not added twice. Commented-out lines don't count: sshd ignores
+        // them, so a key the user disabled must be added again.
         val awkProgram =
-            "{ for (i = 1; i < NF; i++) if (${'$'}i == t && ${'$'}(i + 1) == k) found = 1 } " +
+            "/^[[:space:]]*#/ { next } " +
+                "{ for (i = 1; i < NF; i++) if (${'$'}i == t && ${'$'}(i + 1) == k) found = 1 } " +
                 "END { exit !found }"
         val present =
             "awk -v t=${ShellQuote.quote(type)} -v k=${ShellQuote.quote(data)} " +

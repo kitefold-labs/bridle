@@ -106,6 +106,29 @@ class SshConfigParserTest {
     }
 
     @Test
+    fun `negated patterns exclude a host from a defaults block`() {
+        // The common "everything goes through the bastion except the bastion itself" idiom.
+        val result =
+            SshConfigParser.parse(
+                """
+                Host * !bastion
+                  ProxyJump bastion
+                  User me
+                Host bastion
+                  HostName bastion.example.com
+                Host app
+                  HostName app.internal
+                """.trimIndent(),
+            )
+        val (bastion, app) = result.entries
+        bastion.alias shouldBe "bastion"
+        bastion.proxyJump shouldBe emptyList()
+        bastion.user shouldBe null
+        app.proxyJump shouldBe listOf("bastion")
+        app.user shouldBe "me"
+    }
+
+    @Test
     fun `input size is bounded`() {
         shouldThrow<IllegalArgumentException> { SshConfigParser.parse("#".repeat(1_000_001)) }
     }

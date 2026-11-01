@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -88,6 +89,17 @@ class HostKeyAndPolicyTest {
         shouldThrow<IllegalArgumentException> { ReconnectPolicy(initial = Duration.ZERO) }
         shouldThrow<IllegalArgumentException> { ReconnectPolicy(initial = 2.seconds, max = 1.seconds) }
         shouldThrow<IllegalArgumentException> { ReconnectPolicy(maxAttempts = 0) }
+        shouldThrow<IllegalArgumentException> { ReconnectPolicy(max = Duration.INFINITE) }
+    }
+
+    @Test
+    fun `long backoff bounds saturate instead of overflowing`() {
+        // 200 days shl 30 overflows a Long; the ceiling must clamp to max, not go negative and throw.
+        val policy = ReconnectPolicy(initial = 200.days, max = 300.days, maxAttempts = 40, random = Random(7))
+        for (attempt in 1..39) {
+            val d = policy.nextDelay(attempt)!!
+            (d >= Duration.ZERO && d <= 300.days) shouldBe true
+        }
     }
 
     @Test

@@ -20,7 +20,7 @@ public class ReconnectPolicy(
     private val random: Random = Random.Default,
 ) {
     init {
-        require(initial.isPositive() && max >= initial) { "Invalid backoff bounds" }
+        require(initial.isPositive() && max >= initial && max.isFinite()) { "Invalid backoff bounds" }
         require(maxAttempts > 0) { "maxAttempts must be positive" }
     }
 
@@ -32,7 +32,10 @@ public class ReconnectPolicy(
             attempt == 0 -> Duration.ZERO
             else -> {
                 val shift = (attempt - 1).coerceAtMost(MAX_SHIFT)
-                val ceiling = minOf(max.inWholeMilliseconds, initial.inWholeMilliseconds shl shift)
+                val initialMs = initial.inWholeMilliseconds
+                val maxMs = max.inWholeMilliseconds
+                // Saturate instead of letting `initial shl shift` overflow into a negative bound.
+                val ceiling = if (initialMs > maxMs shr shift) maxMs else initialMs shl shift
                 random.nextLong(0, ceiling + 1).milliseconds
             }
         }

@@ -31,6 +31,8 @@ public data class SshConfigImport(
  */
 public object SshConfigParser {
     private const val MAX_INPUT_CHARS = 1_000_000
+    private val whitespace = Regex("\\s+")
+    private val directive = Regex("^([A-Za-z]+)\\s*(?:=|\\s)\\s*(.*)$")
 
     public fun parse(text: String): SshConfigImport {
         require(text.length <= MAX_INPUT_CHARS) { "ssh config is too large" }
@@ -45,7 +47,7 @@ public object SshConfigParser {
             when (key) {
                 "host" -> {
                     inMatch = false
-                    current = Block(value.split(Regex("\\s+")).filter { it.isNotEmpty() }).also { blocks += it }
+                    current = Block(value.split(whitespace).filter { it.isNotEmpty() }).also { blocks += it }
                 }
                 "match" -> {
                     inMatch = true
@@ -67,7 +69,6 @@ public object SshConfigParser {
         blocks: List<Block>,
         warnings: MutableList<String>,
     ): List<SshConfigEntry> {
-        val defaults = blocks.filter { "*" in it.patterns }
         val entries = linkedMapOf<String, SshConfigEntry>()
         for (block in blocks) {
             for (alias in block.patterns) {
@@ -77,7 +78,7 @@ public object SshConfigParser {
                         warnings += "Host pattern '$alias' is a wildcard and was not imported"
                     alias !in entries -> {
                         // OpenSSH: the first value obtained for each option wins, in file order.
-                        val chain = blocks.filter { alias in it.patterns || it in defaults }
+                        val chain = blocks.filter { it.appliesTo(alias) }
 
                         fun first(key: String) = chain.firstNotNullOfOrNull { it.options[key] }
                         entries[alias] =
@@ -106,7 +107,7 @@ public object SshConfigParser {
     internal fun splitDirective(rawLine: String): Pair<String, String>? {
         val line = rawLine.trim()
         if (line.isEmpty() || line.startsWith("#")) return null
-        val match = Regex("^([A-Za-z]+)\\s*(?:=|\\s)\\s*(.*)$").find(line) ?: return null
+        val match = directive.find(line) ?: return null
         val value = match.groupValues[2].trim().removeSurrounding("\"")
         return match.groupValues[1].lowercase() to value
     }
@@ -116,6 +117,9 @@ public object SshConfigParser {
     ) {
         val options = mutableMapOf<String, String>()
         val identityFiles = mutableListOf<String>()
+
+        /** OpenSSH: a matching `!pattern` excludes the host from the block even if `*` matches it. */
+        fun appliesTo(alias: String): Boolean = "!$alias" !in patterns && (alias in patterns || "*" in patterns)
 
         fun set(
             key: String,
