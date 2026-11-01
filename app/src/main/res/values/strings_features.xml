@@ -202,6 +202,8 @@
     <string name="backup_not_a_backup">This file isn\'t a Bridle backup.</string>
     <string name="backup_too_large">This file is too large to be a Bridle backup.</string>
     <string name="backup_unreadable">The file couldn\'t be read.</string>
+    <string name="backup_not_enough_memory">This phone doesn\'t have enough free memory to open this backup. Close other apps and try again.</string>
+    <string name="backup_export_interrupted">Android closed Bridle while you were choosing the file, so nothing was saved. Your passphrase is never stored: please export again.</string>
     <string name="backup_exported">Backup saved</string>
     <string name="backup_exported_message">Keep the file and its passphrase somewhere safe. Keys aren\'t included: on a new phone, generate or import keys again.</string>
     <string name="backup_imported">Backup imported</string>

@@ -158,7 +158,16 @@ class BackupCryptoTest {
         ).forEach { tampered ->
             shouldThrow<MalformedBackupException> { BackupCrypto.decrypt(tampered, pass()) }
                 .message shouldContain "out of range"
+            shouldThrow<MalformedBackupException> { BackupCrypto.kdfParams(tampered) }
         }
+    }
+
+    @Test
+    fun `kdf parameters can be read without deriving a key`() {
+        BackupCrypto.kdfParams(encrypted()) shouldBe FAST
+        val other = Argon2Params(memoryKiB = 16 * 1024, iterations = 2, parallelism = 2)
+        BackupCrypto.kdfParams(BackupCrypto.seal(ByteArray(0), pass(), other)) shouldBe other
+        shouldThrow<MalformedBackupException> { BackupCrypto.kdfParams(ByteArray(3)) }
     }
 
     @Test

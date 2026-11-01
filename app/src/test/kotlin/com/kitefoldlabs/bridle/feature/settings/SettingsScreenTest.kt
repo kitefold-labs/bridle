@@ -62,18 +62,20 @@ class SettingsScreenTest {
     private val results = FakeResults()
     private val uris = FakeUris()
     private var available = true
+    private lateinit var backup: BackupViewModel
 
     @After
     fun tearDown() = data.close()
 
-    private fun show(): SettingsViewModel {
+    private fun show(memory: () -> Long = { Long.MAX_VALUE }): SettingsViewModel {
         val vm = SettingsViewModel(data.settings) { available }
-        val backup =
+        backup =
             BackupViewModel(
                 data.backup,
                 documents,
                 Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
                 Dispatchers.Default,
+                memory,
             ) { 0L }
         rule.setContent { TestHost(results, uris) { SettingsScreen(vm, backup) } }
         waitForText("Appearance")
@@ -282,6 +284,36 @@ class SettingsScreenTest {
         waitForText("This file isn't a Bridle backup.")
         clickInDialog("Cancel")
         good shouldBe null
+    }
+
+    @Test
+    fun `memory and interrupted exports are explained`() {
+        documents.inputs["content://docs/big-kdf"] =
+            BackupCrypto.encrypt(
+                BackupPayload(createdAtEpochMs = 0, appVersion = "1"),
+                "a long passphrase".toCharArray(),
+                Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
+            )
+        show(memory = { 0L })
+        click("Export encrypted backup")
+        val fields = rule.onAllNodes(hasSetTextAction())
+        fields[0].performTextInput("a long passphrase")
+        fields[1].performTextInput("a long passphrase")
+        results.queue.add(Uri.parse("content://docs/out"))
+        clickInDialog("Choose file")
+        waitForText("doesn't have enough free memory")
+        clickInDialog("OK")
+        results.queue.add(Uri.parse("content://docs/big-kdf"))
+        click("Import backup")
+        waitForField()
+        rule.onNode(hasSetTextAction()).performTextInput("a long passphrase")
+        clickInDialog("Open")
+        waitForText("doesn't have enough free memory")
+        clickInDialog("Cancel")
+        // A picker result that arrives after Android recreated the screen: the passphrase is gone.
+        rule.runOnIdle { backup.exportTo(Uri.parse("content://docs/orphan")) }
+        waitForText("so nothing was saved")
+        documents.deleted shouldContain "content://docs/orphan"
     }
 
     @Test

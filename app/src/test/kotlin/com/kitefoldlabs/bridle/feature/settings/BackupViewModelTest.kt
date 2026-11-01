@@ -19,6 +19,7 @@ import com.kitefoldlabs.bridle.feature.FakeDocuments
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.sftp.clear
 import com.kitefoldlabs.bridle.feature.testData
+import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -193,6 +194,68 @@ class BackupViewModelTest {
         eventually { vm.state.value.importProblem == ImportProblem.NEWER_VERSION }
         vm.cancelImport()
         vm.state.value.importDialog shouldBe false
+    }
+
+    @Test
+    fun `a backup is only decrypted when its key derivation fits in memory`() {
+        documents.inputs[uri("backup").toString()] = exportFile()
+        val small = BackupViewModel(target.backup, documents, cheap, Dispatchers.Unconfined, { 1L }) { 0L }
+        small.importFrom(uri("backup"))
+        eventually { small.state.value.importDialog }
+        val typed = passphrase.toCharArray()
+        small.submitImportPassphrase(typed)
+        eventually { small.state.value.importProblem == ImportProblem.NOT_ENOUGH_MEMORY }
+        small.state.value.review
+            .shouldBeNull()
+        typed.all { it == '\u0000' } shouldBe true
+        small.startExport()
+        small.submitExportPassphrase(passphrase.toCharArray(), passphrase.toCharArray())
+        small.exportTo(uri("small"))
+        eventually { small.state.value.result == BackupResult.NotEnoughMemory }
+        // An OutOfMemoryError despite the check is reported the same way, not as a crash.
+        val oom =
+            BackupViewModel(
+                target.backup,
+                documents,
+                cheap,
+                Dispatchers.Unconfined,
+                { throw OutOfMemoryError() },
+            ) { 0L }
+        oom.importFrom(uri("backup"))
+        eventually { oom.state.value.importDialog }
+        oom.submitImportPassphrase(passphrase.toCharArray())
+        eventually { oom.state.value.importProblem == ImportProblem.NOT_ENOUGH_MEMORY }
+        oom.startExport()
+        oom.submitExportPassphrase(passphrase.toCharArray(), passphrase.toCharArray())
+        oom.exportTo(uri("oom"))
+        eventually { oom.state.value.result == BackupResult.NotEnoughMemory }
+        availableHeap() shouldBeGreaterThan 0L
+    }
+
+    @Test
+    fun `a file picked after the passphrase was lost is removed, and the user told`() {
+        val vm = viewModel(source)
+        vm.exportTo(uri("orphan"))
+        vm.state.value.result shouldBe BackupResult.ExportInterrupted
+        eventually { documents.deleted == listOf(uri("orphan").toString()) }
+        documents.outputs.containsKey(uri("orphan").toString()) shouldBe false
+    }
+
+    @Test
+    fun `a failed import is reported, not thrown`() {
+        documents.inputs[uri("backup").toString()] = exportFile()
+        val broken = testData(context)
+        val vm = viewModel(broken)
+        vm.importFrom(uri("backup"))
+        eventually { vm.state.value.importDialog }
+        vm.submitImportPassphrase(passphrase.toCharArray())
+        eventually { vm.state.value.review != null }
+        broken.close()
+        vm.applyImport()
+        eventually { vm.state.value.result != null }
+        vm.state.value.result
+            .shouldBeInstanceOf<BackupResult.Failed>()
+        vm.state.value.working shouldBe false
     }
 
     @Test

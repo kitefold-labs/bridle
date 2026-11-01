@@ -253,6 +253,10 @@ private fun ResultDialog(
                 stringResource(R.string.backup_imported) to
                     pluralStringResource(R.plurals.backup_imported_message, result.total, result.total, result.hosts)
             is BackupResult.Failed -> stringResource(R.string.backup_failed) to result.detail
+            BackupResult.ExportInterrupted ->
+                stringResource(R.string.backup_failed) to stringResource(R.string.backup_export_interrupted)
+            BackupResult.NotEnoughMemory ->
+                stringResource(R.string.backup_failed) to stringResource(R.string.backup_not_enough_memory)
         }
     MessageDialog(title, text, onDismiss)
 }
@@ -278,6 +282,7 @@ private fun importProblemText(problem: ImportProblem): Int =
         ImportProblem.NOT_A_BACKUP -> R.string.backup_not_a_backup
         ImportProblem.TOO_LARGE -> R.string.backup_too_large
         ImportProblem.UNREADABLE -> R.string.backup_unreadable
+        ImportProblem.NOT_ENOUGH_MEMORY -> R.string.backup_not_enough_memory
     }
 
 private const val BACKUP_MIME = "application/octet-stream"

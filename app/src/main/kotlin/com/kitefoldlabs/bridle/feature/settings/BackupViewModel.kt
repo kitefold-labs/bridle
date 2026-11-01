@@ -35,7 +35,7 @@ import javax.inject.Inject
 
 enum class PassphraseProblem { TOO_SHORT, MISMATCH }
 
-enum class ImportProblem { WRONG_PASSPHRASE, NEWER_VERSION, NOT_A_BACKUP, TOO_LARGE, UNREADABLE }
+enum class ImportProblem { WRONG_PASSPHRASE, NEWER_VERSION, NOT_A_BACKUP, TOO_LARGE, UNREADABLE, NOT_ENOUGH_MEMORY }
 
 /** What an import will do, for the user to confirm. */
 data class ImportReview(
@@ -60,6 +60,15 @@ data class ImportReview(
 
 sealed interface BackupResult {
     data object Exported : BackupResult
+
+    /**
+     * A file was picked but the passphrase is gone: Android stopped Bridle while the picker was
+     * open (passphrases are never saved). The empty file is deleted; the user exports again.
+     */
+    data object ExportInterrupted : BackupResult
+
+    /** The phone did not have the memory the key derivation needs. */
+    data object NotEnoughMemory : BackupResult
 
     data class Imported(
         val hosts: Int,
@@ -89,6 +98,10 @@ data class BackupUiState(
 /**
  * Encrypted export and import of the app's configuration. Passphrases are handled as [CharArray]s
  * and wiped as soon as they have been used.
+ *
+ * A backup file names its own Argon2 memory cost (up to [Argon2Params.MAX_MEMORY_KIB]), so before
+ * decrypting, the cost is checked against [availableMemory] (the heap this app may still use):
+ * a file made on a large phone, or crafted, must not crash a small one with an OutOfMemoryError.
  */
 @HiltViewModel
 class BackupViewModel(
@@ -96,11 +109,12 @@ class BackupViewModel(
     private val documents: DocumentAccess,
     private val params: Argon2Params,
     private val crypto: CoroutineDispatcher,
+    private val availableMemory: () -> Long = ::availableHeap,
     private val clock: () -> Long,
 ) : ViewModel() {
     @Inject
     constructor(backups: BackupRepository, documents: DocumentAccess) :
-        this(backups, documents, Argon2Params.DEFAULT, Dispatchers.Default, System::currentTimeMillis)
+        this(backups, documents, Argon2Params.DEFAULT, Dispatchers.Default, ::availableHeap, System::currentTimeMillis)
 
     private val mutable = MutableStateFlow(BackupUiState())
     val state: StateFlow<BackupUiState> = mutable.asStateFlow()
@@ -150,28 +164,46 @@ class BackupViewModel(
 
     /** Encrypts and writes the backup to [uri], or forgets the passphrase if the picker was cancelled. */
     fun exportTo(uri: Uri?) {
-        val passphrase = exportPassphrase ?: return
+        val passphrase = exportPassphrase
         exportPassphrase = null
-        if (uri == null) {
-            passphrase.fill(0.toChar())
-            return
+        when {
+            uri == null -> passphrase?.fill(0.toChar())
+            passphrase == null -> {
+                // The picker outlived this ViewModel (Android stopped the app while it was open) and
+                // the passphrase is deliberately not saved: say so, and remove the empty file.
+                mutable.update { it.copy(result = BackupResult.ExportInterrupted) }
+                viewModelScope.launch { withContext(crypto) { documents.delete(uri) } }
+            }
+            else -> write(uri, passphrase)
         }
+    }
+
+    private fun write(
+        uri: Uri,
+        passphrase: CharArray,
+    ) {
         mutable.update { it.copy(working = true) }
         viewModelScope.launch {
             val result =
                 try {
                     val payload = backups.export(clock(), BuildConfig.VERSION_NAME)
-                    withContext(crypto) {
-                        val bytes = BackupCrypto.encrypt(payload, passphrase, params)
-                        documents.openOutput(uri).use { it.write(bytes) }
+                    if (affordable(params, fileBytes = 0)) {
+                        withContext(crypto) {
+                            val bytes = BackupCrypto.encrypt(payload, passphrase, params)
+                            documents.openOutput(uri).use { it.write(bytes) }
+                        }
+                        BackupResult.Exported
+                    } else {
+                        BackupResult.NotEnoughMemory
                     }
-                    BackupResult.Exported
                 } catch (e: CancellationException) {
                     throw e
                 } catch (
                     @Suppress("TooGenericExceptionCaught") e: Exception,
                 ) {
                     BackupResult.Failed(e.message ?: e.javaClass.simpleName)
+                } catch (ignored: OutOfMemoryError) {
+                    BackupResult.NotEnoughMemory
                 } finally {
                     passphrase.fill(0.toChar())
                 }
@@ -208,20 +240,42 @@ class BackupViewModel(
         mutable.update { it.copy(working = true, importProblem = null) }
         viewModelScope.launch {
             try {
-                val payload = withContext(crypto) { BackupCrypto.decrypt(bytes, passphrase) }
-                val plan = BackupMerge.plan(backups.existingData(), payload)
-                importBytes = null
-                mutable.update { it.copy(working = false, importDialog = false, review = ImportReview(payload, plan)) }
+                // The file sets its own Argon2 memory cost: check it fits before deriving the key.
+                if (affordable(BackupCrypto.kdfParams(bytes), bytes.size)) {
+                    val payload = withContext(crypto) { BackupCrypto.decrypt(bytes, passphrase) }
+                    val plan = BackupMerge.plan(backups.existingData(), payload)
+                    importBytes = null
+                    mutable.update {
+                        it.copy(working = false, importDialog = false, review = ImportReview(payload, plan))
+                    }
+                } else {
+                    problem(ImportProblem.NOT_ENOUGH_MEMORY)
+                }
             } catch (ignored: WrongPassphraseOrCorruptException) {
                 problem(ImportProblem.WRONG_PASSPHRASE)
             } catch (ignored: UnsupportedBackupVersionException) {
                 problem(ImportProblem.NEWER_VERSION)
             } catch (ignored: MalformedBackupException) {
                 problem(ImportProblem.NOT_A_BACKUP)
+            } catch (ignored: OutOfMemoryError) {
+                problem(ImportProblem.NOT_ENOUGH_MEMORY)
             } finally {
                 passphrase.fill(0.toChar())
             }
         }
+    }
+
+    /**
+     * Whether Argon2 with [kdf] (plus decoding a file of [fileBytes]) fits in the heap left.
+     * BouncyCastle's Argon2 holds `memoryKiB` 1 KiB blocks, each a `long[128]` with object
+     * overhead; decrypting and parsing need a few copies of the file on top.
+     */
+    private fun affordable(
+        kdf: Argon2Params,
+        fileBytes: Int,
+    ): Boolean {
+        val argon = kdf.memoryKiB * KIB * ARGON2_OVERHEAD_PERCENT / PERCENT
+        return argon + fileBytes.toLong() * FILE_COPIES + HEADROOM_BYTES <= availableMemory()
     }
 
     fun cancelImport() {
@@ -234,13 +288,22 @@ class BackupViewModel(
         val review = state.value.review ?: return
         mutable.update { it.copy(working = true) }
         viewModelScope.launch {
-            val applied = backups.import(review.payload)
-            val total =
-                applied.groups.size + applied.hosts.size + applied.launchProfiles.size + applied.snippets.size +
-                    applied.portForwards.size + applied.knownHosts.size
-            mutable.update {
-                it.copy(working = false, review = null, result = BackupResult.Imported(applied.hosts.size, total))
-            }
+            val result =
+                try {
+                    val applied = backups.import(review.payload)
+                    val total =
+                        applied.groups.size + applied.hosts.size + applied.launchProfiles.size +
+                            applied.snippets.size + applied.portForwards.size + applied.knownHosts.size
+                    BackupResult.Imported(applied.hosts.size, total)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    // The import runs in one transaction, so nothing was changed.
+                    BackupResult.Failed(e.message ?: e.javaClass.simpleName)
+                }
+            mutable.update { it.copy(working = false, review = null, result = result) }
         }
     }
 
@@ -272,5 +335,13 @@ class BackupViewModel(
         }
 
         const val BUFFER_SIZE = 64 * 1024
+        const val KIB = 1024L
+        const val PERCENT = 100
+        const val ARGON2_OVERHEAD_PERCENT = 110
+        const val FILE_COPIES = 4
+        const val HEADROOM_BYTES = 16L * 1024 * 1024
     }
 }
+
+/** Heap this process may still allocate: its limit (`memoryClass`, or `largeMemoryClass`) less what is in use. */
+internal fun availableHeap(): Long = Runtime.getRuntime().let { it.maxMemory() - (it.totalMemory() - it.freeMemory()) }
