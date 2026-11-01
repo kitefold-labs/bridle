@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.security.GeneralSecurityException
+import java.security.ProviderException
 import java.security.PublicKey
 
 class ErrorPathsTest {
@@ -39,6 +40,28 @@ class ErrorPathsTest {
                 e.message shouldContain "Authentication failed"
                 SignerAuthMethod(broken).toString() shouldBe "SignerAuthMethod(ecdsa-sha2-nistp256)"
                 shouldThrow<UnsupportedOperationException> { PublicOnlyKeyProvider(pair.public).private }
+            }
+        }
+
+    @Test
+    fun `a keystore ProviderException still lets the next credential authenticate`() =
+        runBlocking<Unit> {
+            val pair = TestKeys.ec()
+            TestSshServer(home, authorizedKeys = setOf(pair.public)).use { srv ->
+                val broken =
+                    object : SshKeySigner {
+                        override val publicKey: PublicKey = pair.public
+
+                        override fun sign(
+                            algorithm: String,
+                            data: ByteArray,
+                        ): ByteArray = throw ProviderException("Keystore operation failed")
+                    }
+                SshjEngine(Dispatchers.IO)
+                    .connect(
+                        srv.target(Credential.Key(broken), TestSshServer.password()),
+                        TofuHostKeyVerifier(MemoryKnownHosts(), AcceptingPrompter()),
+                    ).use { it.exec("true").isSuccess shouldBe true }
             }
         }
 

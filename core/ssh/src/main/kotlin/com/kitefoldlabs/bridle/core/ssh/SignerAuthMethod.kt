@@ -8,6 +8,7 @@ import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 import net.schmizz.sshj.userauth.method.AuthPublickey
 import java.security.GeneralSecurityException
 import java.security.PrivateKey
+import java.security.ProviderException
 import java.security.PublicKey
 
 /**
@@ -33,6 +34,10 @@ internal class SignerAuthMethod(
             try {
                 signer.sign(algorithm, data)
             } catch (e: GeneralSecurityException) {
+                throw UserAuthException("Signing with $algorithm failed", e)
+            } catch (e: ProviderException) {
+                // Android Keystore reports hardware/keystore failures this way. As an auth failure the
+                // remaining credentials are still tried; uncaught, it would tear down the transport.
                 throw UserAuthException("Signing with $algorithm failed", e)
             }
         reqBuf.putSignature(algorithm, signature)
