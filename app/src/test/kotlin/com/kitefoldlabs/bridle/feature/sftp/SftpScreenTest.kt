@@ -60,6 +60,8 @@ class SftpScreenTest {
                 SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 1L)),
                 manager,
                 TransferQueue(manager, documents, scope),
+                scope,
+                Dispatchers.Unconfined,
             )
         rule.setContent { TestHost(results) { SftpScreen(vm, onBack = { backs++ }) } }
         return vm
@@ -186,6 +188,8 @@ class SftpScreenTest {
         rule.waitForIdle()
         results.launched.last() shouldBe "notes.md"
         documents.outputs.getValue("content://docs/saved.md").toString() shouldBe "hello"
+        rule.waitForIdle()
+        results.launched.count { it == "notes.md" } shouldBe 1 // the picker opens once
 
         sftp.transferGate = CompletableDeferred()
         results.queue.add(Uri.parse("content://docs/slow.md"))
@@ -204,6 +208,17 @@ class SftpScreenTest {
         rule.onNodeWithText("Failed: $HOME/later.txt already exists").assertExists()
         clickText("Clear finished")
         clickText("Close")
+    }
+
+    @Test
+    fun `the suggested name for a download is sanitised`() {
+        sftp.file("$HOME/a:b‮txt.sh", "#!/bin/sh")
+        show()
+        results.queue.add(null)
+        clickLabel("Actions for a:b‮txt.sh")
+        clickText("Download")
+        rule.waitForIdle()
+        results.launched.single() shouldBe "a_b_txt.sh"
     }
 
     @Test

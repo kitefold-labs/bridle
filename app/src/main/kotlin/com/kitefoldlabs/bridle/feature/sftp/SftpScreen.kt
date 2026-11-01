@@ -90,8 +90,12 @@ fun SftpScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MIME_BINARY)) @DontMemoize { uri ->
             viewModel.downloadTo(uri)
         }
-    LaunchedEffect(state.pendingDownload) {
-        state.pendingDownload?.let { download.launch(it.name) }
+    LaunchedEffect(state.pendingDownload) @DontMemoize {
+        state.pendingDownload?.let {
+            viewModel.downloadPickerShown()
+            // The name comes from the server: never let it be a path or carry control characters.
+            download.launch(SftpListing.safeName(it.name, fallback = "download", forDocument = true))
+        }
     }
     val editor = state.editor
     if (editor != null) {
@@ -237,7 +241,9 @@ private fun FileList(
         onRefresh = @DontMemoize { viewModel.refresh() },
         modifier = Modifier.fillMaxSize(),
     ) {
-        val files = state.visible
+        // Sorting a big directory on every state change (the refresh spinner, each notice) is
+        // noticeable on slow phones: only re-sort when the listing or its order changes.
+        val files = remember(state.entries, state.sort, state.showHidden) { state.visible }
         LazyColumn(Modifier.fillMaxSize()) {
             if (state.path != "/") {
                 item {

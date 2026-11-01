@@ -76,7 +76,8 @@ class SftpViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = SftpViewModel(SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L)), manager, queue)
+    private fun viewModel(saved: SavedStateHandle = SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L))) =
+        SftpViewModel(saved, manager, queue, unconfined, Dispatchers.Unconfined)
 
     private fun SftpViewModel.names() = state.value.visible.map { it.name }
 
@@ -301,6 +302,8 @@ class SftpViewModelTest {
                 SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L)),
                 manager,
                 TransferQueue(manager, bad, unconfined),
+                unconfined,
+                Dispatchers.Unconfined,
             )
         failing.upload(listOf(Uri.parse("content://docs/x")))
         failing.state.value.notice shouldBe SftpNotice.Failed("no permission")
@@ -336,8 +339,39 @@ class SftpViewModelTest {
     }
 
     @Test
+    fun `a download survives Android recreating the app while the picker is open`() {
+        val saved = SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L))
+        val before = viewModel(saved)
+        before.requestDownload(before.entry("notes.md"))
+        before.downloadPickerShown()
+        before.state.value.pendingDownload
+            .shouldBeNull()
+        clear(before)
+        // The process may be gone by now; only the saved state comes back with the result.
+        val after = viewModel(saved)
+        after.downloadTo(Uri.parse("content://docs/after.md"))
+        documents.outputs.getValue("content://docs/after.md").toString() shouldBe "hello"
+        after.downloadTo(Uri.parse("content://docs/twice.md")) // one picker, one download
+        documents.outputs.containsKey("content://docs/twice.md") shouldBe false
+    }
+
+    @Test
+    fun `a slow listing can't replace the folder opened after it`() {
+        val vm = viewModel()
+        val slow = CompletableDeferred<Unit>()
+        sftp.listGates["$HOME/src"] = slow
+        vm.open("$HOME/src")
+        vm.open(HOME)
+        slow.complete(Unit)
+        vm.state.value.path shouldBe HOME
+        vm.state.value.loading shouldBe false
+    }
+
+    @Test
     fun `edge cases`() {
-        shouldThrow<IllegalStateException> { SftpViewModel(SavedStateHandle(), manager, queue) }
+        shouldThrow<IllegalStateException> {
+            SftpViewModel(SavedStateHandle(), manager, queue, unconfined, Dispatchers.Unconfined)
+        }
         sftp.link("$HOME/dangling", "$HOME/gone")
         val vm = viewModel()
         vm.activate(vm.entry("dangling"))

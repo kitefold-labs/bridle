@@ -61,6 +61,14 @@ class TransferQueueTest {
     }
 
     @Test
+    fun `a provider's display name can't escape the folder`() {
+        documents.inputs[uri("dots").toString()] = "x".toByteArray()
+        documents.names[uri("dots").toString()] = DocumentInfo("..", 1)
+        queue.upload(1, uri("dots"), HOME).remotePath shouldBe "$HOME/upload"
+        sftp.text("$HOME/upload") shouldBe "x"
+    }
+
+    @Test
     fun `failures without a message name the exception`() {
         sftp.failNext = IllegalStateException()
         documents.inputs[uri("b").toString()] = ByteArray(1)

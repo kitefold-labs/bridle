@@ -79,7 +79,8 @@ class TransferQueue
             remoteDir: String,
         ): Transfer {
             val info = documents.describe(uri)
-            val name = info.name.replace('/', '_')
+            // The name comes from the document provider (another app): keep it a plain file name.
+            val name = SftpListing.safeName(info.name, fallback = "upload")
             val transfer =
                 Transfer(
                     id = ids.incrementAndGet(),

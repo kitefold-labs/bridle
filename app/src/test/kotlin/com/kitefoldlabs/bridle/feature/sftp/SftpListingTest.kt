@@ -77,6 +77,19 @@ class SftpListingTest {
     }
 
     @Test
+    fun `untrusted names become a single safe path segment`() {
+        SftpListing.safeName("notes.md", "x") shouldBe "notes.md"
+        SftpListing.safeName("../../etc/passwd", "x") shouldBe ".._.._etc_passwd"
+        SftpListing.safeName("a\u0000b\nc\u001b[31m", "x") shouldBe "a_b_c_[31m"
+        SftpListing.safeName("invoice‮fdp.exe", "x") shouldBe "invoice_fdp.exe"
+        SftpListing.safeName("what?:*.txt", "x") shouldBe "what?:*.txt"
+        SftpListing.safeName("what?:*.txt", "x", forDocument = true) shouldBe "what___.txt"
+        SftpListing.safeName(" .. ", "fallback") shouldBe "fallback"
+        SftpListing.safeName("", "fallback") shouldBe "fallback"
+        SftpListing.safeName("a".repeat(300), "x").length shouldBe 255
+    }
+
+    @Test
     fun `binary detection`() {
         SftpListing.looksBinary("plain text\n") shouldBe false
         SftpListing.looksBinary("nul\u0000byte") shouldBe true

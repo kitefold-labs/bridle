@@ -51,6 +51,9 @@ class FakeSftpSession : SftpSession {
 
     /** When set, uploads and downloads wait for it before finishing. */
     var transferGate: CompletableDeferred<Unit>? = null
+
+    /** Listing a path in here waits for its gate (a slow directory). */
+    val listGates = mutableMapOf<String, CompletableDeferred<Unit>>()
     var closed = false
         private set
 
@@ -98,13 +101,15 @@ class FakeSftpSession : SftpSession {
 
     override suspend fun canonicalize(path: String): String = fail { if (path.isEmpty()) HOME else path }
 
-    override suspend fun list(path: String): List<RemoteFile> =
-        fail {
+    override suspend fun list(path: String): List<RemoteFile> {
+        listGates[path]?.await()
+        return fail {
             val dir = nodes[path]?.linkTarget ?: path
             val node = nodes[dir] ?: throw IOException("No such file: $path")
             if (!node.file.isDirectory) throw IOException("Not a directory: $path")
             nodes.values.map { it.file }.filter { it.path != dir && parentOf(it.path) == dir }
         }
+    }
 
     override suspend fun stat(path: String): RemoteFile? =
         fail {

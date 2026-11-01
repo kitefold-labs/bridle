@@ -90,6 +90,28 @@ object SftpListing {
     /** A file name the user typed is usable: not blank, no `/`, not `.` or `..`. */
     fun isValidName(name: String): Boolean = name.isNotBlank() && '/' !in name && name != "." && name != ".."
 
+    /**
+     * A file name from somewhere untrusted (a server's directory listing, a document provider's
+     * display name) made safe to use as a single path segment: path separators, control
+     * characters (including terminal escapes) and bidirectional overrides, which can disguise an
+     * extension, become `_`. With [forDocument], so do the characters Android's storage rejects.
+     * Falls back to [fallback] if nothing usable is left (`""`, `.`, `..`).
+     */
+    fun safeName(
+        name: String,
+        fallback: String,
+        forDocument: Boolean = false,
+    ): String {
+        val cleaned =
+            buildString {
+                name.forEach { c ->
+                    val unsafe = c == '/' || c.isISOControl() || c in BIDI_CONTROLS || (forDocument && c in RESERVED)
+                    append(if (unsafe) '_' else c)
+                }
+            }.trim().take(MAX_NAME_CHARS)
+        return if (isValidName(cleaned)) cleaned else fallback
+    }
+
     /** Human-readable size: `1.5 MB`. */
     fun formatSize(bytes: Long): String {
         var value = bytes.toDouble()
@@ -108,6 +130,9 @@ object SftpListing {
      */
     fun looksBinary(text: String): Boolean = '\u0000' in text || '�' in text
 
+    private const val MAX_NAME_CHARS = 255
+    private const val RESERVED = "\\:*?\"<>|"
+    private const val BIDI_CONTROLS = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
     private const val OWNER_EXECUTE = 2
     private const val GROUP_EXECUTE = 5
     private const val OTHER_EXECUTE = 8
