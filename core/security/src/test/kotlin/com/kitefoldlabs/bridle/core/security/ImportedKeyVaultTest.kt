@@ -1,10 +1,12 @@
 package com.kitefoldlabs.bridle.core.security
 
+import android.security.keystore.UserNotAuthenticatedException
 import com.kitefoldlabs.bridle.core.model.Identity
 import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
 import com.kitefoldlabs.bridle.core.model.KeySource
 import com.kitefoldlabs.bridle.core.security.testdata.TestKeyFiles
 import com.kitefoldlabs.bridle.core.ssh.OpenSshKeys
+import com.kitefoldlabs.bridle.core.ssh.SshKeySigner
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
@@ -260,29 +262,168 @@ class ImportedKeyVaultTest {
         shouldThrow<KeyImportException.Malformed> { import(TestKeyFiles.openSshRaw(body.copyOf(body.size - 40))) }
     }
 
+    private val wrapping = SoftwareWrappingStore()
+    private val authVault = ImportedKeyVault(aead, clock = { 7L }, wrappingKeys = wrapping)
+
+    private fun importWithAuth(
+        pair: KeyPair,
+        userAuth: UserAuthPolicy,
+    ): ImportedKey = authVault.import(TestKeyFiles.openSsh(pair).toCharArray(), null, "k", userAuth = userAuth)
+
+    private fun SshKeySigner.signOnce(algorithm: String = "ssh-ed25519"): ByteArray = sign(algorithm, byteArrayOf(1))
+
     @Test
-    fun `user auth settings are recorded and enforced by the signer`() {
+    fun `user auth settings are recorded and bound to a keystore wrapping key`() {
         val pair = TestKeyFiles.ed25519()
-        val text = TestKeyFiles.openSsh(pair)
-        val timed = import(text, userAuth = UserAuthPolicy.TimeBound(60))
+        val timed = importWithAuth(pair, UserAuthPolicy.TimeBound(60))
         timed.identity.requireUserAuth shouldBe true
         timed.identity.authValiditySeconds shouldBe 60
-        val perUse = import(text, userAuth = UserAuthPolicy.PerUse)
+        timed.encryptedKey[0] shouldBe ImportedKeyVault.FORMAT_AUTH_BOUND
+        timed.encryptedKey[1] shouldBe ImportedKeyVault.MODE_TIME_BOUND
+        val perUse = importWithAuth(pair, UserAuthPolicy.PerUse)
         perUse.identity.authValiditySeconds shouldBe 0
-        import(text).identity.requireUserAuth shouldBe false
+        perUse.encryptedKey[1] shouldBe ImportedKeyVault.MODE_PER_USE
+        wrapping.keys.values.map { it.second } shouldBe listOf(UserAuthPolicy.TimeBound(60), UserAuthPolicy.PerUse)
+        wrapping.keys.keys.all { it.startsWith(ImportedKeyVault.WRAPPING_ALIAS_PREFIX) } shouldBe true
+        import(TestKeyFiles.openSsh(pair)).identity.requireUserAuth shouldBe false
 
-        shouldThrow<IllegalArgumentException> { vault.signer(timed.identity, timed.encryptedKey) }
+        // The vault's master key alone can't recover an auth-bound key.
+        shouldThrow<IllegalArgumentException> { authVault.signer(timed.identity, timed.encryptedKey) }
+        val noKeystore = vault.signer(timed.identity, timed.encryptedKey, FakeGate())
+        shouldThrow<KeyVaultUnavailableException> { noKeystore.signOnce() }
+    }
+
+    @Test
+    fun `time-bound keys are unlocked by the keystore window, not by the app`() {
+        val pair = TestKeyFiles.ed25519()
+        val timed = importWithAuth(pair, UserAuthPolicy.TimeBound(60))
+        // A gate that says yes without authenticating can't unlock the Keystore.
+        val liar = authVault.signer(timed.identity, timed.encryptedKey, FakeGate(), "r")
+        liar.shouldBeInstanceOf<GatedSigner>()
+        shouldThrow<UserNotAuthenticatedException> { liar.signOnce() }
+
+        val gate = UnlockingGate(wrapping)
+        val signer = authVault.signer(timed.identity, timed.encryptedKey, gate, "r")
+        verifyEd25519(pair, signer.signOnce()) shouldBe true
+        signer.signOnce()
+        gate.plain shouldBe 1 // the window is still open
+        gate.bound shouldBe 0
+
+        wrapping.locked = true
+        val declined = UnlockingGate(wrapping, answer = false)
+        shouldThrow<UserAuthenticationException> {
+            authVault.signer(timed.identity, timed.encryptedKey, declined, "r").signOnce()
+        }
+    }
+
+    @Test
+    fun `per-use keys need a prompt bound to the unwrapping cipher for every signature`() {
+        val perUse = importWithAuth(TestKeyFiles.ec(), UserAuthPolicy.PerUse)
+        val gate = UnlockingGate(wrapping)
+        val signer = authVault.signer(perUse.identity, perUse.encryptedKey, gate, "r")
+        signer.signOnce("ecdsa-sha2-nistp256")
+        signer.signOnce("ecdsa-sha2-nistp256")
+        gate.bound shouldBe 2
+        gate.plain shouldBe 0
+
+        // An unbound "yes" (a hooked or patched prompt) leaves the cipher locked.
+        val liar = FakeGate()
+        shouldThrow<UserAuthenticationException> {
+            authVault.signer(perUse.identity, perUse.encryptedKey, liar, "r").signOnce("ecdsa-sha2-nistp256")
+        }
+        liar.ciphers.shouldHaveSize(1)
+        shouldThrow<UserAuthenticationException> {
+            authVault.signer(perUse.identity, perUse.encryptedKey, FakeGate(false), "r").signOnce("ecdsa-sha2-nistp256")
+        }
+    }
+
+    @Test
+    fun `keystore problems with wrapping keys are typed errors`() {
+        val pair = TestKeyFiles.ed25519()
+        val perUse = importWithAuth(pair, UserAuthPolicy.PerUse)
+        val gate = UnlockingGate(wrapping)
+        wrapping.invalidated = true
+        shouldThrow<StoredKeyException> { authVault.signer(perUse.identity, perUse.encryptedKey, gate).signOnce() }
+        wrapping.invalidated = false
+
+        authVault.delete(perUse.identity, perUse.encryptedKey)
+        wrapping.keys shouldBe emptyMap()
+        shouldThrow<StoredKeyException> { authVault.signer(perUse.identity, perUse.encryptedKey, gate).signOnce() }
+    }
+
+    @Test
+    fun `tampered auth-bound blobs are rejected`() {
+        val pair = TestKeyFiles.ed25519()
+        val imported = importWithAuth(pair, UserAuthPolicy.PerUse)
+        val identity = imported.identity
+        val gate = UnlockingGate(wrapping)
+        // The header is bound into the vault layer.
+        val flipped = imported.encryptedKey.also { it[1] = ImportedKeyVault.MODE_TIME_BOUND }
+        shouldThrow<StoredKeyException> { authVault.signer(identity, flipped, gate).signOnce() }
+        val header = byteArrayOf(ImportedKeyVault.FORMAT_AUTH_BOUND, ImportedKeyVault.MODE_PER_USE)
+        shouldThrow<StoredKeyException> { authVault.signer(identity, header, gate).signOnce() }
+        val headless = byteArrayOf(ImportedKeyVault.FORMAT_AUTH_BOUND)
+        shouldThrow<StoredKeyException> { authVault.signer(identity, headless, gate).signOnce() }
+
+        val publicKey = OpenSshKeys.parseAuthorizedKeyLine(identity.publicKeyOpenSsh)
+        val ad = ImportedKeyVault.associatedData(publicKey) + header
+        val shortInner = header + aead.aead().encrypt(byteArrayOf(9), ad)
+        shouldThrow<StoredKeyException> { authVault.signer(identity, shortInner, gate).signOnce() }
+
+        // A damaged inner ciphertext under a valid wrapping key.
+        val blob = imported.encryptedKey
+        val inner = aead.aead().decrypt(blob.copyOfRange(2, blob.size), ad)
+        inner[inner.size - 1] = (inner[inner.size - 1] + 1).toByte()
+        val damaged = header + aead.aead().encrypt(inner, ad)
+        shouldThrow<StoredKeyException> { authVault.signer(identity, damaged, gate).signOnce() }
+
+        // Deleting a damaged or plain blob, or without a Keystore, deletes nothing.
+        authVault.delete(identity, header)
+        authVault.delete(identity, ByteArray(0))
+        authVault.delete(identity, shortInner)
+        authVault.delete(identity, import(TestKeyFiles.openSsh(pair)).encryptedKey)
+        vault.delete(identity, blob)
+        wrapping.keys.size shouldBe 1
+    }
+
+    @Test
+    fun `imports that can't be bound to the keystore fail and leave nothing behind`() {
+        val text = TestKeyFiles.openSsh(TestKeyFiles.ed25519())
+        shouldThrow<KeyVaultUnavailableException> { import(text, userAuth = UserAuthPolicy.PerUse) }
+        wrapping.failCreate = KeyVaultUnavailableException("no screen lock")
+        shouldThrow<KeyVaultUnavailableException> { importWithAuth(TestKeyFiles.ed25519(), UserAuthPolicy.PerUse) }
+        wrapping.failCreate = null
+        wrapping.failWrap = true
+        shouldThrow<KeyVaultUnavailableException> { importWithAuth(TestKeyFiles.ed25519(), UserAuthPolicy.PerUse) }
+        wrapping.keys shouldBe emptyMap()
+    }
+
+    @Test
+    fun `keys stored before auth was required fall back to an app-enforced prompt`() {
+        val plain = import(TestKeyFiles.openSsh(TestKeyFiles.ed25519()))
+        val timed = plain.identity.copy(requireUserAuth = true, authValiditySeconds = 60)
+        shouldThrow<IllegalArgumentException> { vault.signer(timed, plain.encryptedKey) }
         val gate = FakeGate()
-        val signer = vault.signer(timed.identity, timed.encryptedKey, gate, "use laptop key")
+        val signer = vault.signer(timed, plain.encryptedKey, gate, "use laptop key")
         signer.shouldBeInstanceOf<GatedSigner>()
-        signer.sign("ssh-ed25519", byteArrayOf(1))
+        signer.signOnce()
         signer.sign("ssh-ed25519", byteArrayOf(2))
         gate.reasons.shouldHaveSize(1)
-        val everyTime = vault.signer(perUse.identity, perUse.encryptedKey, gate, "r")
-        everyTime.sign("ssh-ed25519", byteArrayOf(1))
-        everyTime.sign("ssh-ed25519", byteArrayOf(1))
+        val everyTime = vault.signer(timed.copy(authValiditySeconds = 0), plain.encryptedKey, gate, "r")
+        everyTime.signOnce()
+        everyTime.signOnce()
         gate.reasons.shouldHaveSize(3)
     }
+
+    private fun verifyEd25519(
+        pair: KeyPair,
+        signature: ByteArray,
+    ): Boolean =
+        Signature.getInstance("Ed25519").run {
+            initVerify(pair.public)
+            update(byteArrayOf(1))
+            verify(signature)
+        }
 
     @Test
     fun `ciphertexts are bound to their identity`() {
