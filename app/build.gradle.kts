@@ -5,6 +5,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Release signing is optional: without these values `assembleRelease` produces an unsigned APK,
+// which is what F-Droid's build server expects. See docs/release.md.
+fun signingValue(name: String): Provider<String> =
+    providers
+        .gradleProperty("bridle.signing.$name")
+        .orElse(providers.environmentVariable("BRIDLE_SIGNING_${name.uppercase()}"))
+
+val releaseStoreFile = signingValue("storeFile")
+
 android {
     namespace = "com.kitefoldlabs.bridle"
 
@@ -13,6 +22,29 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // termlib ships four ABIs; 32-bit devices are out of scope (ADR-0002).
+        ndk.abiFilters += setOf("arm64-v8a", "x86_64")
+    }
+
+    signingConfigs {
+        if (releaseStoreFile.isPresent) {
+            create("release") {
+                storeFile = file(releaseStoreFile.get())
+                storePassword = signingValue("storePassword").get()
+                keyAlias = signingValue("keyAlias").get()
+                keyPassword = signingValue("keyPassword").get()
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
+    // The dependency-metadata block is encrypted with a Google key; F-Droid rejects APKs that
+    // carry it, and it would make GitHub Releases APKs differ from F-Droid's reproducible build.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = true
     }
 
     buildFeatures {
@@ -24,6 +56,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
             applicationIdSuffix = ".debug"
