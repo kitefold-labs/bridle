@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: Pre-commit hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit==4.3.0
+      # Gradle-backed hooks run in the build job instead (with caching).
+      - run: pre-commit run --all-files --show-diff-on-failure
+        env:
+          SKIP: ktlint,gradle-check
+
+  build:
+    name: Build, test, coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install tmux (integration tests drive a real tmux server)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
+      - name: Build, lint, test, verify >=95% coverage, check licenses
+        run: ./gradlew check koverVerify koverXmlReport koverHtmlReport checkLicense --stacktrace
+      - name: Coverage summary
+        if: always()
+        run: python3 scripts/coverage_summary.py build/reports/kover/report.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          retention-days: 14
+          path: |
+            build/reports/
+            **/build/reports/
+            **/build/test-results/

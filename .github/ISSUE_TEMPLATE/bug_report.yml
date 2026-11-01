@@ -1,0 +1,33 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open host…\n2. Tap…"
+  - type: input
+    id: version
+    attributes:
+      label: Bridle version
+      placeholder: Settings → About
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 9, Android 16
+  - type: input
+    id: server
+    attributes:
+      label: Server details (optional)
+      description: OS, OpenSSH version, tmux version. Please don't include hostnames or IPs.
