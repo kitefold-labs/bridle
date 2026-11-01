@@ -15,6 +15,7 @@ import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.resetMain
@@ -197,5 +198,35 @@ class SnippetsViewModelTest {
             vm.state.value.run!!
                 .error == "IllegalStateException"
         }
+    }
+
+    @Test
+    fun `closing the dialog stops the command, and its result never reaches another snippet`() {
+        val vm = viewModel()
+        val gate = CompletableDeferred<Unit>()
+        connection.execGate = gate
+        connection.execResult = ExecResult(0, "\u001B[32mslow\u001B[0m\n", "")
+        vm.startRun(Snippet(name = "slow", body = "sleep 60; echo slow", runMode = SnippetRunMode.EXEC))
+        vm.exec()
+        eventually { connection.commands.isNotEmpty() }
+        vm.state.value.run!!
+            .running shouldBe true
+        vm.closeRun()
+        vm.startRun(Snippet(name = "other", body = "true", runMode = SnippetRunMode.EXEC))
+        gate.complete(Unit)
+        vm.state.value.run!!
+            .result
+            .shouldBeNull()
+        vm.state.value.run!!
+            .running shouldBe false
+        connection.execGate = null
+        vm.exec()
+        eventually {
+            vm.state.value.run!!
+                .output != null
+        }
+        vm.state.value.run!!
+            .output!!
+            .text shouldBe "slow\n" // shown without its colour codes
     }
 }

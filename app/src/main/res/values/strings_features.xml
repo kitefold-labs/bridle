@@ -78,6 +78,7 @@
     <string name="snippets_preview">Command</string>
     <string name="snippets_exit_status">Exit status: %1$s</string>
     <string name="snippets_no_output">(no output)</string>
+    <string name="snippets_output_shortened">Showing the last %1$d characters of the output, without terminal colours and control codes.</string>
     <string name="snippets_run_failed">Couldn\'t run: %1$s</string>
     <string name="snippets_pasted">Pasted into the terminal. Press Enter there to run it.</string>
     <string name="snippets_no_terminal">No terminal is open on this host. Open one first, or run the snippet and show its output.</string>

@@ -292,7 +292,7 @@ private fun SnippetRunDialog(
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                 )
-                ExecOutput(run)
+                ExecResultView(run)
             }
         },
         confirmButton = {
@@ -312,17 +312,22 @@ private fun SnippetRunDialog(
 }
 
 @Composable
-private fun ExecOutput(run: SnippetRun) {
+private fun ExecResultView(run: SnippetRun) {
     if (run.running) LinearProgressIndicator(Modifier.fillMaxWidth())
     run.error?.let { Text(stringResource(R.string.snippets_run_failed, it), color = MaterialTheme.colorScheme.error) }
-    val result = run.result ?: return
+    val output = run.output ?: return
     Text(
-        stringResource(R.string.snippets_exit_status, result.exitStatus?.toString() ?: "?"),
+        stringResource(R.string.snippets_exit_status, output.exitStatus?.toString() ?: "?"),
         style = MaterialTheme.typography.labelLarge,
     )
-    val output = (result.stdout + result.stderr).ifEmpty { stringResource(R.string.snippets_no_output) }
+    if (output.omitted > 0) {
+        Text(
+            stringResource(R.string.snippets_output_shortened, ExecOutput.MAX_CHARS),
+            style = MaterialTheme.typography.labelSmall,
+        )
+    }
     Text(
-        output,
+        output.text.ifEmpty { stringResource(R.string.snippets_no_output) },
         fontFamily = FontFamily.Monospace,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),

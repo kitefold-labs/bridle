@@ -248,6 +248,9 @@ class FakeConnection(
     var sftpFailure: Exception? = null
     var execResult: ExecResult = ExecResult(0, "ok\n", "")
     var execFailure: Exception? = null
+
+    /** When set, commands run until it completes. */
+    var execGate: CompletableDeferred<Unit>? = null
     val commands = mutableListOf<String>()
 
     override suspend fun exec(
@@ -255,6 +258,7 @@ class FakeConnection(
         timeout: Duration,
     ): ExecResult {
         commands += command
+        execGate?.await()
         execFailure?.let { throw it }
         return execResult
     }

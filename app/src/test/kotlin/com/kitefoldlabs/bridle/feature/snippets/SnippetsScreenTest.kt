@@ -91,6 +91,11 @@ class SnippetsScreenTest {
         rule.onNodeWithText("Filesystem  Size", substring = true).assertExists()
         connection.commands shouldBe listOf("df -h /home")
 
+        connection.execResult = ExecResult(0, "x".repeat(ExecOutput.MAX_CHARS) + "\u001B[1mlast line", "")
+        rule.onAllNodesWithText("Run and show output")[0].performClick()
+        waitForText("Showing the last")
+        rule.onNodeWithText("last line", substring = true).assertExists()
+
         connection.execResult = ExecResult(null, "", "")
         rule.onAllNodesWithText("Run and show output")[0].performClick()
         waitForText("(no output)")

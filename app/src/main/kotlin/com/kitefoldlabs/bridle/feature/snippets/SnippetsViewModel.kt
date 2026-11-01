@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +53,8 @@ data class SnippetRun(
     val values: Map<String, String>,
     val running: Boolean = false,
     val result: ExecResult? = null,
+    /** [result]'s output, cleaned up and shortened for display. */
+    val output: ExecOutput? = null,
     val error: String? = null,
 ) {
     /** The command as it will be typed or run. */
@@ -82,6 +85,7 @@ class SnippetsViewModel
         private val target: SnippetTarget = target.orElse(SnippetTarget.None)
         private val mutable = MutableStateFlow(SnippetsUiState())
         val state: StateFlow<SnippetsUiState> = mutable.asStateFlow()
+        private var execJob: Job? = null
 
         init {
             viewModelScope.launch {
@@ -119,6 +123,7 @@ class SnippetsViewModel
 
         /** Opens the run dialog with each variable set to its default. */
         fun startRun(snippet: Snippet) {
+            stopExec()
             val values = snippet.variables.associate { it.name to it.default.orEmpty() }
             mutable.update { it.copy(run = SnippetRun(snippet, values)) }
         }
@@ -128,7 +133,11 @@ class SnippetsViewModel
             value: String,
         ) = updateRun { it.copy(values = it.values + (name to value)) }
 
-        fun closeRun() = mutable.update { it.copy(run = null) }
+        /** Closes the run dialog, stopping a command that is still running. */
+        fun closeRun() {
+            stopExec()
+            mutable.update { it.copy(run = null) }
+        }
 
         /** Types the command into this host's terminal (the user presses Enter there). */
         fun paste() {
@@ -151,22 +160,34 @@ class SnippetsViewModel
          */
         fun exec() {
             val run = state.value.run ?: return
-            updateRun { it.copy(running = true, result = null, error = null) }
-            viewModelScope.launch {
-                try {
-                    val result = connections.acquire(hostId).use { lease -> lease.awaitConnection().exec(run.command) }
-                    updateRun { it.copy(running = false, result = result) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") e: Exception,
-                ) {
-                    updateRun { it.copy(running = false, error = e.message ?: e.javaClass.simpleName) }
+            stopExec()
+            updateRun { it.copy(running = true, result = null, output = null, error = null) }
+            // Cancelled when the dialog closes or another snippet is opened: its result must not
+            // land in another snippet's dialog, nor keep the command (and the lease) going.
+            execJob =
+                viewModelScope.launch {
+                    try {
+                        val result =
+                            connections.acquire(hostId).use { lease ->
+                                lease.awaitConnection().exec(run.command)
+                            }
+                        updateRun { it.copy(running = false, result = result, output = ExecOutput.of(result)) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") e: Exception,
+                    ) {
+                        updateRun { it.copy(running = false, error = e.message ?: e.javaClass.simpleName) }
+                    }
                 }
-            }
         }
 
         fun consumeNotice() = mutable.update { it.copy(notice = null) }
+
+        private fun stopExec() {
+            execJob?.cancel()
+            execJob = null
+        }
 
         private fun updateRun(change: (SnippetRun) -> SnippetRun) =
             mutable.update { state -> state.copy(run = state.run?.let(change)) }
