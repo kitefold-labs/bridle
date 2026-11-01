@@ -28,6 +28,7 @@ from your phone.
 | [docs/03-implementation-plan.md](docs/03-implementation-plan.md) | Phased plan, milestones, spikes, testing strategy, risks |
 | [docs/host-helper.md](docs/host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
 | [docs/terminal-input.md](docs/terminal-input.md) | Key encodings, safe bracketed paste, and customising the extra-keys bar (JSON format) |
+| [docs/backup-and-privacy.md](docs/backup-and-privacy.md) | What encrypted backups contain (and never contain), how they are encrypted, how crash reports are scrubbed and filed |
 | [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 
