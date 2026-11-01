@@ -67,6 +67,10 @@ class SshConfigImportViewModelTest {
             val resolver = mockk<ContentResolver> { every { openInputStream(any()) } returns null }
             val context = mockk<Context> { every { contentResolver } returns resolver }
             shouldThrow<IOException> { DocumentReader(context).readText(Uri.EMPTY) }
+            val revoked =
+                mockk<ContentResolver> { every { openInputStream(any()) } throws SecurityException("revoked") }
+            val noAccess = mockk<Context> { every { contentResolver } returns revoked }
+            shouldThrow<IOException> { DocumentReader(noAccess).readText(Uri.EMPTY) }
         }
 
     @Test

@@ -21,7 +21,8 @@ class DocumentReader
         @param:ApplicationContext private val context: Context,
     ) {
         /**
-         * The document's text, decoded as UTF-8.
+         * The document's text, decoded as UTF-8. No more than [maxChars] + 1 characters are read,
+         * and the read buffer is zeroed afterwards (the document may be a private key).
          *
          * @throws DocumentTooLargeException if it has more than [maxChars] characters.
          * @throws IOException if it can't be opened or read.
@@ -32,17 +33,26 @@ class DocumentReader
         ): String =
             withContext(Dispatchers.IO) {
                 val stream =
-                    context.contentResolver.openInputStream(uri) ?: throw IOException("Can't open the document")
-                stream.bufferedReader().use { reader ->
-                    val buffer = CharArray(maxChars + 1)
-                    var total = 0
-                    while (total < buffer.size) {
-                        val read = reader.read(buffer, total, buffer.size - total)
-                        if (read < 0) break
-                        total += read
+                    try {
+                        context.contentResolver.openInputStream(uri)
+                    } catch (e: SecurityException) {
+                        // The provider revoked or never granted access.
+                        throw IOException("Can't open the document", e)
+                    } ?: throw IOException("Can't open the document")
+                val buffer = CharArray(maxChars + 1)
+                try {
+                    stream.reader().use { reader ->
+                        var total = 0
+                        while (total < buffer.size) {
+                            val read = reader.read(buffer, total, buffer.size - total)
+                            if (read < 0) break
+                            total += read
+                        }
+                        if (total > maxChars) throw DocumentTooLargeException()
+                        String(buffer, 0, total)
                     }
-                    if (total > maxChars) throw DocumentTooLargeException()
-                    String(buffer, 0, total)
+                } finally {
+                    buffer.fill('\u0000')
                 }
             }
 
