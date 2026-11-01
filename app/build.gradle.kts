@@ -6,11 +6,13 @@ plugins {
 }
 
 // Release signing is optional: without these values `assembleRelease` produces an unsigned APK,
-// which is what F-Droid's build server expects. See docs/release.md.
+// which is what F-Droid's build server expects. See docs/release.md. Blank values count as unset
+// (GitHub Actions passes a missing secret as an empty string).
 fun signingValue(name: String): Provider<String> =
     providers
         .gradleProperty("bridle.signing.$name")
         .orElse(providers.environmentVariable("BRIDLE_SIGNING_${name.uppercase()}"))
+        .filter { it.isNotBlank() }
 
 val releaseStoreFile = signingValue("storeFile")
 
@@ -28,11 +30,24 @@ android {
 
     signingConfigs {
         if (releaseStoreFile.isPresent) {
+            val keystore = file(releaseStoreFile.get())
+            val secrets = listOf("storePassword", "keyAlias", "keyPassword").associateWith { signingValue(it).orNull }
+            val missing = secrets.filterValues { it == null }.keys
+            if (missing.isNotEmpty()) {
+                throw GradleException(
+                    "Release signing: bridle.signing.storeFile is set but these are missing: " +
+                        missing.joinToString { "bridle.signing.$it / BRIDLE_SIGNING_${it.uppercase()}" } +
+                        ". Set all four values or none; see docs/release.md.",
+                )
+            }
+            if (!keystore.isFile) {
+                throw GradleException("Release signing: keystore $keystore does not exist (bridle.signing.storeFile).")
+            }
             create("release") {
-                storeFile = file(releaseStoreFile.get())
-                storePassword = signingValue("storePassword").get()
-                keyAlias = signingValue("keyAlias").get()
-                keyPassword = signingValue("keyPassword").get()
+                storeFile = keystore
+                storePassword = secrets.getValue("storePassword")
+                keyAlias = secrets.getValue("keyAlias")
+                keyPassword = secrets.getValue("keyPassword")
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
@@ -57,6 +72,9 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfigs.findByName("release")?.let { signingConfig = it }
+            // The VCS info file holds the commit hash, or an error when the build runs from a
+            // source archive or a worktree; leaving it out keeps the APK independent of the checkout.
+            vcsInfo.include = false
         }
         debug {
             applicationIdSuffix = ".debug"
