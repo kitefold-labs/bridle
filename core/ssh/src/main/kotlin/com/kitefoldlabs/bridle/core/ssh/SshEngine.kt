@@ -110,6 +110,9 @@ public interface SshConnection : Closeable {
         command: String? = null,
     ): ShellChannel
 
+    /** Opens an SFTP session on this connection. */
+    public suspend fun openSftp(): SftpSession = throw UnsupportedOperationException("SFTP is not available")
+
     /** Opens a `direct-tcpip` stream to [host]:[port] as seen from the server. */
     public suspend fun openDirectTcpip(
         host: String,

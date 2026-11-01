@@ -318,6 +318,11 @@ internal class SshjConnection(
             }
         }
 
+    override suspend fun openSftp(): SftpSession =
+        withContext(ioDispatcher) {
+            SshjSftpSession(guard { client.newSFTPClient() }, ioDispatcher)
+        }
+
     override suspend fun openDirectTcpip(
         host: String,
         port: Int,
