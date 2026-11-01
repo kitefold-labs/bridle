@@ -19,7 +19,8 @@ Nothing. Bridle has:
 ## Network connections
 
 Bridle only connects to the SSH servers that **you** add, at the addresses you enter, and only
-when you open a connection. It makes no other network requests.
+when you open a connection. It makes no other network requests. Links you tap (the source code,
+licences, this policy, or a crash report you choose to file) open in your browser.
 
 Port forwards that you create listen on your phone's loopback address (`127.0.0.1`) only, so other
 devices on your network can't use them.
@@ -53,11 +54,14 @@ Kitefold Labs never receives it.
 
 ## Crash reports
 
-Crash reporting is **off** unless you turn it on, and even then nothing is sent automatically:
+Bridle has no crash-reporting service, and nothing is ever sent automatically:
 
 1. If Bridle crashes, it saves a report on your phone, with hostnames, usernames, IP addresses,
-   file paths, key fingerprints and anything that looks like a secret removed.
-2. On the next launch, Bridle asks whether you want to report it and shows you the full text.
+   file paths, key fingerprints and anything that looks like a secret removed. The report stays
+   in Bridle's private storage.
+2. On the next launch, Bridle asks whether you want to look at it. If you have turned on
+   **Offer to report crashes** in Settings, it shows you the full text straight away instead.
+   If you decline or discard it, the report is deleted.
 3. If you choose to, Bridle opens a pre-filled issue on GitHub in your browser. You can edit or
    delete anything, and nothing is sent until you submit it yourself. GitHub's own privacy policy
    applies to issues you file there.

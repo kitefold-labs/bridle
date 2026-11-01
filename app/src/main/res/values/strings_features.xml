@@ -166,7 +166,7 @@
     <string name="settings_privacy_statement">Privacy statement</string>
     <string name="settings_source">Source code</string>
     <string name="licences_intro">Bridle is free software under the Apache License 2.0, built with these open-source components. Their licence texts are included in the app.</string>
-    <string name="privacy_statement">Bridle collects no data. It has no accounts, no analytics, no ads and no servers: it only connects to the SSH hosts you add.\n\nYour hosts, keys and settings stay on this phone. Keys you generate never leave its secure hardware.\n\nCrash reports are off unless you turn them on. After a crash, Bridle shows you the scrubbed report, and only you can file it, as a GitHub issue in your browser.\n\nBackups are files you export yourself, encrypted with your passphrase. They never contain private keys or passwords.</string>
+    <string name="privacy_statement">Bridle collects no data. It has no accounts, no analytics, no ads and no servers: it only connects to the SSH hosts you add.\n\nYour hosts, keys and settings stay on this phone. Keys you generate never leave its secure hardware.\n\nCrash reports never leave the phone on their own. After a crash, Bridle offers to show you the scrubbed report, and only you can file it, as a GitHub issue in your browser.\n\nBackups are files you export yourself, encrypted with your passphrase. They never contain private keys or passwords.</string>
     <string name="privacy_full_policy">Read the full privacy policy</string>
 
     <!-- Backup -->
