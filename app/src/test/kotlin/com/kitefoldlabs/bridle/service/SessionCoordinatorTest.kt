@@ -109,6 +109,22 @@ class SessionCoordinatorTest {
 
         override fun close() {
             closed++
+            check(!fail) { "already gone" }
+        }
+    }
+
+    private class ClosingSink :
+        TerminalSink,
+        AutoCloseable {
+        var closed = false
+
+        override fun onOutput(
+            buffer: ByteArray,
+            length: Int,
+        ) = Unit
+
+        override fun close() {
+            closed = true
         }
     }
 
@@ -116,12 +132,12 @@ class SessionCoordinatorTest {
     fun `tabs are wired before their session starts and close their attachment`() =
         runBlocking<Unit> {
             var created: TerminalSession? = null
-            val first = Closeable()
+            val first = Owned()
             val tab = coordinator.openTab(1, "a", AttachSpec.Shell, { _, _ -> }, attachment = first) { created = it }
             created shouldBe tab.session
             coordinator.closeTab(tab.id)
             first.closed shouldBe 1
-            val second = Closeable()
+            val second = Owned()
             coordinator.openTab(1, "b", AttachSpec.Shell, { _, _ -> }, attachment = second)
             coordinator.disconnectAll()
             second.closed shouldBe 1
