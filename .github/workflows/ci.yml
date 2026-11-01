@@ -46,6 +46,9 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
       - name: Build, lint, test, verify >=95% coverage
         run: ./gradlew check koverVerifyBridle koverXmlReportBridle koverHtmlReportBridle --stacktrace
+      # R8 only runs for release builds; catches missing keep/dontwarn rules (e.g. sshj's GSSAPI).
+      - name: Assemble release (R8 minify)
+        run: ./gradlew :app:assembleRelease --stacktrace
       # The license-report plugin resolves every project's classpath from a root task, which
       # Gradle 9 only allows without parallel execution or the configuration cache.
       - name: Check dependency licenses (Apache-2.0 compatible)
