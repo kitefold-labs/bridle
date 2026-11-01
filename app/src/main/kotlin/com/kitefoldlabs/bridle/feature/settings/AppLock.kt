@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature.settings
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators
 import androidx.lifecycle.ViewModel
@@ -62,6 +63,10 @@ interface AppLockModule {
  * Process-wide lock state. The app starts locked; it locks again when it returns to the
  * foreground after more than [timeoutMillis] in the background. Whether the lock is shown at all
  * depends on the app-lock setting (see [AppLockViewModel]).
+ *
+ * Time in the background is measured on [clock], by default the monotonic
+ * [SystemClock.elapsedRealtime]: with the wall clock, setting the phone's time back would keep
+ * the app unlocked indefinitely.
  */
 @Singleton
 class AppLock(
@@ -69,7 +74,7 @@ class AppLock(
     private val clock: () -> Long,
 ) {
     @Inject
-    constructor() : this(DEFAULT_TIMEOUT_MILLIS, System::currentTimeMillis)
+    constructor() : this(DEFAULT_TIMEOUT_MILLIS, SystemClock::elapsedRealtime)
 
     private val mutable = MutableStateFlow(true)
     private var backgroundedAt: Long? = null
@@ -79,7 +84,9 @@ class AppLock(
     fun onForeground() {
         val since = backgroundedAt ?: return
         backgroundedAt = null
-        if (clock() - since >= timeoutMillis) mutable.value = true
+        val away = clock() - since
+        // A clock that went backwards proves nothing about how long the app was away.
+        if (away < 0 || away >= timeoutMillis) mutable.value = true
     }
 
     fun onBackground() {

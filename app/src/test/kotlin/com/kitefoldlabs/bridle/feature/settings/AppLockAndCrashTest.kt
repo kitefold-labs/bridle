@@ -61,6 +61,12 @@ class AppLockAndCrashTest {
         now = 2_000
         lock.onForeground()
         lock.locked.value shouldBe true
+        // Setting the clock back must not keep the app unlocked.
+        lock.unlock()
+        lock.onBackground()
+        now = 100
+        lock.onForeground()
+        lock.locked.value shouldBe true
         AppLock().locked.value shouldBe true
     }
 
