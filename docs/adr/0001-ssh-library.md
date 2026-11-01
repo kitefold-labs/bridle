@@ -1,6 +1,9 @@
 # ADR-0001: SSH library
 
-- **Status:** Proposed. To be confirmed by Phase 0 Spike A.
+- **Status:** Accepted. On the JVM, sshj authenticates through our `SshKeySigner`
+  (ECDSA P-256/384/521, Ed25519, RSA with rsa-sha2-*), including ProxyJump.
+  Integration tests run against an embedded Apache MINA SSHD server. Keystore-backed keys
+  use the same signer path; on-device instrumented tests cover them.
 - **Context:** We need an SSH client for the JVM that runs on Android,
   supports SFTP, port forwarding, `direct-tcpip` (for ProxyJump), keepalive,
   modern algorithms (curve25519 kex, chacha20-poly1305/aes-gcm, rsa-sha2), and

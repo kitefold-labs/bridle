@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 rootProject.name = "bridle"
 
 include(":core:model")
+include(":core:ssh")
