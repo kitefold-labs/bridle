@@ -31,10 +31,18 @@ class CrashReporter
         private val file: File get() = File(context.noBackupFilesDir, FILE_NAME)
         private val json = Json { ignoreUnknownKeys = true }
 
+        // Anything at all may go wrong while reporting a crash; it must not stop the crash.
+        @Suppress("TooGenericExceptionCaught")
         fun install(previous: Thread.UncaughtExceptionHandler? = Thread.getDefaultUncaughtExceptionHandler()) {
             Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-                record(error)
-                previous?.uncaughtException(thread, error)
+                try {
+                    record(error)
+                } catch (ignored: Throwable) {
+                    // Reporting must never replace the crash: the previous handler (Android's,
+                    // which kills the process) has to run whatever happened here.
+                } finally {
+                    previous?.uncaughtException(thread, error)
+                }
             }
         }
 

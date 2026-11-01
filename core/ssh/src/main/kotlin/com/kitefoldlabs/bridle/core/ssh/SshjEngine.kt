@@ -48,6 +48,11 @@ public class SshjEngine(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val configFactory: () -> DefaultConfig = ::defaultConfig,
 ) : SshEngine {
+    init {
+        // sshj resolves its algorithms through the provider named "BC"; make sure it is the full one.
+        BouncyCastleRegistration.install()
+    }
+
     override suspend fun connect(
         target: ConnectTarget,
         hostKeys: HostKeyVerifier,
