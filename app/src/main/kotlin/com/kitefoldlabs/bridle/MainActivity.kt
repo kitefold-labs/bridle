@@ -5,8 +5,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
-import com.kitefoldlabs.bridle.ui.nav.BridleNavHost
-import com.kitefoldlabs.bridle.ui.theme.BridleTheme
+import com.kitefoldlabs.bridle.feature.settings.SettingsRoute
+import com.kitefoldlabs.bridle.ui.BridleApp
+import com.kitefoldlabs.bridle.ui.nav.TopLevel
 import dagger.hilt.android.AndroidEntryPoint
 
 /** Single activity. A FragmentActivity so BiometricPrompt can be shown for key unlocks. */
@@ -17,9 +18,12 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            BridleTheme {
-                BridleNavHost()
-            }
+            BridleApp(
+                screens =
+                    mapOf(
+                        TopLevel.SETTINGS to { SettingsRoute() },
+                    ),
+            )
         }
     }
 
