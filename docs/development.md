@@ -18,8 +18,8 @@ The Gradle wrapper (`./gradlew`) downloads the pinned Gradle version on first us
 
 ```sh
 ./gradlew check                 # compile, unit + integration tests, ktlint, detekt
-./gradlew koverVerify           # fail if coverage < 95% (lines AND branches)
-./gradlew koverHtmlReport       # open build/reports/kover/html/index.html
+./gradlew koverVerifyBridle     # fail if coverage < 95% (lines AND branches)
+./gradlew koverHtmlReportBridle # open build/reports/kover/htmlBridle/index.html
 ./gradlew ktlintFormat          # auto-fix formatting
 ./gradlew checkLicense          # every runtime dependency must be Apache-2.0-compatible
 ```
@@ -34,7 +34,8 @@ Every pull request must pass all of these in CI (`.github/workflows/ci.yml`):
 2. **ktlint** (official Kotlin style) and **detekt** (complexity and smells, zero issues allowed).
 3. **Tests**: JUnit 6 + Kotest assertions/property tests; Robolectric for Android code.
 4. **Coverage ≥ 95%** for both **lines and branches** over handwritten code, merged across all
-   modules and measured with the JaCoCo engine via Kover. JaCoCo's Kotlin filters ignore
+   modules (JVM modules plus the **debug** build of Android modules, Kover variant `bridle`) and
+   measured with the JaCoCo engine via Kover. JaCoCo's Kotlin filters ignore
    compiler-generated members (default-argument bridges, data-class methods, serialization
    constructors). The only class-level exclusions are generated sources: `BuildConfig`, `R`,
    Hilt/Dagger factories, Room `_Impl` classes, Compose singletons, and `@Preview` functions.
@@ -51,7 +52,7 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 Commit hooks are fast: hygiene checks, secret scanning, ktlint. The pre-push hook runs the full
-`check koverVerify`. To run every hook on the whole tree: `pre-commit run --all-files`.
+`check koverVerifyBridle`. To run every hook on the whole tree: `pre-commit run --all-files`.
 
 ## Module map
 

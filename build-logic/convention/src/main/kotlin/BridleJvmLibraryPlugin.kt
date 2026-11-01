@@ -34,6 +34,10 @@ class BridleJvmLibraryPlugin : Plugin<Project> {
                 }
             }
 
+            extensions.configure<kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension> {
+                currentProject { createVariant(COVERAGE_VARIANT) { add("jvm") } }
+            }
+
             tasks.withType<Test>().configureEach {
                 useJUnitPlatform()
                 maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)

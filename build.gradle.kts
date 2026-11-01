@@ -30,6 +30,9 @@ dependencies {
 }
 
 kover {
+    // The `bridle` variant = JVM modules + the debug build of Android modules. Use
+    // `koverVerifyBridle` / `koverXmlReportBridle` / `koverHtmlReportBridle`.
+    currentProject { createVariant("bridle") {} }
     // JaCoCo's Kotlin filters drop compiler-generated code (default-argument bridges, data-class
     // members, kotlinx.serialization constructors) so the gate measures only handwritten code.
     useJacoco(libs.versions.jacoco.get())
@@ -42,18 +45,25 @@ kover {
                     "dagger.internal.DaggerGenerated",
                     "androidx.compose.ui.tooling.preview.Preview",
                 )
+                // Generated sources only (patterns are fully-qualified class names).
                 classes(
                     "*.BuildConfig",
                     "*.R",
                     "*.R$*",
+                    "*.ComposableSingletons*",
                     "*_Factory",
                     "*_Factory$*",
                     "*_MembersInjector",
                     "*_HiltModules*",
-                    "Hilt_*",
+                    "*_HiltComponents*",
+                    "*_GeneratedInjector",
+                    "*_ComponentTreeDeps",
+                    "*.Hilt_*",
+                    "*.Dagger*Component*",
+                    "hilt_aggregated_deps.*",
+                    "dagger.hilt.internal.aggregatedroot.codegen.*",
                     "*_Impl",
                     "*_Impl$*",
-                    "*ComposableSingletons*",
                     "*\$serializer",
                 )
             }

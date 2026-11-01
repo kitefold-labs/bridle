@@ -45,10 +45,10 @@ jobs:
       - name: Install tmux (integration tests drive a real tmux server)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
       - name: Build, lint, test, verify >=95% coverage, check licenses
-        run: ./gradlew check koverVerify koverXmlReport koverHtmlReport checkLicense --stacktrace
+        run: ./gradlew check koverVerifyBridle koverXmlReportBridle koverHtmlReportBridle checkLicense --stacktrace
       - name: Coverage summary
         if: always()
-        run: python3 scripts/coverage_summary.py build/reports/kover/report.xml >> "$GITHUB_STEP_SUMMARY"
+        run: python3 scripts/coverage_summary.py build/reports/kover/reportBridle.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

@@ -17,6 +17,9 @@ import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
+/** Kover variant that the 95% gate and CI reports use (see root build.gradle.kts). */
+const val COVERAGE_VARIANT: String = "bridle"
+
 internal val Project.libs get() = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 internal fun Project.version(name: String): String = libs.findVersion(name).get().requiredVersion
@@ -50,6 +53,11 @@ internal fun Project.configureAndroid(android: CommonExtension) {
         beforeVariants(selector().withBuildType("release")) { variant ->
             (variant as? HasHostTestsBuilder)?.hostTests?.get(HostTestBuilder.UNIT_TEST_TYPE)?.enable = false
         }
+    }
+    // Coverage is measured on the debug build (the one the unit tests run against); Kover's
+    // default total variant would also pull in release classes, whose bytecode differs.
+    extensions.configure<kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension> {
+        currentProject { createVariant(COVERAGE_VARIANT) { add("debug") } }
     }
     tasks.withType<Test>().configureEach {
         maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
