@@ -112,14 +112,18 @@ CI-signed AAB to Play; build or sign the AAB locally with the upload key.
 
    ```sh
    apksigner sign --ks bridle-release.jks --ks-key-alias bridle \
+     --v1-signing-enabled false --alignment-preserved \
      --out Bridle-v0.1.0.apk Bridle-v0.1.0-unsigned.apk
    cp Bridle-v0.1.0-unsigned.aab Bridle-v0.1.0.aab
    jarsigner -keystore upload.jks Bridle-v0.1.0.aab upload
    sha256sum Bridle-v0.1.0.apk Bridle-v0.1.0.aab > SHA256SUMS
    ```
 
-   Replace the unsigned files and `SHA256SUMS` on the draft. The APK name
-   matters: F-Droid's `Binaries:` URL expects `Bridle-v<version>.apk`.
+   Keep both `apksigner` flags: by default it adds a v1 signature and
+   re-aligns the zip entries, and F-Droid's `apksigcopier` then can't match
+   the result to its own unsigned build. Replace the unsigned files and
+   `SHA256SUMS` on the draft. The APK name matters: F-Droid's `Binaries:`
+   URL expects `Bridle-v<version>.apk`.
 5. Upload the AAB to the Play internal track, smoke-test it on a phone
    (connect over Tailscale and a public IP, launch and restart Claude, SFTP
    upload, backup round trip), then promote to closed, then production.
@@ -262,7 +266,9 @@ from the build path. The Gradle wrapper and every dependency are pinned, AGP
 writes fixed zip timestamps, and release builds leave out
 `META-INF/version-control-info.textproto`, which would otherwise differ
 between a clone (commit hash) and a worktree or source archive (an error
-string).
+string). Last checked on 1 November 2026: two builds in different directories
+gave byte-identical unsigned APKs, and both a CI-style (Gradle-signed) APK and
+one signed with the `apksigner` command above passed `apksigcopier compare`.
 
 ## When the repository moves to `kitefoldlabs/bridle`
 
