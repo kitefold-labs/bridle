@@ -1,0 +1,35 @@
+<p>Bridle is a free, open-source SSH client for supervising long-running work on your own Linux machines from your phone. It is built around detached <b>tmux</b> sessions, with first-class support for <b>Claude Code</b>.</p>
+
+<p><b>Sessions that survive your phone</b></p>
+<ul>
+<li>Every connection attaches to a named tmux session, so work keeps running when the phone sleeps, changes networks or loses signal, and Bridle reattaches when you come back.</li>
+<li>Launch Profiles start Claude (or any command) in the right directory with one tap; Restart respawns a hung Claude with <i>--continue</i>.</li>
+<li>Session browser with live previews and status: working, waiting for you, idle or exited.</li>
+<li>Optional notifications while connected, with Approve / Deny actions for Claude's permission prompts.</li>
+</ul>
+
+<p><b>A terminal made for a phone</b></p>
+<ul>
+<li>Extra-keys bar with a Claude preset (Esc, Shift+Tab, Ctrl+C, y/n, slash commands), a compose box for long prompts, safe bracketed paste, pinch zoom and selection.</li>
+</ul>
+
+<p><b>Keys that never leave the device</b></p>
+<ul>
+<li>Generate ECDSA (P-256, P-384), RSA or, on Android 13+ devices that support it, Ed25519 keys in the Android Keystore (hardware-backed where available), optionally requiring a biometric check for each use.</li>
+<li>Import existing OpenSSH keys; they are stored encrypted.</li>
+<li>Trust-on-first-use host key verification with a blocking warning when a key changes.</li>
+</ul>
+
+<p><b>Also included</b></p>
+<ul>
+<li>SFTP file browser with uploads, downloads, rename, chmod and a small text editor.</li>
+<li>Local and dynamic (SOCKS) port forwards, optionally started automatically when you connect.</li>
+<li>Snippets with variables, app lock, screenshot blocking.</li>
+<li>Encrypted backup file (Argon2id + AES-256-GCM) to move your setup to a new phone. Private keys are never included.</li>
+</ul>
+
+<p>Works with Tailscale, other VPNs and public IPs. Needs only <i>sshd</i> and <i>tmux</i> on the host; an optional helper script adds precise Claude status.</p>
+
+<p>No accounts, no ads, no analytics, no servers. Bridle connects only to the hosts you add. Crash reports are opt-in: you review the text and file it yourself as a GitHub issue.</p>
+
+<p>Bridle is not affiliated with or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.</p>

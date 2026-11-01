@@ -1,0 +1,1 @@
+First release: SSH terminal with tmux sessions, Claude Code launch/restart and status, Keystore keys, SFTP, port forwards, snippets and encrypted backups.
