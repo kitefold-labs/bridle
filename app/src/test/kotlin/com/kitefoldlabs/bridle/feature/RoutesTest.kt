@@ -20,6 +20,7 @@ import com.kitefoldlabs.bridle.feature.terminal.TerminalTabsRoute
 import com.kitefoldlabs.bridle.feature.terminal.TerminalTabsViewModel
 import com.kitefoldlabs.bridle.feature.terminal.hold
 import com.kitefoldlabs.bridle.service.ClaudeNotifier
+import com.kitefoldlabs.bridle.service.SessionLinks
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.CoroutineScope
@@ -105,7 +106,7 @@ class RoutesTest {
                 world.data.hosts,
                 world.data.launchProfiles,
                 world.data.settings,
-                ClaudeNotifier(context),
+                ClaudeNotifier(context, SessionLinks(context)),
                 navigator,
                 AppVisibility(MutableStateFlow(true)),
                 scope,

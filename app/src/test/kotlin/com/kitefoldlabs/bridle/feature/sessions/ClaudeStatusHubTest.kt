@@ -20,6 +20,7 @@ import com.kitefoldlabs.bridle.feature.awaitUntil
 import com.kitefoldlabs.bridle.feature.terminal.TerminalNavigator
 import com.kitefoldlabs.bridle.service.ClaudeNotifier
 import com.kitefoldlabs.bridle.service.Notifications
+import com.kitefoldlabs.bridle.service.SessionLinks
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -57,7 +58,7 @@ class ClaudeStatusHubTest {
             world.data.hosts,
             world.data.launchProfiles,
             world.data.settings,
-            ClaudeNotifier(context),
+            ClaudeNotifier(context, SessionLinks(context)),
             navigator,
             AppVisibility(visible),
             scope,

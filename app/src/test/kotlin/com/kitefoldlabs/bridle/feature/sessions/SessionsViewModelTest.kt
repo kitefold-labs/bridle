@@ -19,6 +19,7 @@ import com.kitefoldlabs.bridle.feature.terminal.TerminalLauncher
 import com.kitefoldlabs.bridle.feature.terminal.TerminalNavigator
 import com.kitefoldlabs.bridle.feature.terminal.hold
 import com.kitefoldlabs.bridle.service.ClaudeNotifier
+import com.kitefoldlabs.bridle.service.SessionLinks
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -61,7 +62,7 @@ class SessionsViewModelTest {
             world.data.hosts,
             world.data.launchProfiles,
             world.data.settings,
-            ClaudeNotifier(context),
+            ClaudeNotifier(context, SessionLinks(context)),
             navigator,
             AppVisibility(MutableStateFlow(true)),
             scope,

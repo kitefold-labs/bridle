@@ -34,7 +34,7 @@ class NotificationsTest {
 
     @Test
     fun `permission prompts get approve and deny actions`() {
-        val notifier = ClaudeNotifier(context)
+        val notifier = ClaudeNotifier(context, SessionLinks(context))
         val n = notifier.build(event(ClaudeState.WAITING_PERMISSION), "devbox")!!
         NotificationCompat.getContentTitle(n).toString() shouldContain "claude-api · devbox"
         n.actions.map { it.title.toString() } shouldBe listOf("Approve", "Deny")
@@ -47,9 +47,22 @@ class NotificationsTest {
     }
 
     @Test
+    fun `claude notifications hide their details on the lock screen and need an unlock to answer`() {
+        val n = ClaudeNotifier(context, SessionLinks(context)).build(event(ClaudeState.WAITING_PERMISSION), "devbox")!!
+        n.visibility shouldBe android.app.Notification.VISIBILITY_PRIVATE
+        val public = n.publicVersion!!
+        NotificationCompat.getContentTitle(public).toString() shouldBe "Claude Code status changed"
+        NotificationCompat.getContentText(public) shouldBe null
+        n.actions.map { it.isAuthenticationRequired } shouldBe listOf(true, true)
+        // The tap carries the token that marks it as Bridle's own.
+        val tap = shadowOf(n.contentIntent).savedIntent
+        SessionLinks(context).consume(tap) shouldBe SessionLink(7, "claude-api")
+    }
+
+    @Test
     fun `posting respects the notification permission`() {
         Notifications.createChannels(context)
-        val notifier = ClaudeNotifier(context)
+        val notifier = ClaudeNotifier(context, SessionLinks(context))
         shadowOf(manager).setNotificationsEnabled(false)
         notifier.post(event(ClaudeState.IDLE), "devbox") shouldBe false
         shadowOf(manager).setNotificationsEnabled(true)

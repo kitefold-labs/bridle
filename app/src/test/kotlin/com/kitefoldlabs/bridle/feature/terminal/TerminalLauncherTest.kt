@@ -3,7 +3,6 @@ package com.kitefoldlabs.bridle.feature.terminal
 import android.app.Application
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
-import com.kitefoldlabs.bridle.MainActivity
 import com.kitefoldlabs.bridle.connect.UnknownHostException
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.TerminalState
@@ -12,6 +11,8 @@ import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
+import com.kitefoldlabs.bridle.service.SessionLink
+import com.kitefoldlabs.bridle.service.SessionLinks
 import com.kitefoldlabs.bridle.service.SessionService
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -140,16 +141,19 @@ class TerminalLauncherTest {
     fun `notification taps attach to their session once`() =
         runBlocking<Unit> {
             val id = world.addHost()
-            val links = TerminalDeepLinks(launcher, scope)
+            val sessionLinks = SessionLinks(context)
+            val links = TerminalDeepLinks(launcher, sessionLinks, scope)
             links.handle(null) shouldBe null
             links.handle(Intent()) shouldBe null
-            links.handle(Intent().putExtra(MainActivity.EXTRA_HOST, id)) shouldBe null
-            links.handle(Intent().putExtra(MainActivity.EXTRA_SESSION, "api")) shouldBe null
+            // Without Bridle's token (another app starting the exported activity): nothing opens.
+            links.handle(
+                Intent().putExtra(SessionLinks.EXTRA_HOST, id).putExtra(SessionLinks.EXTRA_SESSION, "api"),
+            ) shouldBe null
 
             fun tap(
                 host: Long,
                 session: String,
-            ) = Intent().putExtra(MainActivity.EXTRA_HOST, host).putExtra(MainActivity.EXTRA_SESSION, session)
+            ) = sessionLinks.intent(SessionLink(host, session))
             val intent = tap(id, "api")
             links.handle(intent)!!.join()
             world.coordinator.tabs.value

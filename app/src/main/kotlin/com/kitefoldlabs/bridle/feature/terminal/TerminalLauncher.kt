@@ -1,7 +1,6 @@
 package com.kitefoldlabs.bridle.feature.terminal
 
 import android.content.Intent
-import com.kitefoldlabs.bridle.MainActivity
 import com.kitefoldlabs.bridle.connect.UnknownHostException
 import com.kitefoldlabs.bridle.core.data.HostRepository
 import com.kitefoldlabs.bridle.core.model.EntityId
@@ -14,6 +13,7 @@ import com.kitefoldlabs.bridle.core.terminalui.asTerminalConnection
 import com.kitefoldlabs.bridle.core.terminalui.sendRemoteInputTo
 import com.kitefoldlabs.bridle.di.ApplicationScope
 import com.kitefoldlabs.bridle.service.SessionCoordinator
+import com.kitefoldlabs.bridle.service.SessionLinks
 import com.kitefoldlabs.bridle.service.TerminalTab
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -135,29 +135,21 @@ class TerminalDeepLinks
     @Inject
     constructor(
         private val launcher: TerminalLauncher,
+        private val links: SessionLinks,
         @param:ApplicationScope private val scope: CoroutineScope,
     ) {
         /**
-         * Attaches to the host and tmux session named by [intent]'s extras, if it has them. The
-         * extras are removed so a recreated activity does not open the session again. Returns the
-         * work started, or null if the intent is not a notification tap.
+         * Attaches to the host and tmux session named by [intent], if it is a genuine notification
+         * tap ([SessionLinks.consume]). Returns the work started, or null if there is none.
          */
         fun handle(intent: Intent?): Job? {
-            val hostId = intent?.getLongExtra(MainActivity.EXTRA_HOST, NO_HOST) ?: NO_HOST
-            val session = intent?.getStringExtra(MainActivity.EXTRA_SESSION)
-            if (hostId == NO_HOST || session == null) return null
-            intent.removeExtra(MainActivity.EXTRA_HOST)
-            intent.removeExtra(MainActivity.EXTRA_SESSION)
+            val link = links.consume(intent) ?: return null
             return scope.launch {
                 try {
-                    launcher.attachTmux(hostId, session)
+                    launcher.attachTmux(link.hostId, link.session)
                 } catch (_: IllegalArgumentException) {
                     // The host was deleted or the name is not a valid session: nothing to open.
                 }
             }
-        }
-
-        private companion object {
-            const val NO_HOST = -1L
         }
     }

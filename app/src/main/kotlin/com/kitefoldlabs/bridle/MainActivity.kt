@@ -51,9 +51,4 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         deepLinks.handle(intent)
     }
-
-    companion object {
-        const val EXTRA_HOST: String = "host"
-        const val EXTRA_SESSION: String = "session"
-    }
 }

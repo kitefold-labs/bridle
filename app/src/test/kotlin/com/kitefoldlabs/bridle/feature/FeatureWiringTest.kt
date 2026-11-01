@@ -1,7 +1,5 @@
 package com.kitefoldlabs.bridle.feature
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -9,7 +7,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
-import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.MainActivity
 import com.kitefoldlabs.bridle.core.data.HostRepository
 import com.kitefoldlabs.bridle.core.model.Host
@@ -18,6 +15,8 @@ import com.kitefoldlabs.bridle.feature.terminal.SessionServiceStarter
 import com.kitefoldlabs.bridle.feature.terminal.TerminalEngineFactory
 import com.kitefoldlabs.bridle.feature.terminal.TerminalModule
 import com.kitefoldlabs.bridle.service.SessionCoordinator
+import com.kitefoldlabs.bridle.service.SessionLink
+import com.kitefoldlabs.bridle.service.SessionLinks
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -58,7 +57,7 @@ class FeatureWiringTest {
 
     @Inject lateinit var hosts: HostRepository
 
-    private val context = ApplicationProvider.getApplicationContext<Context>()
+    @Inject lateinit var links: SessionLinks
 
     @Before
     fun setUp() = hilt.inject()
@@ -69,10 +68,7 @@ class FeatureWiringTest {
     @Test
     fun `a notification tap opens its session, and the sessions tab lists the host`() {
         val id = runBlocking { hosts.upsert(Host(label = "devbox", hostname = "127.0.0.1", port = 1, username = "me")) }
-        val intent =
-            Intent(context, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_HOST, id)
-                .putExtra(MainActivity.EXTRA_SESSION, "api")
+        val intent = links.intent(SessionLink(id, "api"))
         ActivityScenario.launch<MainActivity>(intent).use {
             compose.waitUntil(10_000) { coordinator.tabs.value.isNotEmpty() }
             coordinator.tabs.value

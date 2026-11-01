@@ -78,6 +78,13 @@ When a session starts **waiting for your permission**, Bridle posts a notificati
 - **Approve** picks *Yes* in Claude Code's permission menu (it sends `1`).
 - **Deny** declines (it sends Escape), and Claude asks you what to do instead.
 
+Both buttons first check that the session's screen still shows a permission prompt, and do
+nothing if it doesn't (for example because you already answered it at your desk), so a stale
+notification never types into whatever Claude is doing now. Both also ask you to unlock the
+phone first (Android 12 and newer): approving lets Claude run a command, which nobody holding
+your locked phone should be able to do. On a lock screen set to hide sensitive content, the
+notification shows only *Claude Code status changed*, without the session, host or message.
+
 Tapping the notification itself opens Bridle attached to that session, so you can read the full
 request first. Other notifications tell you when Claude **finished** or is **waiting for
 you**, and when it **exited**. You won't be notified about a session you're looking at in the
