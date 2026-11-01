@@ -15,6 +15,7 @@ val coveredModules =
         ":core:model",
         ":core:ssh",
         ":core:tmux",
+        ":core:session",
     )
 
 dependencies {
