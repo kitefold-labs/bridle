@@ -39,18 +39,22 @@ kover {
     reports {
         filters {
             excludes {
+                // Generated code only. @Preview functions and ComposableSingletons classes are
+                // not excluded: both hold handwritten composable code (lambda bodies included).
                 annotatedBy(
                     "javax.annotation.processing.Generated",
                     "javax.annotation.Generated",
+                    // Dagger/Hilt components and factories (CLASS retention, so Kover sees it).
                     "dagger.internal.DaggerGenerated",
-                    "androidx.compose.ui.tooling.preview.Preview",
                 )
-                // Generated sources only (patterns are fully-qualified class names).
+                // Patterns are fully-qualified class names; `*` also matches '.' and '$'. Apart
+                // from BuildConfig, R and Hilt's own codegen package, each needs a '_' or
+                // '$serializer' in the name, which detekt's ClassNaming rule keeps out of
+                // handwritten classes.
                 classes(
                     "*.BuildConfig",
                     "*.R",
                     "*.R$*",
-                    "*.ComposableSingletons*",
                     "*_Factory",
                     "*_Factory$*",
                     "*_MembersInjector",
@@ -59,7 +63,6 @@ kover {
                     "*_GeneratedInjector",
                     "*_ComponentTreeDeps",
                     "*.Hilt_*",
-                    "*.Dagger*Component*",
                     "hilt_aggregated_deps.*",
                     "dagger.hilt.internal.aggregatedroot.codegen.*",
                     "*_Impl",
