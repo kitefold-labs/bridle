@@ -1,16 +1,15 @@
 package com.kitefoldlabs.bridle.core.ssh
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.io.DataInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -19,7 +18,6 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.SocketException
 import java.util.concurrent.atomic.AtomicInteger
 
 /** A running port forward. Listens on loopback only, so other devices on the network can't use it. */
@@ -31,10 +29,19 @@ public interface PortForwardHandle : AutoCloseable {
     public val activeConnections: StateFlow<Int>
 }
 
-/** Starts local (`-L`) and dynamic SOCKS5 (`-D`) forwards over an [SshConnection]. */
+/**
+ * Starts local (`-L`) and dynamic SOCKS5 (`-D`) forwards over an [SshConnection].
+ *
+ * Every forwarded connection blocks two threads (one per direction), so a forward serves at most
+ * [maxConnections] at a time and closes any beyond that, and the default dispatcher is a view of
+ * [Dispatchers.IO] with its own thread budget: a flood of local connections can't starve the rest
+ * of the app's I/O. A SOCKS client must finish its handshake within [handshakeTimeoutMillis].
+ */
 public class PortForwarder(
     private val connection: SshConnection,
-    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val io: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(2 * DEFAULT_MAX_CONNECTIONS + 1),
+    private val maxConnections: Int = DEFAULT_MAX_CONNECTIONS,
+    private val handshakeTimeoutMillis: Int = HANDSHAKE_TIMEOUT_MS,
 ) {
     /** Forwards `127.0.0.1:[bindPort]` to [destHost]:[destPort] as seen from the server. */
     public fun local(
@@ -43,7 +50,7 @@ public class PortForwarder(
         destPort: Int,
     ): PortForwardHandle {
         require(destPort in 1..MAX_PORT) { "Invalid destination port" }
-        return Listener(bind(bindPort), io) { client ->
+        return Listener(bind(bindPort), io, maxConnections) { client ->
             pump(client, connection.openDirectTcpip(destHost, destPort))
         }
     }
@@ -53,7 +60,9 @@ public class PortForwarder(
      * Point the phone's browser or another app at it to reach anything the server can reach.
      */
     public fun dynamic(bindPort: Int): PortForwardHandle =
-        Listener(bind(bindPort), io) { client ->
+        Listener(bind(bindPort), io, maxConnections) { client ->
+            // A client that connects and then says nothing would otherwise hold a slot forever.
+            client.soTimeout = handshakeTimeoutMillis
             val request = Socks5.handshake(client.getInputStream(), client.getOutputStream())
             if (request != null) {
                 val remote =
@@ -64,6 +73,7 @@ public class PortForwarder(
                         throw e
                     }
                 Socks5.reply(client.getOutputStream(), Socks5.SUCCEEDED)
+                client.soTimeout = 0
                 pump(client, remote)
             }
         }
@@ -81,7 +91,7 @@ public class PortForwarder(
         client: Socket,
         remote: DuplexStream,
     ) {
-        val scope = CoroutineScope(io)
+        val scope = CoroutineScope(io + ignoreErrors)
         val up = scope.launch { copyQuietly(client.getInputStream(), remote.output) }
         val down = scope.launch { copyQuietly(remote.input, client.getOutputStream()) }
         try {
@@ -101,48 +111,68 @@ public class PortForwarder(
     private class Listener(
         private val server: ServerSocket,
         io: CoroutineDispatcher,
+        private val maxConnections: Int,
         private val handle: suspend (Socket) -> Unit,
     ) : PortForwardHandle {
-        private val scope = CoroutineScope(SupervisorJob() + io)
+        // A failure in one forwarded connection must neither stop the forward nor reach the
+        // default handler, which would crash an Android app.
+        private val scope = CoroutineScope(SupervisorJob() + io + ignoreErrors)
         private val count = AtomicInteger()
         private val active = MutableStateFlow(0)
         override val localPort: Int = server.localPort
         override val activeConnections: StateFlow<Int> = active.asStateFlow()
-        private val acceptLoop: Job =
+
+        init {
             scope.launch {
                 while (true) {
                     val client =
                         try {
                             server.accept()
-                        } catch (_: SocketException) {
+                        } catch (_: IOException) {
                             break // closed
                         }
-                    client.tcpNoDelay = true
-                    scope.launch {
-                        active.value = count.incrementAndGet()
-                        try {
-                            handle(client)
-                        } catch (_: IOException) {
-                            // A single failed connection doesn't stop the forward.
-                        } catch (_: ConnectionFailedException) {
-                            // Destination unreachable from the server.
-                        } finally {
-                            closeQuietly(client)
-                            active.value = count.decrementAndGet()
-                        }
+                    if (count.incrementAndGet() > maxConnections) {
+                        count.decrementAndGet()
+                        closeQuietly(client)
+                    } else {
+                        active.value = count.get()
+                        scope.launch { serve(client) }
                     }
                 }
             }
+        }
 
+        private suspend fun serve(client: Socket) {
+            try {
+                client.tcpNoDelay = true
+                handle(client)
+            } catch (_: IOException) {
+                // A single failed connection doesn't stop the forward.
+            } catch (_: ConnectionFailedException) {
+                // Destination unreachable from the server.
+            } finally {
+                closeQuietly(client)
+                active.value = count.decrementAndGet()
+            }
+        }
+
+        /** Stops accepting and drops every forwarded connection. Never blocks. */
         override fun close() {
             closeQuietly(server)
-            runBlocking { acceptLoop.join() }
             scope.cancel()
         }
     }
 
-    private companion object {
-        const val MAX_PORT = 65_535
+    public companion object {
+        /** Concurrent connections per forward; a browser needs a few dozen at most. */
+        public const val DEFAULT_MAX_CONNECTIONS: Int = 64
+
+        /** How long a SOCKS client may take to send its greeting and request, in milliseconds. */
+        public const val HANDSHAKE_TIMEOUT_MS: Int = 10_000
+        private const val MAX_PORT = 65_535
+
+        /** Errors in one forwarded connection are that connection's end, never an app crash. */
+        private val ignoreErrors = CoroutineExceptionHandler { _, _ -> }
     }
 }
 

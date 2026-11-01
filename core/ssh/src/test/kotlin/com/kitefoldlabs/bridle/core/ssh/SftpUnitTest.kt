@@ -53,17 +53,40 @@ class SftpUnitTest {
         runBlocking<Unit> {
             val client = mockk<SFTPClient>(relaxed = true)
             every { client.statExistence(any()) } returns null
-            every { client.rename("/f.bridle-part", "/f") } throws
+            every { client.rename(match { it.startsWith("/f.") }, "/f") } throws
                 SFTPException(Response.StatusCode.FAILURE, "exists") andThen Unit
             SshjSftpSession(client, Dispatchers.IO).upload(ByteArray(0).inputStream(), "/f", overwrite = true)
             verify { client.rm("/f") }
 
-            every { client.rename("/g.bridle-part", "/g") } throws
+            every { client.rename(match { it.startsWith("/g.") }, "/g") } throws
                 SFTPException(Response.StatusCode.PERMISSION_DENIED, "no")
-            every { client.rm("/g.bridle-part") } throws java.io.IOException("cleanup failed too")
+            every { client.rm(match { it.startsWith("/g.") }) } throws java.io.IOException("cleanup failed too")
             shouldThrow<SFTPException> {
                 SshjSftpSession(client, Dispatchers.IO).upload(ByteArray(0).inputStream(), "/g", overwrite = true)
             }
+        }
+
+    @Test
+    fun `a failed replace keeps the temp file once the old target is gone`() =
+        runBlocking<Unit> {
+            val client = mockk<SFTPClient>(relaxed = true)
+            every { client.statExistence(any()) } returns null
+            every { client.rename(match { it.startsWith("/h.") }, "/h") } throws
+                SFTPException(Response.StatusCode.FAILURE, "exists")
+            shouldThrow<SFTPException> {
+                SshjSftpSession(client, Dispatchers.IO).upload(ByteArray(0).inputStream(), "/h", overwrite = true)
+            }
+            verify { client.rm("/h") }
+            // The temp file is the only copy of the data now: it must not be deleted.
+            verify(exactly = 0) { client.rm(match { it.startsWith("/h.") }) }
+        }
+
+    @Test
+    fun `delete reports lstat errors other than a missing file`() =
+        runBlocking<Unit> {
+            val client = mockk<SFTPClient>(relaxed = true)
+            every { client.lstat("/locked") } throws SFTPException(Response.StatusCode.PERMISSION_DENIED, "no")
+            shouldThrow<SFTPException> { SshjSftpSession(client, Dispatchers.IO).delete("/locked") }
         }
 
     @Test

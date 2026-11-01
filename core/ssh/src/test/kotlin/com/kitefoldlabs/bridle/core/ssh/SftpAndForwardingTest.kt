@@ -5,9 +5,15 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
@@ -23,6 +29,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.concurrent.thread
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -86,6 +93,68 @@ class SftpAndForwardingTest {
         }
 
     @Test
+    fun `recursive delete removes symlinks without following them`() =
+        runBlocking<Unit> {
+            Files.createDirectories(home.resolve("victim"))
+            home.resolve("victim/keep.txt").writeText("precious")
+            Files.createDirectories(home.resolve("tree/sub"))
+            home.resolve("tree/sub/a.txt").writeText("a")
+            Files.createSymbolicLink(home.resolve("tree/dirlink"), Path.of("../victim"))
+            Files.createSymbolicLink(home.resolve("tree/sub/filelink"), Path.of("../../victim/keep.txt"))
+            Files.createSymbolicLink(home.resolve("toplink"), Path.of("victim"))
+            conn.openSftp().use { sftp ->
+                sftp.delete("/tree", recursive = true)
+                sftp.delete("/toplink", recursive = true)
+            }
+            Files.exists(home.resolve("tree"), java.nio.file.LinkOption.NOFOLLOW_LINKS) shouldBe false
+            Files.exists(home.resolve("toplink"), java.nio.file.LinkOption.NOFOLLOW_LINKS) shouldBe false
+            home.resolve("victim/keep.txt").readText() shouldBe "precious"
+        }
+
+    @Test
+    fun `overwriting keeps the target's permissions`() =
+        runBlocking<Unit> {
+            val secret = home.resolve("secret.env").also { it.writeText("TOKEN=1") }
+            Files.setPosixFilePermissions(secret, PosixFilePermissions.fromString("rw-------"))
+            val script = home.resolve("run.sh").also { it.writeText("#!/bin/sh") }
+            Files.setPosixFilePermissions(script, PosixFilePermissions.fromString("rwxr-x---"))
+            conn.openSftp().use { sftp ->
+                val (_, opened) = sftp.readText("/secret.env")
+                sftp.writeText("/secret.env", "TOKEN=2", opened)
+                sftp.upload("echo hi".byteInputStream(), "/run.sh", overwrite = true)
+            }
+            secret.readText() shouldBe "TOKEN=2"
+            PosixFilePermissions.toString(Files.getPosixFilePermissions(secret)) shouldBe "rw-------"
+            PosixFilePermissions.toString(Files.getPosixFilePermissions(script)) shouldBe "rwxr-x---"
+        }
+
+    @Test
+    fun `a cancelled upload leaves no temp file behind`() =
+        runBlocking<Unit> {
+            val reading = CompletableDeferred<Unit>()
+            val endless =
+                object : InputStream() {
+                    override fun read(): Int = 0
+
+                    override fun read(
+                        b: ByteArray,
+                        off: Int,
+                        len: Int,
+                    ): Int {
+                        reading.complete(Unit)
+                        Thread.sleep(1)
+                        return len
+                    }
+                }
+            conn.openSftp().use { sftp ->
+                val job = launch(Dispatchers.IO) { sftp.upload(endless, "/never.bin") }
+                reading.await()
+                job.cancelAndJoin()
+            }
+            Files.list(home).use { files -> files.map { it.fileName.toString() }.toList() } shouldBe emptyList()
+        }
+
+    @Test
     fun `transfers are atomic, report progress and can overwrite`() =
         runBlocking<Unit> {
             val data = Random(7).nextBytes(1_500_000)
@@ -97,7 +166,10 @@ class SftpAndForwardingTest {
                 }
                 updates.last() shouldBe (data.size.toLong() to data.size.toLong())
                 (updates.size > 2) shouldBe true
-                Files.exists(home.resolve("blob.bin.bridle-part")) shouldBe false
+                Files.list(home).use { files ->
+                    files.filter { it.toString().endsWith(".bridle-part") }.count()
+                } shouldBe
+                    0L
 
                 shouldThrow<IOException> { sftp.upload(byteArrayOf(1).inputStream(), "/blob.bin") }
                 sftp.upload(byteArrayOf(1, 2, 3).inputStream(), "/blob.bin", overwrite = true) shouldBe 3
@@ -110,7 +182,10 @@ class SftpAndForwardingTest {
                     }
                 shouldThrow<IOException> { sftp.upload(failing, "/partial.bin") }
                 Files.exists(home.resolve("partial.bin")) shouldBe false
-                Files.exists(home.resolve("partial.bin.bridle-part")) shouldBe false
+                Files.list(home).use { files ->
+                    files.filter { it.toString().endsWith(".bridle-part") }.count()
+                } shouldBe
+                    0L
 
                 sftp.upload(data.inputStream(), "/big.bin")
                 val out = ByteArrayOutputStream()
@@ -244,6 +319,58 @@ class SftpAndForwardingTest {
                 }
             }
             service.close()
+        }
+
+    @Test
+    fun `forwards cap connections, time out silent socks clients and close without blocking`() =
+        runBlocking<Unit> {
+            PortForwarder(conn, maxConnections = 1, handshakeTimeoutMillis = 300).dynamic(0).use { socks ->
+                Socket(InetAddress.getLoopbackAddress(), socks.localPort).use { idle ->
+                    withTimeout(5.seconds) { socks.activeConnections.first { it == 1 } }
+                    // Over the cap: closed straight away, the first one is unaffected.
+                    Socket(InetAddress.getLoopbackAddress(), socks.localPort).use { extra ->
+                        extra.soTimeout = 5_000
+                        extra.getInputStream().read() shouldBe -1
+                    }
+                    // The idle client never sends a greeting: dropped after the handshake timeout.
+                    idle.soTimeout = 5_000
+                    idle.getInputStream().read() shouldBe -1
+                    withTimeout(5.seconds) { socks.activeConnections.first { it == 0 } }
+                }
+            }
+            val service = echoServer()
+            val fwd = PortForwarder(conn).local(0, "127.0.0.1", service.localPort)
+            val s = Socket(InetAddress.getLoopbackAddress(), fwd.localPort)
+            s.getOutputStream().write("x\n".toByteArray())
+            s.getInputStream().bufferedReader().readLine() shouldBe "x"
+            withTimeout(5.seconds) { fwd.close() } // drops the open connection too
+            s.soTimeout = 5_000
+            s.getInputStream().read() shouldBe -1
+            s.close()
+            service.close()
+        }
+
+    @Test
+    fun `an unexpected error in one connection neither crashes nor stops the forward`() =
+        runBlocking<Unit> {
+            val crashes = mutableListOf<Throwable>()
+            val previous = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { _, e -> synchronized(crashes) { crashes += e } }
+            try {
+                val broken = mockk<SshConnection>()
+                coEvery { broken.openDirectTcpip(any(), any()) } throws IllegalStateException("sshj bug")
+                PortForwarder(broken).local(0, "h", 1).use { fwd ->
+                    repeat(2) {
+                        Socket(InetAddress.getLoopbackAddress(), fwd.localPort).use { s ->
+                            s.soTimeout = 5_000
+                            s.getInputStream().read() shouldBe -1
+                        }
+                    }
+                }
+            } finally {
+                Thread.setDefaultUncaughtExceptionHandler(previous)
+            }
+            synchronized(crashes) { crashes shouldBe emptyList() }
         }
 
     @Test

@@ -15,6 +15,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.EnumSet
+import java.util.UUID
 
 /** A file or directory on the remote host. */
 public data class RemoteFile(
@@ -65,7 +66,10 @@ public interface SftpSession : AutoCloseable {
         to: String,
     )
 
-    /** Deletes a file, or an empty directory (or a directory tree with [recursive]). */
+    /**
+     * Deletes a file, or an empty directory (or a directory tree with [recursive]). Symbolic links
+     * are removed, never followed, so deleting a tree can't reach anything outside it.
+     */
     public suspend fun delete(
         path: String,
         recursive: Boolean = false,
@@ -122,6 +126,7 @@ public object Sftp {
     internal const val PERMISSION_BITS: Int = 0b111_111_111
     internal const val SPECIAL_BITS: Int = 0b111_000_000_000
     internal const val TEMP_SUFFIX: String = ".bridle-part"
+    internal const val TEMP_MODE: Int = 0b110_000_000
 
     /** Joins a directory and a name with exactly one `/`. */
     public fun join(
@@ -165,7 +170,8 @@ internal class SshjSftpSession(
         path: String,
         recursive: Boolean,
     ) {
-        val target = stat(path) ?: return
+        // lstat, not stat: a symlink to a directory is removed itself, never recursed into.
+        val target = lstat(path) ?: return
         if (!target.isDirectory) return call { client.rm(path) }
         if (recursive) {
             for (child in list(path)) delete(child.path, recursive = true)
@@ -203,24 +209,38 @@ internal class SshjSftpSession(
         progress: TransferProgress,
     ): Long =
         withContext(io) {
-            if (!overwrite && client.statExistence(path) != null) {
+            val existing = client.statExistence(path)
+            if (!overwrite && existing != null) {
                 throw IOException("$path already exists")
             }
-            val temp = path + Sftp.TEMP_SUFFIX
-            val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)
-            val written =
-                try {
-                    client.open(temp, modes).use { file ->
+            // A fresh, unpredictable name opened with EXCL: never another upload's file, and never
+            // a planted symlink (O_EXCL does not follow one), even in a shared directory.
+            val temp = "$path.${UUID.randomUUID().toString().take(TEMP_ID_LENGTH)}${Sftp.TEMP_SUFFIX}"
+            val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.EXCL)
+            // A replacement stays private while it is written and gets the target's mode before the
+            // rename, so saving a 0600 file never exposes it and a script stays executable.
+            val attrs = if (existing == null) FileAttributes.EMPTY else privateFile
+            var created = false
+            var targetRemoved = false
+            try {
+                val written =
+                    client.open(temp, modes, attrs).use { file ->
+                        created = true
                         file.RemoteFileOutputStream(0, Sftp.UNCONFIRMED_WRITES).use { out ->
                             copy(source, out, size, progress)
                         }
                     }
-                } catch (e: IOException) {
-                    removeQuietly(temp)
-                    throw e
-                }
-            replace(temp, path)
-            written
+                existing?.mode?.let { client.chmod(temp, it.permissionsMask and Sftp.PERMISSION_BITS) }
+                replace(temp, path) { targetRemoved = true }
+                written
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
+                // Also on cancellation: an abandoned upload must not leave its temp file behind. Once
+                // the old target is gone, though, the temp file is the only copy, so it is kept.
+                if (created && !targetRemoved) removeQuietly(temp)
+                throw e
+            }
         }
 
     override suspend fun readText(
@@ -255,6 +275,7 @@ internal class SshjSftpSession(
     private fun replace(
         temp: String,
         target: String,
+        onTargetRemoved: () -> Unit,
     ) {
         try {
             client.rename(temp, target)
@@ -263,13 +284,23 @@ internal class SshjSftpSession(
             if (e.statusCode != Response.StatusCode.FAILURE &&
                 e.statusCode != Response.StatusCode.FILE_ALREADY_EXISTS
             ) {
-                removeQuietly(temp)
                 throw e
             }
             client.rm(target)
+            onTargetRemoved()
             client.rename(temp, target)
         }
     }
+
+    /** Like [stat] but does not follow a final symbolic link. */
+    private suspend fun lstat(path: String): RemoteFile? =
+        call {
+            try {
+                client.lstat(path).toRemote(path.trimEnd('/').substringAfterLast('/'), path)
+            } catch (e: SFTPException) {
+                if (e.statusCode == Response.StatusCode.NO_SUCH_FILE) null else throw e
+            }
+        }
 
     private fun removeQuietly(path: String) {
         try {
@@ -305,6 +336,11 @@ internal class SshjSftpSession(
     }
 
     private suspend fun <T> call(block: () -> T): T = withContext(io) { block() }
+
+    private companion object {
+        const val TEMP_ID_LENGTH = 8
+        val privateFile: FileAttributes = FileAttributes.Builder().withPermissions(Sftp.TEMP_MODE).build()
+    }
 }
 
 internal fun RemoteResourceInfo.toRemote(): RemoteFile = attributes.toRemote(name, path)
