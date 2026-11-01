@@ -87,19 +87,17 @@ class InteractionViewModel
             question: Interaction.TrustHost,
             trusted: Boolean,
         ) {
-            // A dialog left up after its question timed out must never answer the next one.
-            if (broker.pending.value === question) broker.answer(trusted)
+            // The broker drops answers to questions that are no longer pending, so a dialog left
+            // up after its question timed out can never answer the next one.
+            broker.answer(question, trusted)
         }
 
         override fun password(
             question: Interaction.Password,
             password: CharArray?,
         ) {
-            if (broker.pending.value === question) {
-                broker.answer(password)
-            } else {
-                password?.fill('\u0000')
-            }
+            // A stale answer is dropped and zeroed by the broker.
+            broker.answer(question, password)
         }
 
         override fun forgetOldKey() {

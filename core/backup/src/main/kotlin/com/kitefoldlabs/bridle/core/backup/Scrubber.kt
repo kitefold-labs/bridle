@@ -8,12 +8,16 @@ package com.kitefoldlabs.bridle.core.backup
  * Replaced, in this order:
  * 1. caller-supplied [sensitive] values (configured hostnames, usernames, labels…) → `<redacted>`
  * 2. URLs (any scheme) → `<url>`
- * 3. email addresses → `<email>`, then `user@host` → `<user>@<host>`
+ * 3. email addresses (also with `@` URL-encoded as `%40`) → `<email>`, then `user@host` → `<user>@<host>`
  * 4. `SHA256:` and MD5 colon-hex fingerprints → `<fingerprint>`
- * 5. absolute and home-relative paths (`/home/…`, `/data/user/…`, `/storage/…`, `~/…`, `C:\…`) → `<path>`
- * 6. IPv6 (including zone ids and MAC-like colon hex) and IPv4 addresses → `<ip>`
- * 7. dotted DNS names → `<host>`, except fully qualified JVM class names (`java.io.File`)
- * 8. hex strings of 32+ digits and base64-like blobs (20+ characters with a digit, or 40+) → `<redacted>`
+ * 5. absolute, home-relative and relative paths (`/home/…`, `/data/user/…`, `/storage/…`, `~/…`,
+ *    `./…`, `../…`, `C:\…`, `\\server\…`) → `<path>`
+ * 6. IPv6 (including zone ids and MAC-like colon hex) and IPv4 addresses → `<ip>`, even when glued
+ *    to other text (`addr_10.0.0.1`); longer dotted-number runs are replaced whole
+ * 7. dotted DNS names (any letters, `_` allowed) → `<host>`, except fully qualified JVM class names
+ *    (`java.io.File`)
+ * 8. hex strings of 32+ digits and base64-like blobs (20+ characters with a digit, or 40+) → `<redacted>`,
+ *    including values of `key=value` pairs
  *
  * Single-label hostnames (`devbox`) and bare usernames cannot be recognised by shape; pass them in
  * [sensitive] to remove them too.
@@ -37,31 +41,31 @@ public object Scrubber {
     private const val MIN_BLOB_WITHOUT_DIGIT = 40
 
     private val url = Regex("""\b[A-Za-z][A-Za-z0-9+.-]*://[^\s"'<>`]+""")
-    private val email = Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}""")
+    private val email = Regex("""[A-Za-z0-9._%+-]+(?:@|%40)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}""")
     private val userAtHost = Regex("""[A-Za-z0-9._-]+@(?:\[[0-9A-Za-z:.%_-]+]|[A-Za-z0-9._:%-]*[A-Za-z0-9])""")
     private val sha256 = Regex("""SHA256:[A-Za-z0-9+/]{43}=?""")
     private val md5 = Regex("""\b(?:[0-9A-Fa-f]{2}:){15}[0-9A-Fa-f]{2}\b""")
-    private val windowsPath = Regex("""\b[A-Za-z]:\\[^\s"'<>`]*""")
-    private val homePath = Regex("""(?<![\w.~-])~/[^\s"'<>`()\[\],;:]*""")
+    private val windowsPath = Regex("""\b[A-Za-z]:\\[^\s"'<>`]*|\\\\[^\s"'<>`]+""")
+    private val homePath = Regex("""(?<![\w.~-])(?:~|\.\.?)/[^\s"'<>`()\[\],;:]*""")
     private val absolutePath = Regex("""(?<![\w.~>/\\-])/[^\s"'<>`()\[\],;:]+""")
     private val ipv6 =
         Regex(
             """(?<![\w:.])(?:[0-9A-Fa-f]{0,4}:){2,8}""" +
                 """(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9A-Fa-f]{0,4})(?:%[\w.-]+)?(?![\w:]|\.\d)""",
         )
-    private val ipv4 = Regex("""(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)""")
+    private val ipv4 = Regex("""(?<!\d)(?:\d{1,3}\.){3,}\d{1,3}(?!\d)""")
     private val hostname =
         Regex(
-            """(?<![\w.@-])(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+""" +
-                """[A-Za-z][A-Za-z0-9-]*[A-Za-z0-9](?![\w-]|\.\w)""",
+            """(?<![\p{L}\p{N}_])(?:[\p{L}\p{N}_](?:[\p{L}\p{N}_-]{0,61}[\p{L}\p{N}_])?\.)+""" +
+                """\p{L}[\p{L}\p{N}-]*[\p{L}\p{N}](?![\p{L}\p{N}_-]|\.[\p{L}\p{N}_])""",
         )
     private val className =
         Regex(
             """^(?:java|javax|kotlin|kotlinx|android|androidx|dalvik|libcore|com|org|net|io|sun|jdk)""" +
                 """(?:\.[a-z_][a-z0-9_]*)*\.[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)*$""",
         )
-    private val hex = Regex("""(?<![\w+/=-])[0-9A-Fa-f]{32,}(?![\w+/=-])""")
-    private val blob = Regex("""(?<![\w+/=-])[A-Za-z0-9+/_-]{20,}={0,2}(?![\w+/=-])""")
+    private val hex = Regex("""(?<![\w+/-])[0-9A-Fa-f]{32,}(?![\w+/=-])""")
+    private val blob = Regex("""(?<![\w+/-])[A-Za-z0-9+/_-]{20,}={0,2}(?![\w+/=-])""")
 
     /** Returns [text] with everything sensitive replaced by placeholders. */
     public fun scrub(

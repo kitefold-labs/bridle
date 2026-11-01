@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.feature.hosts.HostsFeature
 import com.kitefoldlabs.bridle.feature.keys.InteractionHost
 import com.kitefoldlabs.bridle.feature.keys.KeysFeature
 import com.kitefoldlabs.bridle.feature.keys.ResumedActivityTracker
+import com.kitefoldlabs.bridle.ui.SecureScreen
 import com.kitefoldlabs.bridle.ui.nav.BridleNavHost
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
@@ -20,11 +21,14 @@ import javax.inject.Inject
 class MainActivity : FragmentActivity() {
     @Inject lateinit var activityTracker: ResumedActivityTracker
 
+    @Inject lateinit var secureScreen: SecureScreen
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         activityTracker.attach(this)
+        secureScreen.bind(this)
         setContent {
             BridleTheme {
                 BridleNavHost(

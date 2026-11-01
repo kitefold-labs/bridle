@@ -61,9 +61,21 @@ class InteractionBroker(
         username: String,
     ): CharArray? = ask(Interaction.Password(hostLabel, username)) as? CharArray
 
-    /** The UI's answer: a Boolean for [Interaction.TrustHost], a CharArray (or null) for passwords. */
-    fun answer(value: Any?) {
-        current.value?.answer?.complete(value)
+    /**
+     * The UI's answer to [interaction] (the instance it showed from [pending]): a Boolean for
+     * [Interaction.TrustHost], a CharArray (or null) for passwords.
+     *
+     * An answer to a question that is no longer pending (it timed out, or a newer question
+     * replaced it while the dialog was up) is dropped, so a "Trust" tapped for one host can never
+     * trust another; a dropped password is zeroed.
+     */
+    fun answer(
+        interaction: Interaction,
+        value: Any?,
+    ) {
+        val pending = current.value
+        val accepted = pending != null && pending.interaction === interaction && pending.answer.complete(value)
+        if (!accepted) (value as? CharArray)?.fill('\u0000')
     }
 
     private fun ask(interaction: Interaction): Any? =
@@ -72,7 +84,11 @@ class InteractionBroker(
             current.value = pending
             mutablePending.value = interaction
             try {
-                runBlocking { withTimeoutOrNull(timeout) { pending.answer.await() } }
+                runBlocking {
+                    // On timeout, close the question; an answer that won the race still counts.
+                    withTimeoutOrNull(timeout) { pending.answer.await() }
+                        ?: pending.answer.also { it.complete(null) }.await()
+                }
             } finally {
                 current.value = null
                 mutablePending.value = null

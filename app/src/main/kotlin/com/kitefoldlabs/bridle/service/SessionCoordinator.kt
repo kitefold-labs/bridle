@@ -17,14 +17,26 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** An open terminal tab. [attachment] carries the UI's emulator so it outlives the screen. */
+/**
+ * An open terminal tab. [attachment] carries the UI's emulator so it outlives the screen. The tab
+ * owns [sink] and [attachment]: closing the tab closes them too when they are [AutoCloseable].
+ */
 data class TerminalTab(
     val id: String,
     val hostId: EntityId,
     val title: String,
     val session: TerminalSession,
     val attachment: Any?,
-)
+    val sink: TerminalSink? = null,
+) {
+    /** Stops the session, then the sink feeding the emulator, then the emulator (native memory). */
+    internal fun release() {
+        session.close()
+        for (owned in listOf(sink, attachment)) {
+            if (owned is AutoCloseable) runCatching { owned.close() }
+        }
+    }
+}
 
 /**
  * Owns everything that must outlive the UI: shared host connections and open terminal tabs. The
@@ -54,7 +66,7 @@ class SessionCoordinator
         ): TerminalTab {
             val lease = connections.acquire(hostId)
             val session = TerminalSession(lease, attach, sink, scope, size)
-            val tab = TerminalTab(UUID.randomUUID().toString(), hostId, title, session, attachment)
+            val tab = TerminalTab(UUID.randomUUID().toString(), hostId, title, session, attachment, sink)
             mutableTabs.update { it + tab }
             session.start()
             return tab
@@ -65,14 +77,14 @@ class SessionCoordinator
         fun closeTab(id: String) {
             val tab = tab(id) ?: return
             mutableTabs.update { tabs -> tabs.filterNot { it.id == id } }
-            tab.session.close()
+            tab.release()
         }
 
         /** Closes every tab and connection ("Disconnect all"). */
         suspend fun disconnectAll() {
             val all = mutableTabs.value
             mutableTabs.value = emptyList()
-            all.forEach { it.session.close() }
+            all.forEach { it.release() }
             connections.closeAll()
         }
 
