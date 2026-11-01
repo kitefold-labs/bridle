@@ -48,11 +48,15 @@ data class HostRow(
 /** What a section of the list holds. */
 enum class SectionKind { FAVORITES, RECENT, GROUP, OTHER, RESULTS }
 
-/** A titled run of hosts. [groupName] is set for [SectionKind.GROUP]. */
+/**
+ * A titled run of hosts. [groupName] and [groupId] are set for [SectionKind.GROUP]; group names
+ * needn't be unique, so the list tells group sections apart by [groupId].
+ */
 data class HostSection(
     val kind: SectionKind,
     val rows: List<HostRow>,
     val groupName: String? = null,
+    val groupId: EntityId? = null,
 )
 
 data class HostsUiState(
@@ -181,7 +185,8 @@ class HostsViewModel
                     add(HostSection(SectionKind.FAVORITES, favorites.map(::row)))
                     add(HostSection(SectionKind.RECENT, recent.map(::row)))
                     groups.forEach { group ->
-                        add(HostSection(SectionKind.GROUP, byGroup[group.id].orEmpty().map(::row), group.name))
+                        val rows = byGroup[group.id].orEmpty().map(::row)
+                        add(HostSection(SectionKind.GROUP, rows, group.name, group.id))
                     }
                     add(HostSection(SectionKind.OTHER, rest.filter { it.groupId !in knownGroups }.map(::row)))
                 }.filter { it.rows.isNotEmpty() }

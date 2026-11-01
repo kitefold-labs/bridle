@@ -167,7 +167,7 @@ private fun LazyListScope.section(
     actions: HostsActions,
     navigation: HostsNavigation,
 ) {
-    item(key = "header-${section.kind}-${section.groupName}") {
+    item(key = "header-${section.kind}-${section.groupId}", contentType = CONTENT_HEADER) {
         Text(
             section.groupName ?: stringResource(section.kind.title()),
             style = MaterialTheme.typography.titleSmall,
@@ -175,10 +175,13 @@ private fun LazyListScope.section(
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp).semantics { heading() },
         )
     }
-    items(section.rows, key = { "${section.kind}-${it.host.id}" }) { row ->
+    items(section.rows, key = { "${section.kind}-${it.host.id}" }, contentType = { CONTENT_HOST }) { row ->
         HostRowItem(row, actions, navigation)
     }
 }
+
+private const val CONTENT_HEADER = "header"
+private const val CONTENT_HOST = "host"
 
 /** The heading of a section; group sections show the group's name instead. */
 @StringRes

@@ -167,6 +167,24 @@ class HostsScreensTest {
     }
 
     @Test
+    fun `groups with the same name each get a section`() {
+        // Group names aren't unique; list keys made from them would crash the LazyColumn.
+        val groups = listOf(Group(1, "Prod"), Group(2, "Prod"))
+        val hosts = listOf(host(1, "Web").copy(groupId = 1), host(2, "Db").copy(groupId = 2))
+        val sections = HostsViewModel.sections(hosts, groups, emptyMap(), query = "")
+        sections.map { it.groupId } shouldBe listOf(1L, 2L)
+        rule.setContent {
+            HostsScreen(
+                HostsUiState(loading = false, sections = sections),
+                RecordingHostsActions(),
+                navigation,
+            )
+        }
+        rule.onNodeWithText("Web").assertExists()
+        rule.onNodeWithText("Db").assertExists()
+    }
+
+    @Test
     fun `search without results`() {
         rule.setContent {
             HostsScreen(
