@@ -102,6 +102,16 @@ class SftpUnitTest {
         }
 
     @Test
+    fun `the editor's read buffer stops at its limit`() {
+        val buffer = CappedBuffer(4) { size -> RemoteFileTooLargeException("/f", size, 4) }
+        buffer.write(byteArrayOf(1, 2, 3), 0, 3)
+        buffer.write(4)
+        shouldThrow<RemoteFileTooLargeException> { buffer.write(5) }.size shouldBe 5
+        shouldThrow<RemoteFileTooLargeException> { buffer.write(byteArrayOf(5, 6), 0, 2) }.size shouldBe 6
+        buffer.toByteArray() shouldBe byteArrayOf(1, 2, 3, 4)
+    }
+
+    @Test
     fun `port bounds are validated`() {
         val conn = mockk<SshConnection>()
         shouldThrow<IllegalArgumentException> { PortForwarder(conn).local(0, "h", 65_536) }

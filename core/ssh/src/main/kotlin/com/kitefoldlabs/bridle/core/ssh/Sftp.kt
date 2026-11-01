@@ -11,6 +11,7 @@ import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.Response
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.sftp.SFTPException
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -248,8 +249,12 @@ internal class SshjSftpSession(
         limit: Long,
     ): Pair<String, RemoteFile> {
         val info = stat(path) ?: throw IOException("$path does not exist")
+        // Devices, FIFOs and sockets report size 0: /dev/zero would be read until memory runs
+        // out, and a FIFO would block forever.
+        if (info.type != RemoteFile.Type.FILE) throw IOException("$path is not a regular file")
         if (info.size > limit) throw RemoteFileTooLargeException(path, info.size, limit)
-        val out = java.io.ByteArrayOutputStream()
+        // The size can also be wrong (/proc) or grow while it is read (a log): cap the read too.
+        val out = CappedBuffer(limit) { size -> RemoteFileTooLargeException(path, size, limit) }
         download(path, out)
         return out.toString(Charsets.UTF_8) to info
     }
@@ -340,6 +345,31 @@ internal class SshjSftpSession(
     private companion object {
         const val TEMP_ID_LENGTH = 8
         val privateFile: FileAttributes = FileAttributes.Builder().withPermissions(Sftp.TEMP_MODE).build()
+    }
+}
+
+/** A byte buffer that refuses to grow past [limit] bytes, throwing [tooLarge] (given the size it would reach). */
+internal class CappedBuffer(
+    private val limit: Long,
+    private val tooLarge: (Long) -> IOException,
+) : ByteArrayOutputStream() {
+    override fun write(b: Int) {
+        ensureRoom(1)
+        super.write(b)
+    }
+
+    override fun write(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
+        ensureRoom(len)
+        super.write(b, off, len)
+    }
+
+    private fun ensureRoom(len: Int) {
+        val size = count.toLong() + len
+        if (size > limit) throw tooLarge(size)
     }
 }
 
