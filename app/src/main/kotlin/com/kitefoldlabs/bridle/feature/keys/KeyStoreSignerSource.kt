@@ -3,6 +3,8 @@ package com.kitefoldlabs.bridle.feature.keys
 import android.content.Context
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.connect.SignerSource
@@ -15,7 +17,11 @@ import com.kitefoldlabs.bridle.core.security.ImportedKeyVault
 import com.kitefoldlabs.bridle.core.security.KeystoreKeyManager
 import com.kitefoldlabs.bridle.core.ssh.SshKeySigner
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 import java.security.GeneralSecurityException
@@ -59,6 +65,11 @@ class ResumedActivityTracker
  * is needed (looked up for every prompt, never captured). With the app
  * in the background there's no one to ask, so authentication fails and the SSH layer moves on to
  * the next credential (a password prompt, which waits for the user to come back).
+ *
+ * The activity is checked again on the main thread, where the prompt is shown, and the prompt is
+ * cancelled (failing authentication) if the activity stops before it is answered: a prompt
+ * started on an activity that is being stopped would otherwise never answer, leaving the SSH
+ * thread that waits for it blocked.
  */
 @Singleton
 class ActivityBiometricGate internal constructor(
@@ -77,18 +88,42 @@ class ActivityBiometricGate internal constructor(
         )
     })
 
-    override suspend fun authenticate(reason: String): Boolean =
-        tracker.current()?.let { promptFor(it).authenticate(reason) } ?: false
+    override suspend fun authenticate(reason: String): Boolean = onResumed { it.authenticate(reason) }
 
     override suspend fun authenticate(
         reason: String,
         signature: Signature,
-    ): Boolean = tracker.current()?.let { promptFor(it).authenticate(reason, signature) } ?: false
+    ): Boolean = onResumed { it.authenticate(reason, signature) }
 
     override suspend fun authenticate(
         reason: String,
         cipher: Cipher,
-    ): Boolean = tracker.current()?.let { promptFor(it).authenticate(reason, cipher) } ?: false
+    ): Boolean = onResumed { it.authenticate(reason, cipher) }
+
+    /** Runs [prompt] over the resumed activity; false if there is none or it stops meanwhile. */
+    private suspend fun onResumed(prompt: suspend (BiometricGate) -> Boolean): Boolean {
+        val activity = tracker.current() ?: return false
+        return withContext(Dispatchers.Main.immediate) {
+            val lifecycle = activity.lifecycle
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@withContext false
+            coroutineScope {
+                val answer = async { prompt(promptFor(activity)) }
+                val observer =
+                    LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_STOP) answer.cancel()
+                    }
+                lifecycle.addObserver(observer)
+                try {
+                    answer.await()
+                } catch (ignored: CancellationException) {
+                    ensureActive() // our caller was cancelled: pass that on
+                    false // the activity stopped: fail closed
+                } finally {
+                    lifecycle.removeObserver(observer)
+                }
+            }
+        }
+    }
 }
 
 /**

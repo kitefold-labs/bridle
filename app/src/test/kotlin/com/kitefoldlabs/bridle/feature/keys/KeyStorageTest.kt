@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.feature.keys
 
 import android.app.Application
+import android.os.Looper
 import androidx.fragment.app.FragmentActivity
 import com.kitefoldlabs.bridle.core.model.Identity
 import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
@@ -32,6 +33,10 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -39,6 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.security.GeneralSecurityException
 import java.security.KeyStoreException
@@ -273,6 +279,33 @@ class KeyStorageTest {
             val real = ActivityBiometricGate(tracker, env.context)
             real.promptFor(controller.get()).shouldBeInstanceOf<BiometricPromptGate>()
         }
+
+    @Test
+    fun `the gate fails closed when the activity stops before the prompt is answered`() {
+        val tracker = ResumedActivityTracker()
+        val controller = Robolectric.buildActivity(FragmentActivity::class.java).create()
+        tracker.attach(controller.get())
+        controller.start().resume()
+        val waiting =
+            object : BiometricGate {
+                override suspend fun authenticate(reason: String): Boolean = awaitCancellation()
+            }
+        val gate = ActivityBiometricGate(tracker) { waiting }
+        val scope = CoroutineScope(Dispatchers.Main.immediate)
+        val answer = scope.async { gate.authenticate("why") }
+        val cancelled = scope.async { gate.authenticate("why") }
+        answer.isActive shouldBe true
+        cancelled.cancel() // the connection gave up: the cancellation is passed on
+        cancelled.isCancelled shouldBe true
+        controller.pause().stop()
+        shadowOf(Looper.getMainLooper()).idle()
+        answer.isCompleted shouldBe true
+        runBlocking { answer.await() } shouldBe false
+
+        // An activity that stopped after it was looked up is never prompted over.
+        val stale = mockk<ResumedActivityTracker> { every { current() } returns controller.get() }
+        runBlocking { ActivityBiometricGate(stale) { error("no prompt") }.authenticate("why") } shouldBe false
+    }
 
     @Test
     fun `security modules build the production objects`() {
