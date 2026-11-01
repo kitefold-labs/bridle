@@ -16,6 +16,8 @@ from your phone.
 - **Package id:** `com.kitefoldlabs.bridle`
 - **License:** [Apache License 2.0](LICENSE)
 - **Price:** free, with no paid tiers, ads, accounts or backend
+- **Home:** moving to the Kitefold Labs GitHub org (proposed
+  `kitefoldlabs/bridle`). Bugs and crash reports go to GitHub Issues.
 
 ## Documents
 

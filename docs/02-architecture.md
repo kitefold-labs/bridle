@@ -329,5 +329,7 @@ helper uninstall
   can later be composed into list-detail layouts.
 - **Accessibility:** all chrome is accessible. The terminal exposes its
   visible text to TalkBack as a best effort.
-- **Privacy:** no analytics by default. Crash reporting is opt-in and scrubbed
-  of hostnames, usernames and terminal content.
+- **Privacy:** no analytics and no network calls besides the SSH connections
+  the user configures. Crash reporting is opt-in and goes through a
+  user-reviewed, pre-filled GitHub issue, scrubbed of hostnames, usernames,
+  paths and terminal content. There is no crash SDK.

@@ -101,13 +101,29 @@ back to the same session.
 - [ ] Play requirements: privacy policy, Data Safety form, foreground-service
       type declaration and justification, target SDK, 16 KB page-size
       compliance for the native libvterm library.
-- [ ] Closed testing track. New personal developer accounts must run a closed
-      test before production; at last check this was 12 testers for 14 days,
-      so verify the current rule. Opt-in crash reporting.
-- [ ] Open-source release: public repo, CONTRIBUTING, issue templates,
-      reproducible release builds; publish signed APKs on GitHub Releases.
-      F-Droid is optional and would need a build without proprietary
-      dependencies (we plan none).
+- [ ] Play Console under a **Kitefold Labs organization account**, which needs
+      D-U-N-S verification. The closed-test rule for new *personal* accounts
+      (at last check 12 testers for 14 days) should not apply; verify at
+      signup. Run internal and closed tracks anyway.
+- [ ] Signing: use Play App Signing (Google holds the app-signing key) with a
+      Kitefold Labs **upload key** kept offline and backed up, and stored as an
+      encrypted CI secret only if releases are automated. GitHub Releases
+      APKs are signed with a separate Kitefold Labs release key, and the
+      signing-certificate fingerprints are published in the README.
+- [ ] Crash reporting through **GitHub Issues**, with no SDK and no server.
+      An uncaught-exception handler saves a scrubbed report locally (stack
+      trace, app/OS version, device model; no hostnames, usernames, paths or
+      terminal content). On the next launch the app offers to report it,
+      shows the exact text, and opens a pre-filled
+      `github.com/kitefoldlabs/bridle/issues/new` URL in the browser. The URL
+      is size-capped and the stack trace is trimmed. Issue templates live in
+      `.github/ISSUE_TEMPLATE/` (bug, crash, feature).
+- [ ] Open-source release: public repo, CONTRIBUTING, CODE_OF_CONDUCT,
+      SECURITY.md (private vulnerability reporting enabled), reproducible
+      release builds, signed APKs on GitHub Releases.
+- [ ] Stay **F-Droid-ready**: no proprietary dependencies, pinned NDK and
+      toolchain versions, reproducible builds. Whether to list on F-Droid is
+      decided at release (see Remaining open questions).
 - [ ] Security review: ShellQuote fuzzing, host-key flows, logging audit
       (no secrets or terminal content in logs).
 
@@ -151,14 +167,13 @@ Launch Profiles, multi-host snippet broadcast.
 | Push when disconnected | No; notifications only while connected |
 | Other agent presets | No; Claude-first (profiles still accept any command) |
 | Device focus | Phone first; tablet/foldable later |
+| Repository | Moves to the Kitefold Labs GitHub org (proposed `kitefoldlabs/bridle`) |
+| Store signing | Kitefold Labs holds the Play upload key (Play App Signing) |
+| Crash reporting | Opt-in, user-reviewed GitHub Issues; no crash SDK or server |
 
 ## Remaining open questions
 
-1. **Repository & signing:** will the code stay in `nkoenig/terminal`, or
-   move to a Kitefold Labs GitHub org (for example `kitefoldlabs/bridle`)?
-   Who holds the Play upload key?
-2. **F-Droid:** do you want an F-Droid listing in addition to Play and GitHub
-   Releases?
-3. **Crash reporting:** opt-in reports need somewhere to go. Is
-   "share report via email/GitHub issue" (no server) enough, or do you want a
-   hosted service?
+1. **F-Droid listing:** list Bridle on F-Droid in addition to Play and GitHub
+   Releases? The recommendation is yes, using reproducible builds so the
+   F-Droid build carries the Kitefold Labs signature. Decide in Phase 5; the
+   build stays F-Droid-compatible either way.
