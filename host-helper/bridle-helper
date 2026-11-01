@@ -1,0 +1,196 @@
+#!/bin/sh
+# bridle-helper: optional companion for the Bridle Android SSH client.
+#
+# Copyright 2026 Kitefold Labs. Licensed under the Apache License, Version 2.0.
+#
+# Records Claude Code session state (working / waiting / idle / exited) from Claude Code hooks so
+# Bridle can show status badges and notifications. It needs no root, runs no daemon, makes no
+# network connections, and only writes under $XDG_STATE_HOME/bridle (default ~/.local/state/bridle).
+#
+#   bridle-helper version                Print the protocol version.
+#   bridle-helper hook <EventName>       Called by Claude Code hooks; reads the hook JSON on stdin.
+#   bridle-helper list                   Print one JSON object per known session.
+#   bridle-helper prune [days]           Remove state older than N days (default 7).
+#   bridle-helper install-hooks [--dry-run]    Add hooks to ~/.claude/settings.json (backs it up).
+#   bridle-helper uninstall-hooks        Remove Bridle's hooks from ~/.claude/settings.json.
+#
+# Requires: POSIX sh, sed, date, mv, mkdir. install-hooks also needs python3 (or jq).
+
+set -u
+
+HELPER_VERSION=1
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bridle/sessions"
+SETTINGS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+SELF_PATH="${BRIDLE_HELPER_PATH:-$HOME/.local/share/bridle/bridle-helper}"
+HOOK_EVENTS="SessionStart UserPromptSubmit PreToolUse Notification Stop SessionEnd"
+
+die() {
+  printf 'bridle-helper: %s\n' "$*" >&2
+  exit 2
+}
+
+# Extract a top-level string field from a JSON document (good enough for hook payloads, which
+# are flat objects with simple string values). Prints the value still JSON-escaped (a valid JSON
+# string body), or nothing if the field is absent.
+json_field() {
+  # Extended regex (-E, in POSIX.1-2024 and every BSD/GNU/busybox sed): BRE `\|` is a GNU
+  # extension, and without it macOS sed would silently extract nothing.
+  printf '%s' "$1" | tr '\n' ' ' | sed -n -E "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"(([^\"\\\\]|\\\\.)*)\".*/\\1/p"
+}
+
+# Escape a value for embedding in a JSON string.
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '\000-\037'
+}
+
+# An already-escaped JSON string body: just drop control characters.
+json_clean() {
+  printf '%s' "$1" | tr -d '\000-\037'
+}
+
+# Keep only characters that are safe in a file name.
+safe_name() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9_.-' '_' | cut -c1-80
+}
+
+state_for_event() {
+  case "$1" in
+    SessionStart) echo idle ;;
+    UserPromptSubmit | PreToolUse) echo working ;;
+    Notification)
+      case "$2" in
+        *permission*) echo waiting_permission ;;
+        *) echo waiting_input ;;
+      esac
+      ;;
+    Stop) echo idle ;;
+    SessionEnd) echo exited ;;
+    *) echo unknown ;;
+  esac
+}
+
+cmd_hook() {
+  event="${1:-}"
+  [ -n "$event" ] || die "usage: bridle-helper hook <EventName>"
+  payload="$(cat)"
+  session_id="$(json_field "$payload" session_id)"
+  cwd="$(json_field "$payload" cwd)"
+  notification_type="$(json_field "$payload" notification_type)"
+  message="$(json_field "$payload" message)"
+  tmux_session=""
+  if [ -n "${TMUX:-}" ] && command -v tmux >/dev/null 2>&1; then
+    tmux_session="$(tmux display-message -p '#S' 2>/dev/null || true)"
+  fi
+  state="$(state_for_event "$event" "$notification_type $message")"
+  key="$(safe_name "${tmux_session:-${session_id:-unknown}}")"
+  now="$(date +%s)"
+
+  # Before mkdir, so the state directory itself is private too.
+  umask 077
+  mkdir -p "$STATE_DIR" || exit 0
+  tmp="$STATE_DIR/.$key.$$"
+  printf '{"v":%s,"state":"%s","event":"%s","tmux_session":"%s","session_id":"%s","cwd":"%s","message":"%s","ts":%s}\n' \
+    "$HELPER_VERSION" "$state" "$(json_escape "$event")" "$(json_escape "$tmux_session")" \
+    "$(json_clean "$session_id")" "$(json_clean "$cwd")" "$(json_clean "$message")" "$now" >"$tmp" &&
+    mv -f "$tmp" "$STATE_DIR/$key.json"
+  # Hooks must never block or fail Claude Code.
+  exit 0
+}
+
+cmd_list() {
+  [ -d "$STATE_DIR" ] || exit 0
+  for f in "$STATE_DIR"/*.json; do
+    [ -f "$f" ] && cat "$f"
+  done
+  exit 0
+}
+
+cmd_prune() {
+  days="${1:-7}"
+  case "$days" in '' | *[!0-9]*) die "prune: days must be a number" ;; esac
+  [ -d "$STATE_DIR" ] && find "$STATE_DIR" -name '*.json' -type f -mtime +"$days" -exec rm -f {} +
+  exit 0
+}
+
+# Merge or remove our hooks with python3 (preferred) — never with ad-hoc text edits.
+edit_settings() {
+  mode="$1"
+  dry_run="$2"
+  command -v python3 >/dev/null 2>&1 || die "python3 is required to edit $SETTINGS; add hooks manually (see Bridle docs)"
+  mkdir -p "$(dirname "$SETTINGS")"
+  BRIDLE_MODE="$mode" BRIDLE_DRY_RUN="$dry_run" BRIDLE_SETTINGS="$SETTINGS" BRIDLE_SELF="$SELF_PATH" \
+    BRIDLE_EVENTS="$HOOK_EVENTS" python3 - <<'PY'
+import json, os, shlex, shutil, sys, tempfile, time
+
+# Edit the file a symlinked settings.json points to (dotfile managers), not replace the link.
+path = os.path.realpath(os.environ["BRIDLE_SETTINGS"])
+mode = os.environ["BRIDLE_MODE"]
+dry = os.environ["BRIDLE_DRY_RUN"] == "1"
+helper = os.environ["BRIDLE_SELF"]
+events = os.environ["BRIDLE_EVENTS"].split()
+
+try:
+    with open(path, encoding="utf-8") as fh:
+        settings = json.load(fh)
+except FileNotFoundError:
+    settings = {}
+except json.JSONDecodeError as err:
+    sys.exit(f"bridle-helper: {path} is not valid JSON ({err}); not modified")
+if not isinstance(settings, dict):
+    sys.exit(f"bridle-helper: {path} is not a JSON object; not modified")
+
+hooks = settings.setdefault("hooks", {})
+if not isinstance(hooks, dict) or any(not isinstance(v, list) for v in hooks.values()):
+    sys.exit(f"bridle-helper: unexpected \"hooks\" layout in {path}; not modified")
+def ours(entry):
+    inner = entry.get("hooks", [])
+    return isinstance(inner, list) and any(
+        isinstance(h, dict) and "bridle-helper" in str(h.get("command", "")) for h in inner
+    )
+
+changed = False
+for event in events:
+    entries = [e for e in hooks.get(event, []) if isinstance(e, dict)]
+    kept = [e for e in entries if not ours(e)]
+    if mode == "install":
+        kept.append({"hooks": [{"type": "command", "command": f"{shlex.quote(helper)} hook {event}", "timeout": 5}]})
+    if kept != hooks.get(event, []):
+        changed = True
+    if kept:
+        hooks[event] = kept
+    else:
+        hooks.pop(event, None)
+if not hooks:
+    settings.pop("hooks", None)
+
+text = json.dumps(settings, indent=2) + "\n"
+if dry:
+    sys.stdout.write(text)
+elif changed:
+    if os.path.exists(path):
+        shutil.copy2(path, path + ".bridle-backup-" + time.strftime("%Y%m%d%H%M%S"))
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", prefix=".settings.")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+print("BRIDLE_HOOKS_" + ("CHANGED" if changed else "UNCHANGED"), file=sys.stderr)
+PY
+}
+
+main() {
+  sub="${1:-}"
+  [ $# -gt 0 ] && shift
+  case "$sub" in
+    version) echo "bridle-helper $HELPER_VERSION" ;;
+    hook) cmd_hook "$@" ;;
+    list) cmd_list ;;
+    prune) cmd_prune "$@" ;;
+    install-hooks)
+      if [ "${1:-}" = "--dry-run" ]; then edit_settings install 1; else edit_settings install 0; fi
+      ;;
+    uninstall-hooks) edit_settings uninstall 0 ;;
+    *) die "usage: bridle-helper {version|hook <event>|list|prune [days]|install-hooks [--dry-run]|uninstall-hooks}" ;;
+  esac
+}
+
+main "$@"
