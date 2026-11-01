@@ -86,20 +86,51 @@ class ConnectTest {
             val trust = async(Dispatchers.IO) { broker.confirmNewHost(prompt) }
             while (broker.pending.value == null) delay(5.milliseconds)
             broker.pending.value shouldBe Interaction.TrustHost(prompt)
-            broker.answer(true)
+            broker.answer(broker.pending.value!!, true)
             trust.await() shouldBe true
             broker.pending.value shouldBe null
 
             val password = async(Dispatchers.IO) { broker.requestPassword("Dev", "nate") }
             while (broker.pending.value == null) delay(5.milliseconds)
             broker.pending.value shouldBe Interaction.Password("Dev", "nate")
-            broker.answer("hunter2".toCharArray())
+            broker.answer(broker.pending.value!!, "hunter2".toCharArray())
             String(password.await()!!) shouldBe "hunter2"
 
-            broker.answer(true) // nothing pending: ignored
+            val late = "late".toCharArray()
+            broker.answer(Interaction.Password("Dev", "nate"), late) // nothing pending: dropped and zeroed
+            late.all { it == '\u0000' } shouldBe true
             InteractionBroker(timeout = 50.milliseconds).confirmNewHost(prompt) shouldBe false
             InteractionBroker(timeout = 50.milliseconds).requestPassword("a", "b") shouldBe null
             InteractionBroker().pending.value shouldBe null
+        }
+
+    @Test
+    fun `an answer to a stale question never answers the next one`() =
+        runBlocking<Unit> {
+            val broker = InteractionBroker(timeout = 300.milliseconds)
+            val first =
+                async(Dispatchers.IO) { broker.confirmNewHost(HostKeyPrompt("a", 22, "ssh-ed25519", "SHA256:a")) }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            val shown = broker.pending.value!! // the dialog for host a
+            first.await() shouldBe false // the user was too slow
+            val second =
+                async(Dispatchers.IO) { broker.confirmNewHost(HostKeyPrompt("b", 22, "ssh-ed25519", "SHA256:b")) }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            broker.answer(shown, true) // "Trust" tapped on a's dialog
+            // An equal question that the UI never showed doesn't count either.
+            broker.answer(Interaction.TrustHost(HostKeyPrompt("b", 22, "ssh-ed25519", "SHA256:b")), true)
+            second.await() shouldBe false // b was never trusted
+
+            val password = async(Dispatchers.IO) { broker.requestPassword("Dev", "nate") }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            val stale = "for-a".toCharArray()
+            broker.answer(shown, stale)
+            stale.all { it == '\u0000' } shouldBe true
+            broker.answer(broker.pending.value!!, null) // cancelled
+            password.await() shouldBe null
+            val again = "twice".toCharArray()
+            broker.answer(Interaction.Password("Dev", "nate"), again)
+            again.all { it == '\u0000' } shouldBe true
         }
 
     @Test

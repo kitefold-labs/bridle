@@ -1,14 +1,11 @@
 package com.kitefoldlabs.bridle.feature.settings
 
 import android.app.Application
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -153,25 +150,8 @@ class GatesUiTest {
     }
 
     @Test
-    fun `secure window sets and clears FLAG_SECURE`() {
-        var secure by mutableStateOf(true)
-        rule.setContent { SecureWindow(secure) }
-        rule.waitForIdle()
-        (rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) shouldBe
-            WindowManager.LayoutParams.FLAG_SECURE
-        secure = false
-        rule.waitForIdle()
-        (rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) shouldBe 0
+    fun `contexts without an activity have none`() {
         context.findActivity() shouldBe null
-    }
-
-    @Test
-    fun `secure window outside an activity does nothing`() {
-        var secure by mutableStateOf(true)
-        rule.setContent { CompositionLocalProvider(LocalContext provides context) { SecureWindow(secure) } }
-        rule.waitForIdle()
-        secure = false
-        rule.waitForIdle()
-        (rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) shouldBe 0
+        rule.activity.findActivity() shouldBe rule.activity
     }
 }

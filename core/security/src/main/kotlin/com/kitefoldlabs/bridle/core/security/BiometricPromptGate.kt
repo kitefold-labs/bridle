@@ -7,12 +7,17 @@ import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.security.Signature
+import javax.crypto.Cipher
 import kotlin.coroutines.resume
 
 /**
  * [BiometricGate] backed by AndroidX [BiometricPrompt] on [activity]. Safe to call from any
  * thread: the prompt is always shown on the main thread. Cancelling the calling coroutine
  * dismisses the prompt.
+ *
+ * Prompts for a [Signature] or [Cipher] pass it as a `CryptoObject`, so success unlocks exactly
+ * that Keystore operation. The plain prompt carries no `CryptoObject` by necessity: it renews a
+ * time-bound key's window, which the Keystore checks when the key is used (see [BiometricGate]).
  *
  * @param title prompt title (localised by the caller).
  * @param negativeButtonText cancel-button label, used when device credentials can't be offered.
@@ -28,6 +33,11 @@ public class BiometricPromptGate(
         reason: String,
         signature: Signature,
     ): Boolean = prompt(reason, BiometricPrompt.CryptoObject(signature))
+
+    override suspend fun authenticate(
+        reason: String,
+        cipher: Cipher,
+    ): Boolean = prompt(reason, BiometricPrompt.CryptoObject(cipher))
 
     private suspend fun prompt(
         reason: String,

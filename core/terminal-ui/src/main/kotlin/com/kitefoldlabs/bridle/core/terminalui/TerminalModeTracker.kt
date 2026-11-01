@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 public class TerminalModeTracker {
     private val mutableTitle = MutableStateFlow("")
 
-    /** The last title set with OSC 0 or OSC 2, without control characters. */
+    /** The last title set with OSC 0 or OSC 2, without control or bidirectional formatting characters. */
     public val title: StateFlow<String> = mutableTitle.asStateFlow()
 
     @Volatile
@@ -221,8 +221,15 @@ public class TerminalModeTracker {
         private val INTERMEDIATES = 0x20..0x2F
         private val FINALS = 0x40..0x7E
 
+        /**
+         * Bidirectional formatting characters: in a title they could make a tab or notification
+         * read differently from what the host sent (e.g. RLO reversing `exe.txt`).
+         */
+        private fun isBidiControl(c: Char): Boolean =
+            c == '\u061C' || c == '\u200E' || c == '\u200F' || c in '\u202A'..'\u202E' || c in '\u2066'..'\u2069'
+
         private fun cleanTitle(raw: String): String {
-            val printable = raw.filterNot { it.isISOControl() }
+            val printable = raw.filterNot { it.isISOControl() || isBidiControl(it) }
             if (printable.length <= MAX_TITLE_LENGTH) return printable
             // Don't cut a surrogate pair in half.
             val end = if (printable[MAX_TITLE_LENGTH - 1].isHighSurrogate()) MAX_TITLE_LENGTH - 1 else MAX_TITLE_LENGTH

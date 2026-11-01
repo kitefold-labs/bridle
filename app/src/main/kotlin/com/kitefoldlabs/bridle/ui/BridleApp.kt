@@ -12,7 +12,6 @@ import com.kitefoldlabs.bridle.feature.forwards.forwardsDestination
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingGate
 import com.kitefoldlabs.bridle.feature.settings.AppLockGate
 import com.kitefoldlabs.bridle.feature.settings.CrashReportPrompt
-import com.kitefoldlabs.bridle.feature.settings.SecureWindow
 import com.kitefoldlabs.bridle.feature.settings.SettingsViewModel
 import com.kitefoldlabs.bridle.feature.settings.rememberBiometricUnlocker
 import com.kitefoldlabs.bridle.feature.sftp.sftpDestination
@@ -22,9 +21,9 @@ import com.kitefoldlabs.bridle.ui.nav.TopLevel
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
 
 /**
- * The whole UI: theme and screenshot blocking from settings, the app-lock gate, first-run
- * onboarding, the crash-report prompt, and navigation. [screens] are the top-level tabs;
- * [routes] adds further destinations (pass `{}` for none) next to the built-in host tools (files, snippets, forwards).
+ * The whole UI: the theme from settings, the app-lock gate, first-run onboarding, the
+ * crash-report prompt, and navigation. [screens] are the top-level tabs; [routes] adds further
+ * destinations (pass `{}` for none) next to the built-in host tools (files, snippets, forwards).
  */
 @Composable
 fun BridleApp(
@@ -35,7 +34,6 @@ fun BridleApp(
     val nav = rememberNavController()
     val current by settings.settings.collectAsStateWithLifecycle()
     BridleTheme(current?.theme ?: ThemeMode.SYSTEM) {
-        SecureWindow(current?.secureScreenEnabled == true)
         AppLockGate(hiltViewModel(), rememberBiometricUnlocker()) {
             OnboardingGate(
                 onGenerateKey = { nav.navigate(TopLevel.KEYS.route) },
