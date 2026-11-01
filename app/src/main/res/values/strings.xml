@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bridle</string>
+    <string name="channel_sessions">Active sessions</string>
+    <string name="channel_sessions_description">Shown while SSH sessions are open in the background.</string>
+    <string name="channel_claude">Claude status</string>
+    <string name="channel_claude_description">When Claude Code needs your permission, finishes, or exits.</string>
+    <string name="sessions_notification_title">Bridle is connected</string>
+    <plurals name="sessions_notification_text">
+        <item quantity="one">%d session open</item>
+        <item quantity="other">%d sessions open</item>
+    </plurals>
+    <string name="action_disconnect_all">Disconnect all</string>
+    <string name="action_approve">Approve</string>
+    <string name="action_deny">Deny</string>
+    <string name="claude_waiting_permission">%1$s needs your permission</string>
+    <string name="claude_waiting_input">%1$s is waiting for you</string>
+    <string name="claude_idle">%1$s finished</string>
+    <string name="claude_exited">%1$s exited</string>
+    <string name="nav_hosts">Hosts</string>
+    <string name="nav_sessions">Sessions</string>
+    <string name="nav_keys">Keys</string>
+    <string name="nav_settings">Settings</string>
+</resources>

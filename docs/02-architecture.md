@@ -190,6 +190,13 @@ interface SshConnection : Closeable {
   `sh -s` with the POSIX script on stdin (`SshConnection.runScript`), so the
   login shell only ever parses `sh -s`. Scripts extend `PATH` with the common
   install locations, and we probe once per host with `command -v tmux claude`.
+- **Crypto provider:** sshj looks algorithms up by the provider name "BC",
+  which on Android is the platform's stripped BouncyCastle (no Ed25519).
+  `BouncyCastleRegistration.install()` (first thing in
+  `BridleApplication.onCreate`, and again whenever an `SshjEngine` is
+  created) swaps in the full BouncyCastle under that name, at the platform
+  provider's position: below `AndroidKeyStoreBCWorkaround`, so Keystore keys
+  keep reaching the Keystore, and below Conscrypt, which stays the default.
 - **ShellQuote:** a single audited function single-quotes every interpolated
   value. Session names are validated against `[A-Za-z0-9_.-]{1,64}`. It is
   covered by unit and property-based tests.

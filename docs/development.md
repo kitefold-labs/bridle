@@ -75,6 +75,12 @@ modules stay thin.
 
 ## Conventions
 
+- **Keep Hilt entry points thin** (`@HiltAndroidApp`, `@AndroidEntryPoint` activities, services and
+  receivers). Hilt's Gradle plugin rewrites their bytecode, so coverage recorded while they run
+  can't be matched to the compiled classes and shows as 0%. Put the logic in injected classes
+  (e.g. `SessionActions`, `SessionCoordinator`), where it is tested and measured. Entry points
+  are still exercised by Robolectric tests.
+
 - `explicitApi()` is on for library modules, so public API is deliberate.
 - Warnings are errors.
 - Anything interpolated into a remote command **must** go through `ShellQuote` and be validated
