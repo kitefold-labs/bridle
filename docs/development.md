@@ -37,9 +37,11 @@ Every pull request must pass all of these in CI (`.github/workflows/ci.yml`):
    modules (JVM modules plus the **debug** build of Android modules, Kover variant `bridle`) and
    measured with the JaCoCo engine via Kover. JaCoCo's Kotlin filters ignore
    compiler-generated members (default-argument bridges, data-class methods, serialization
-   constructors). The only class-level exclusions are generated sources: `BuildConfig`, `R`,
-   Hilt/Dagger factories, Room `_Impl` classes, Compose singletons, and `@Preview` functions.
-   Don't add exclusions to dodge the gate. Write the test.
+   constructors). The only exclusions are generated sources: `BuildConfig`, `R`, Hilt/Dagger
+   generated classes, Room `_Impl` classes and kotlinx.serialization `$serializer`s. Composable
+   code is measured like any other, `@Preview` functions and `ComposableSingletons` lambdas
+   included: exercise them from Robolectric Compose tests. Don't add exclusions to dodge the
+   gate. Write the test.
 5. **License check**: runtime dependencies must be on the allow-list in
    `config/license/allowed-licenses.json`. No GPL/AGPL.
 6. **CodeQL** (`security-extended` queries) for Kotlin/Java.
