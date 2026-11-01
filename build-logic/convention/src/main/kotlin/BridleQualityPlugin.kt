@@ -2,7 +2,9 @@ import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.withType
 import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
@@ -12,19 +14,22 @@ import org.jlleitschuh.gradle.ktlint.KtlintExtension
  * complexity) and Kover (coverage instrumentation; the 95% gate lives in the root build).
  */
 class BridleQualityPlugin : Plugin<Project> {
-    private companion object {
-        /** Keep in sync with `jacoco` in gradle/libs.versions.toml. */
-        const val JACOCO_VERSION = "0.8.16"
-    }
-
     override fun apply(target: Project) =
         with(target) {
             pluginManager.apply("org.jlleitschuh.gradle.ktlint")
             pluginManager.apply("io.gitlab.arturbosch.detekt")
             pluginManager.apply("org.jetbrains.kotlinx.kover")
 
+            // Same JaCoCo as the root report (single source of truth: gradle/libs.versions.toml).
+            val jacoco =
+                extensions
+                    .getByType<VersionCatalogsExtension>()
+                    .named("libs")
+                    .findVersion("jacoco")
+                    .get()
+                    .requiredVersion
             extensions.configure<KoverProjectExtension> {
-                useJacoco(JACOCO_VERSION)
+                useJacoco(jacoco)
             }
 
             extensions.configure<KtlintExtension> {
