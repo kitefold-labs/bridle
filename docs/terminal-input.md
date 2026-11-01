@@ -51,6 +51,10 @@ Pasted text is always cleaned first:
 - Control characters are removed, except tab and line breaks. That includes NUL, ESC, DEL and
   the 8-bit C1 controls, so no escape sequence of any kind can come from pasted text.
 
+Text the keyboard commits in one go (more than one character, such as a word, a suggestion or a
+keyboard's clipboard strip) is cleaned the same way, so pasting through the keyboard can't
+bypass this.
+
 If the remote program has **not** enabled bracketed paste, every line break in a paste acts like
 Enter, so each line runs as soon as it arrives. Bridle detects this case so it can warn you
 before sending a multi-line paste.

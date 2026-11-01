@@ -100,6 +100,13 @@ class InputDispatcherTest {
     }
 
     @Test
+    fun `multi-character keyboard commits are sanitised like a paste`() {
+        // Gboard's clipboard strip commits the clipboard as text: no escape sequences may survive.
+        input.type("ls\u001b[201~\u001b[31m;\u0000 x\u009b").latin1() shouldBe "ls[31m; x"
+        input.type("a\tb").latin1() shouldBe "a\tb"
+    }
+
+    @Test
     fun `hardware keys combine with sticky modifiers`() {
         input.sticky.tap(StickyModifier.CTRL, nowMillis = 0)
         input.onKey(Key.Left, Modifiers.SHIFT).latin1() shouldBe "\u001b[1;6D"

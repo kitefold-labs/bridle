@@ -46,7 +46,9 @@ public class InputDispatcher(
     /**
      * Handles typed [text] (an IME commit or a hardware character). Line feeds are sent as CR,
      * like the Enter key. A single character gets the active modifiers, so sticky Ctrl then `c`
-     * sends `^C`; longer text is sent as UTF-8 unchanged.
+     * sends `^C`. Longer text is sent as UTF-8 with control characters removed, like a paste
+     * ([BracketedPaste.sanitize]): keyboards commit clipboard contents this way (Gboard's clipboard
+     * strip), so it must not be a way around paste sanitising.
      */
     public fun type(
         text: String,
@@ -57,7 +59,7 @@ public class InputDispatcher(
         val codePoint = normalized.codePointAt(0)
         val single = Character.charCount(codePoint) == normalized.length && KeyEncoder.isScalarValue(codePoint)
         return when {
-            !single -> encoder.encodeText(normalized)
+            !single -> encoder.encodeText(BracketedPaste.sanitize(normalized))
             codePoint == '\r'.code -> onKey(Key.Enter, hardware)
             else -> encoder.encodeChar(codePoint, sticky.consume(hardware))
         }

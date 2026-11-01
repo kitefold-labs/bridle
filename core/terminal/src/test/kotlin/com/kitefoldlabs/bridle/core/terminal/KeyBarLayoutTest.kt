@@ -132,6 +132,21 @@ class KeyBarLayoutTest {
     }
 
     @Test
+    fun `maximally nested input within the size limit fails cleanly`() {
+        // As deep as 64 KiB allows: a layout error (macros can't nest), not a StackOverflowError.
+        val depth = (KeyBarLayout.MAX_JSON_LENGTH - 200) / 29
+        val nested = """{"type":"macro","actions":[""".repeat(depth) + "]}".repeat(depth)
+        rejects(oneAction(nested), "nested")
+        // Deeply nested unknown fields are skipped.
+        val deep = "[".repeat(30_000) + "]".repeat(30_000)
+        val layout =
+            KeyBarLayout.parse(
+                """{"x": $deep, "rows": [[{"label": "K", "action": {"type": "key", "key": "Up"}}]]}""",
+            )
+        layout.rows.size shouldBe 1
+    }
+
+    @Test
     fun `rejects bad row and key counts`() {
         val key = """{"label": "K", "action": {"type": "text", "text": "k"}}"""
         val row = "[$key]"
@@ -160,6 +175,8 @@ class KeyBarLayoutTest {
     fun `rejects bad chars`() {
         rejects(oneAction("""{"type": "char", "char": ""}"""), "exactly one character")
         rejects(oneAction("""{"type": "char", "char": "ab"}"""), "exactly one character")
+        // A lone surrogate counts as one code point but would make KeyEncoder throw on every press.
+        rejects(oneAction("""{"type": "char", "char": "\ud800"}"""), "exactly one character")
         rejects(oneAction("""{"type": "char", "char": "\r"}"""), "rows[0][0].action.char must be printable")
         KeyBarLayout.parse(oneAction("""{"type": "char", "char": "😀"}""")).rows[0][0].action shouldBe
             KeyAction.Chord("😀")

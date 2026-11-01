@@ -250,7 +250,11 @@ public data class KeyBarLayout(
                 is KeyAction.Press -> Unit
                 is KeyAction.Chord -> {
                     val c = action.char
-                    require(c.isNotEmpty() && c.codePointCount(0, c.length) == 1) {
+                    require(
+                        c.isNotEmpty() &&
+                            c.codePointCount(0, c.length) == 1 &&
+                            KeyEncoder.isScalarValue(c.codePointAt(0)),
+                    ) {
                         "$path.char must be exactly one character"
                     }
                     require(c.none(::isTerminalControl)) {
