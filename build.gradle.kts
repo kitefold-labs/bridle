@@ -85,7 +85,9 @@ kover {
 // ---------------------------------------------------------------------------------------------
 licenseReport {
     allowedLicensesFile = file("config/license/allowed-licenses.json")
-    configurations = arrayOf("runtimeClasspath")
+    // JVM modules resolve runtimeClasspath; Android modules have per-variant classpaths, and release
+    // is what ships.
+    configurations = arrayOf("runtimeClasspath", "releaseRuntimeClasspath")
 }
 
 listOf("generateLicenseReport", "checkLicense", "checkLicensePreparation").forEach { name ->

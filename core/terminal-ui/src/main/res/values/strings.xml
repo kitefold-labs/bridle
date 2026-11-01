@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Status banner -->
+    <string name="bridle_terminal_connecting">Connecting…</string>
+    <string name="bridle_terminal_reattaching">Connection lost. Reattaching…</string>
+    <string name="bridle_terminal_ended">Session ended: %1$s</string>
+    <string name="bridle_terminal_exit_status">Exit status %1$d</string>
+    <string name="bridle_terminal_reconnect">Reconnect</string>
+
+    <!-- Key bar -->
+    <string name="bridle_key_state_off">Off</string>
+    <string name="bridle_key_state_once">On for the next key</string>
+    <string name="bridle_key_state_locked">Locked</string>
+    <string name="bridle_key_swipe_up">Swipe up: %1$s</string>
+    <string name="bridle_toolbar_open_compose">Open compose box</string>
+    <string name="bridle_toolbar_close_compose">Close compose box</string>
+    <string name="bridle_toolbar_show_keyboard">Show keyboard</string>
+    <string name="bridle_toolbar_hide_keyboard">Hide keyboard</string>
+
+    <!-- Compose box -->
+    <string name="bridle_compose_label">Message to send</string>
+    <string name="bridle_compose_send">Send</string>
+    <string name="bridle_compose_history_previous">Previous message</string>
+    <string name="bridle_compose_history_next">Next message</string>
+
+    <!-- Paste confirmation -->
+    <plurals name="bridle_paste_confirm_title">
+        <item quantity="one">Run %1$d line?</item>
+        <item quantity="other">Run %1$d lines?</item>
+    </plurals>
+    <string name="bridle_paste_confirm_body">The remote program has not turned on bracketed paste, so each line runs as soon as it arrives.</string>
+    <string name="bridle_paste_confirm_send">Send anyway</string>
+    <string name="bridle_paste_confirm_cancel">Cancel</string>
+</resources>
