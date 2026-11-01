@@ -154,7 +154,8 @@ class KeyImportViewModel
                     { it.copy(busy = false, askPassphrase = true, wrongPassphrase = false) }
                 } else {
                     val id = library.import(text, passphrase, current.label.trim(), current.auth.policy())
-                    ({ it.copy(busy = false, askPassphrase = false, createdId = id) })
+                    // Don't keep the private key's text around once it's in the vault.
+                    ({ it.copy(busy = false, askPassphrase = false, keyText = "", createdId = id) })
                 }
             } catch (e: KeyImportException) {
                 { failed(it, e) }

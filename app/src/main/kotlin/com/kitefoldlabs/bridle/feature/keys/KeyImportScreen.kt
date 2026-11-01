@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,9 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -106,7 +107,7 @@ private fun PassphraseDialog(
     wrong: Boolean,
     actions: KeyImportActions,
 ) {
-    val passphrase = rememberTextFieldState()
+    val passphrase = rememberSecretFieldState()
     AlertDialog(
         onDismissRequest = @DontMemoize { actions.cancelPassphrase() },
         title = { Text(stringResource(R.string.key_import_passphrase_title)) },
@@ -137,6 +138,18 @@ private fun PassphraseDialog(
             ) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+}
+
+/**
+ * State for a password or passphrase field. `rememberTextFieldState` would save the text in the
+ * instance state, a Bundle handed to the system that outlives the process; this state is only
+ * remembered (a rotation empties the field) and is cleared when the field leaves composition.
+ */
+@Composable
+internal fun rememberSecretFieldState(): TextFieldState {
+    val state = remember { TextFieldState() }
+    DisposableEffect(state, effect = @DontMemoize { onDispose { state.clearText() } })
+    return state
 }
 
 /** Copies the field's text into a new array (never a String) and clears the field. */

@@ -1,10 +1,14 @@
 package com.kitefoldlabs.bridle.feature.keys
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -63,6 +67,27 @@ private class RecordingKnownHosts : KnownHostsActions {
     }
 }
 
+/** Records the passphrases the import screen hands over. */
+private class RecordingPassphrase : KeyImportActions {
+    val passphrases = mutableListOf<String>()
+
+    override fun setLabel(label: String) = Unit
+
+    override fun setKeyText(text: String) = Unit
+
+    override fun setAuth(auth: AuthSetting) = Unit
+
+    override fun loadFile(uri: Uri) = Unit
+
+    override fun submit() = Unit
+
+    override fun submitPassphrase(passphrase: CharArray) {
+        passphrases += String(passphrase)
+    }
+
+    override fun cancelPassphrase() = Unit
+}
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "w411dp-h2400dp")
 class TrustScreensTest {
@@ -99,6 +124,24 @@ class TrustScreensTest {
         actions.calls shouldBe listOf("password:hunter2", "password:again", "password:null")
         pending = Interaction.Password("Dev", "root")
         rule.onNodeWithText("Password for root on Dev").assertExists()
+    }
+
+    @Test
+    fun `typed passwords and passphrases are never saved to the instance state`() {
+        val restoration = StateRestorationTester(rule)
+        val imports = RecordingPassphrase()
+        restoration.setContent {
+            InteractionDialogs(Interaction.Password("Dev", "nate"), null, actions)
+            KeyImportScreen(KeyImportUiState(askPassphrase = true), imports, onBack = {}, onCreated = {})
+        }
+        rule.onNodeWithText("Password").performTextInput("hunter2")
+        rule.onNodeWithText("Passphrase").performTextInput("s3cret")
+        // Saving and restoring the state (rotation, process death) must not bring the secrets back.
+        restoration.emulateSavedInstanceStateRestore()
+        rule.onNodeWithText("Log in").performClick()
+        rule.onAllNodesWithText("Import").onLast().performClick()
+        actions.calls shouldBe listOf("password:")
+        imports.passphrases shouldBe listOf("")
     }
 
     @Test

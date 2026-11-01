@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -119,7 +118,7 @@ private fun PasswordDialog(
     question: Interaction.Password,
     actions: InteractionActions,
 ) {
-    val password = rememberTextFieldState()
+    val password = rememberSecretFieldState()
     val submit = @DontMemoize { actions.password(question, password.takeChars()) }
     AlertDialog(
         onDismissRequest = @DontMemoize { actions.password(question, null) },

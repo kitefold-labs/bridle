@@ -124,9 +124,10 @@ class KeyViewModelsTest {
             vm.setAuth(AuthSetting(AuthChoice.EVERY_USE))
             vm.submit()
             vm.submit() // already busy: ignored
-            val id = vm.state.await { it.createdId != null }.createdId!!
+            val done = vm.state.await { it.createdId != null }
+            done.keyText shouldBe "" // the private key isn't kept in memory once imported
             env.data.identities
-                .get(id)!!
+                .get(done.createdId!!)!!
                 .authValiditySeconds shouldBe 0
         }
 
