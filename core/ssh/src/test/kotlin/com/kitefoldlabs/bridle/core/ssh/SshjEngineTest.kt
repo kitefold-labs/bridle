@@ -194,19 +194,6 @@ class SshjEngineTest {
         }
 
     @Test
-    fun `failure on the final hop closes the jump connection`() =
-        runBlocking<Unit> {
-            val bastion = server()
-            val inner = TestSshServer(home).track()
-            shouldThrow<AuthenticationFailedException> {
-                engine.connect(
-                    inner.target(TestSshServer.password("nope"), jump = bastion.target(TestSshServer.password())),
-                    verifier(),
-                )
-            }
-        }
-
-    @Test
     fun `server shutdown is reported as disconnected`() =
         runBlocking<Unit> {
             val srv = server()

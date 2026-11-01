@@ -24,6 +24,8 @@ class TestSshServer(
     val hostKey: KeyPair = TestKeys.ec(),
     private val password: String = PASSWORD,
     private val authorizedKeys: Set<PublicKey> = emptySet(),
+    /** Replaces the `/bin/sh`-backed exec handler (for protocol-level tests). */
+    private val commands: CommandFactory? = null,
 ) : AutoCloseable {
     val server: SshServer =
         SshServer.setUpDefaultServer().apply {
@@ -37,8 +39,8 @@ class TestSshServer(
                 }
             keyboardInteractiveAuthenticator = null
             // HOME points at a temp dir so scripts never touch the real home directory.
-            commandFactory =
-                CommandFactory { channel, command ->
+            commandFactory = commands
+                ?: CommandFactory { channel, command ->
                     ProcessShellCommandFactory.INSTANCE.createCommand(channel, "env HOME=$home $command")
                 }
             shellFactory = ProcessShellFactory("sh", "env", "HOME=$home", "/bin/sh", "-i")

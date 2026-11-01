@@ -1,12 +1,19 @@
 package com.kitefoldlabs.bridle.core.ssh
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import net.schmizz.keepalive.KeepAliveProvider
@@ -32,7 +39,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import net.schmizz.sshj.transport.verification.HostKeyVerifier as SshjHostKeyVerifier
 
-/** [SshEngine] backed by sshj. Blocking sshj calls run on [ioDispatcher]. */
+/**
+ * [SshEngine] backed by sshj. Blocking sshj calls run on [ioDispatcher], which must have more than
+ * one thread (the default, [Dispatchers.IO]): cancellation and timeouts are serviced by a sibling
+ * coroutine while a call blocks.
+ */
 public class SshjEngine(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val configFactory: () -> DefaultConfig = ::defaultConfig,
@@ -41,45 +52,89 @@ public class SshjEngine(
         target: ConnectTarget,
         hostKeys: HostKeyVerifier,
         options: ConnectOptions,
-    ): SshConnection =
-        withContext(ioDispatcher) {
-            connectBlocking(target, hostKeys, options)
+    ): SshConnection {
+        val attempt = ConnectAttempt()
+        var connected: SshjConnection? = null
+        try {
+            return withContext(ioDispatcher) {
+                // sshj's connect/kex/auth calls block and ignore coroutine cancellation; closing the
+                // half-open clients is the only way to make them return early.
+                // UNDISPATCHED: a cancellation that lands before the watchdog was scheduled must still abort.
+                val watchdog =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            attempt.abort()
+                        }
+                    }
+                try {
+                    connectBlocking(target, hostKeys, options, attempt).also { connected = it }
+                } finally {
+                    attempt.complete()
+                    watchdog.cancel()
+                }
+            }
+        } catch (e: CancellationException) {
+            // Cancelled after the handshake finished: nobody will ever receive this connection.
+            connected?.close()
+            throw e
+        } catch (e: ConnectionFailedException) {
+            currentCoroutineContext().ensureActive() // report the cancellation, not its side effect
+            throw e
         }
+    }
 
     private fun connectBlocking(
         target: ConnectTarget,
         hostKeys: HostKeyVerifier,
         options: ConnectOptions,
+        attempt: ConnectAttempt,
     ): SshjConnection {
-        val jump = target.jump?.let { connectBlocking(it, hostKeys, options) }
+        val jump = target.jump?.let { connectBlocking(it, hostKeys, options, attempt) }
         val client = SSHClient(configFactory())
         val verifier = VerifierAdapter(hostKeys)
+        val passwords = mutableListOf<OneShotPasswordFinder>()
+        var connected = false
         try {
+            attempt.register(client)
             client.addHostKeyVerifier(verifier)
             client.connectTimeout = options.connectTimeout.inWholeMilliseconds.toInt()
             client.timeout = options.socketTimeout.inWholeMilliseconds.toInt()
+            if (options.keepAlive.isPositive()) {
+                // Must be set before connect(): sshj starts the keepalive thread only in onConnect().
+                client.connection.keepAlive.keepAliveInterval =
+                    options.keepAlive.inWholeSeconds
+                        .coerceAtLeast(1)
+                        .toInt()
+            }
             if (jump == null) {
                 client.connect(target.hostname, target.port)
             } else {
                 client.connectVia(jump.client.newDirectConnection(target.hostname, target.port))
             }
-            if (options.keepAlive.isPositive()) {
-                client.connection.keepAlive.keepAliveInterval = options.keepAlive.inWholeSeconds.toInt()
-            }
-            client.auth(target.username, target.credentials.flatMap(::authMethods))
+            client.auth(target.username, target.credentials.flatMap { authMethods(it, passwords) })
+            connected = true
             return SshjConnection(client, jump, ioDispatcher)
         } catch (e: IOException) {
-            closeQuietly(client)
-            jump?.close()
             throw translate(e, verifier.failure)
+        } finally {
+            passwords.forEach { it.wipe() }
+            if (!connected) {
+                closeQuietly(client)
+                jump?.close()
+            }
         }
     }
 
-    private fun authMethods(credential: Credential): List<AuthMethod> =
+    private fun authMethods(
+        credential: Credential,
+        passwords: MutableList<OneShotPasswordFinder>,
+    ): List<AuthMethod> =
         when (credential) {
             is Credential.Key -> listOf(SignerAuthMethod(credential.signer))
             is Credential.Password -> {
-                val finder = OneShotPasswordFinder(credential.supply)
+                val finder = OneShotPasswordFinder(credential.supply).also { passwords += it }
                 listOf(AuthPassword(finder), AuthKeyboardInteractive(PasswordResponseProvider(finder)))
             }
         }
@@ -130,13 +185,59 @@ internal class VerifierAdapter(
     ): List<String> = delegate.knownKeyTypes(hostname, port)
 }
 
-/** Supplies the password once, then wipes our copy; never retries with the same secret. */
+/**
+ * Hands sshj the password when the server asks for it and never retries with the same secret.
+ * sshj copies the characters into the outgoing packet (and wipes that copy) but not the array we
+ * return, so every array handed out is zeroed by [wipe] once authentication has finished.
+ */
 internal class OneShotPasswordFinder(
     private val supply: () -> CharArray,
 ) : PasswordFinder {
-    override fun reqPassword(resource: Resource<*>?): CharArray = supply()
+    private val issued = mutableListOf<CharArray>()
+
+    @Synchronized
+    override fun reqPassword(resource: Resource<*>?): CharArray = supply().also { issued += it }
 
     override fun shouldRetry(resource: Resource<*>?): Boolean = false
+
+    @Synchronized
+    fun wipe() {
+        issued.forEach { it.fill('\u0000') }
+        issued.clear()
+    }
+}
+
+/**
+ * The clients opened by one [SshjEngine.connect] call (target plus jump hops), so a cancelled
+ * connect can close them all, including hops that are still being set up.
+ */
+internal class ConnectAttempt {
+    private val clients = mutableListOf<SSHClient>()
+    private var finished = false
+
+    @Synchronized
+    fun register(client: SSHClient) {
+        if (finished) throw ConnectionFailedException("Connect was cancelled")
+        clients += client
+    }
+
+    /** Closes every client registered so far, unless the attempt already [complete]d. */
+    @Synchronized
+    fun abort() {
+        if (finished) return
+        finished = true
+        for (client in clients) {
+            // close() alone leaves a thread waiting for kex/auth asleep until the transport timeout;
+            // die() fails those waits immediately. It needs a started transport.
+            if (client.transport.isRunning) client.transport.die(IOException("Connect was cancelled"))
+            closeQuietly(client)
+        }
+    }
+
+    @Synchronized
+    fun complete() {
+        finished = true
+    }
 }
 
 internal class SshjConnection(
@@ -170,21 +271,32 @@ internal class SshjConnection(
             val session = guard { client.startSession() }
             try {
                 val cmd = guard { session.exec(command) }
-                if (stdin != null) {
-                    cmd.outputStream.write(stdin)
-                    cmd.outputStream.flush()
-                }
-                cmd.outputStream.close() // sends EOF so `sh -s` (or any stdin reader) can finish
-                val result =
-                    withTimeoutOrNull(timeout) {
-                        coroutineScope {
-                            val err = async(ioDispatcher) { cmd.errorStream.readCapped() }
-                            val out = cmd.inputStream.readCapped()
-                            Pair(out, err.await())
+                // Every blocking sshj call runs in its own child. The streams are drained while stdin is
+                // fed, so neither side can stall on a full window, and closing the channel (on success,
+                // timeout or cancellation) is what makes the blocked reads return. supervisorScope keeps
+                // a child's failure from overtaking the timeout/cancellation that caused it.
+                supervisorScope {
+                    // Not awaited: if the command exits without reading all of stdin the write fails,
+                    // and the exit status is still the meaningful result.
+                    launch(IgnoreFailures) {
+                        cmd.outputStream.use { stream -> stdin?.let(stream::write) } // close() sends EOF
+                    }
+                    val out = async { cmd.inputStream.readCapped() }
+                    val err = async { cmd.errorStream.readCapped() }
+                    val exit =
+                        async {
+                            cmd.join()
+                            cmd.exitStatus
                         }
-                    } ?: throw ExecTimeoutException(timeout)
-                cmd.join()
-                ExecResult(cmd.exitStatus, result.first, result.second)
+                    try {
+                        withTimeoutOrNull(timeout) { ExecResult(exit.await(), out.await(), err.await()) }
+                            ?: throw ExecTimeoutException(timeout)
+                    } catch (e: IOException) {
+                        throw ConnectionFailedException("Remote command failed: ${e.message}", e)
+                    } finally {
+                        closeQuietly(session)
+                    }
+                }
             } finally {
                 closeQuietly(session)
             }
@@ -287,6 +399,9 @@ internal fun InputStream.readCapped(limit: Int = MAX_EXEC_OUTPUT): String {
     }
     return out.toString(Charsets.UTF_8)
 }
+
+/** For children whose failure is expected and deliberately ignored. */
+private val IgnoreFailures = CoroutineExceptionHandler { _, _ -> }
 
 internal const val MAX_EXEC_OUTPUT: Int = 4 * 1024 * 1024
 private const val BUFFER_SIZE: Int = 8 * 1024

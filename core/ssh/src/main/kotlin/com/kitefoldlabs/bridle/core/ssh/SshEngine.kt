@@ -6,6 +6,7 @@ import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /** Where to connect. [jump] is the ProxyJump hop (itself possibly jumping further). */
@@ -31,7 +32,10 @@ public sealed interface Credential {
         override fun toString(): String = "Credential.Key(${OpenSshKeys.typeName(signer.publicKey)})"
     }
 
-    /** The password is requested only when the server asks for it; the array is wiped after use. */
+    /**
+     * [supply] is called only when the server asks for a password. Each call must return a fresh
+     * array: it is zeroed as soon as authentication finishes.
+     */
     public class Password(
         public val supply: () -> CharArray,
     ) : Credential {
@@ -44,7 +48,18 @@ public data class ConnectOptions(
     val socketTimeout: Duration = Duration.ZERO,
     /** `keepalive@openssh.com` interval; [Duration.ZERO] disables keepalives. */
     val keepAlive: Duration = 30.seconds,
-)
+) {
+    init {
+        // sshj takes int milliseconds; reject values that would overflow or go negative.
+        require(connectTimeout in Duration.ZERO..MAX_DURATION) { "connectTimeout out of range" }
+        require(socketTimeout in Duration.ZERO..MAX_DURATION) { "socketTimeout out of range" }
+        require(keepAlive in Duration.ZERO..MAX_DURATION) { "keepAlive out of range" }
+    }
+
+    private companion object {
+        val MAX_DURATION: Duration = Int.MAX_VALUE.milliseconds
+    }
+}
 
 public enum class ConnectionState { CONNECTED, DISCONNECTED }
 
