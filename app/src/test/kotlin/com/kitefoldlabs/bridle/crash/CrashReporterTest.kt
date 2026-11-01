@@ -58,6 +58,23 @@ class CrashReporterTest {
     }
 
     @Test
+    fun `a crash while reporting still reaches the previous handler`() {
+        var chained: Throwable? = null
+        val original = Thread.getDefaultUncaughtExceptionHandler()
+        val hostile =
+            object : RuntimeException() {
+                override val message: String get() = error("reporting failed")
+            }
+        try {
+            reporter.install { _, e -> chained = e }
+            Thread.getDefaultUncaughtExceptionHandler()!!.uncaughtException(Thread.currentThread(), hostile)
+            (chained === hostile) shouldBe true
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(original)
+        }
+    }
+
+    @Test
     fun `write failures are swallowed`() {
         val dir = context.noBackupFilesDir
         File(dir, "pending-crash.json").mkdirs() // a directory where the file should be

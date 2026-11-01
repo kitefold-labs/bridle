@@ -2,9 +2,12 @@ package com.kitefoldlabs.bridle
 
 import android.content.Context
 import android.content.Intent
+import android.view.WindowManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.service.Notifications
 import com.kitefoldlabs.bridle.service.SessionActionReceiver
 import com.kitefoldlabs.bridle.service.SessionCoordinator
 import com.kitefoldlabs.bridle.service.SessionService
@@ -34,6 +37,8 @@ class HiltWiringTest {
 
     @Inject lateinit var coordinator: SessionCoordinator
 
+    @Inject lateinit var settings: SettingsRepository
+
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Before
@@ -60,6 +65,46 @@ class HiltWiringTest {
             shadowOf(service).isStoppedBySelf shouldBe true
             controller.destroy()
         }
+
+    @Test
+    fun `a start with no tabs left goes foreground before it stops`() {
+        // The tab that asked for the service closed before the start arrived. Stopping without
+        // startForeground() would crash on Android 8+ (startForegroundService's contract).
+        val controller = Robolectric.buildService(SessionService::class.java).create().startCommand(0, 1)
+        ShadowLooper.idleMainLooper()
+        val shadow = shadowOf(controller.get())
+        shadow.lastForegroundNotificationId shouldBe Notifications.ID_SESSIONS // startForeground() ran
+        shadow.isForegroundStopped shouldBe true // ...and was followed by stopForeground(), not preceded
+        shadow.isStoppedBySelf shouldBe true
+        controller.startCommand(0, 2) // a second start doesn't watch the tabs twice
+        ShadowLooper.idleMainLooper()
+        controller.destroy()
+    }
+
+    @Test
+    fun `main activity follows the secure screen setting`() =
+        runBlocking<Unit> {
+            settings.setSecureScreenEnabled(true)
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                awaitFlag(scenario, secure = true)
+                settings.setSecureScreenEnabled(false)
+                awaitFlag(scenario, secure = false)
+            }
+        }
+
+    private fun awaitFlag(
+        scenario: ActivityScenario<MainActivity>,
+        secure: Boolean,
+    ) {
+        var flags = 0
+        repeat(200) {
+            ShadowLooper.idleMainLooper()
+            scenario.onActivity { flags = it.window.attributes.flags }
+            if ((flags and WindowManager.LayoutParams.FLAG_SECURE != 0) == secure) return
+            Thread.sleep(10)
+        }
+        (flags and WindowManager.LayoutParams.FLAG_SECURE != 0) shouldBe secure
+    }
 
     @Test
     fun `receiver injects and handles disconnect all`() =

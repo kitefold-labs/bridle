@@ -38,7 +38,10 @@ public sealed interface ImportIssue {
 
     /**
      * The backup trusts a different key for a host this device already trusts. The existing key is
-     * kept: a trusted host key is never replaced silently. Show both fingerprints.
+     * kept: a trusted host key is never replaced silently, nor joined by a key of another type.
+     * Show both fingerprints. [keyType] is the type of the backup's key; [existingFingerprint] is
+     * the trusted key of that type or, if this device trusts only other types for the host, one
+     * of those.
      */
     public data class KnownHostKeyConflict(
         val host: String,

@@ -11,6 +11,7 @@ import com.kitefoldlabs.bridle.feature.sessions.SessionsRoute
 import com.kitefoldlabs.bridle.feature.terminal.TerminalDeepLinks
 import com.kitefoldlabs.bridle.feature.terminal.TerminalNavigator
 import com.kitefoldlabs.bridle.feature.terminal.TerminalTabsRoute
+import com.kitefoldlabs.bridle.ui.SecureScreen
 import com.kitefoldlabs.bridle.ui.nav.BridleNavHost
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
@@ -24,10 +25,13 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var deepLinks: TerminalDeepLinks
 
+    @Inject lateinit var secureScreen: SecureScreen
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        secureScreen.bind(this)
         // Only for a fresh start: a recreated activity (rotation) gets the same intent again.
         if (savedInstanceState == null) deepLinks.handle(intent)
         val screens: Map<TopLevel, @Composable () -> Unit> = mapOf(TopLevel.SESSIONS to { SessionsRoute() })

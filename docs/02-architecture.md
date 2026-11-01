@@ -190,6 +190,13 @@ interface SshConnection : Closeable {
   `sh -s` with the POSIX script on stdin (`SshConnection.runScript`), so the
   login shell only ever parses `sh -s`. Scripts extend `PATH` with the common
   install locations, and we probe once per host with `command -v tmux claude`.
+- **Crypto provider:** sshj looks algorithms up by the provider name "BC",
+  which on Android is the platform's stripped BouncyCastle (no Ed25519).
+  `BouncyCastleRegistration.install()` (first thing in
+  `BridleApplication.onCreate`, and again whenever an `SshjEngine` is
+  created) swaps in the full BouncyCastle under that name, at the platform
+  provider's position: below `AndroidKeyStoreBCWorkaround`, so Keystore keys
+  keep reaching the Keystore, and below Conscrypt, which stays the default.
 - **ShellQuote:** a single audited function single-quotes every interpolated
   value. Session names are validated against `[A-Za-z0-9_.-]{1,64}`. It is
   covered by unit and property-based tests.
@@ -222,11 +229,29 @@ interface SshConnection : Closeable {
   "hardware key".
 - **User auth:** optional per key. Either "require biometric, valid for N
   minutes" (good for reconnects) or "every signature" (BiometricPrompt with a
-  `CryptoObject(Signature)`). Hardware keys enforce this in the Keystore: when
-  the unlock has expired, signing throws `UserNotAuthenticatedException`, and
-  `GatedSigner` prompts and retries once. For imported keys Bridle enforces it
-  itself (prompt before decrypting, at most once per validity window): an
-  auth-bound master key would lock the whole vault, not one key.
+  `CryptoObject`). The Keystore enforces it in both cases, so a patched or
+  hooked app process can't skip the prompt:
+  - Hardware keys are generated with `setUserAuthenticationRequired`. Per-use
+    keys sign through a `CryptoObject(Signature)`; when a time-bound unlock has
+    expired, signing throws `UserNotAuthenticatedException`, and `GatedSigner`
+    prompts and retries once.
+  - Imported keys that require auth get their own Keystore RSA-OAEP *wrapping
+    key* (`bridle-wrap-<uuid>`, `PURPOSE_DECRYPT`, same auth parameters). The
+    PKCS#8 bytes are encrypted with a random AES-256-GCM data key, the data key
+    is wrapped with the wrapping key's public half (so importing never
+    prompts), and the result is sealed by the vault's Tink AEAD as before
+    (format `2`, header bound into the associated data). Signing unwraps the
+    data key in the Keystore: per-use keys prompt with a `CryptoObject(Cipher)`
+    for the unwrapping cipher, time-bound keys prompt when the Keystore reports
+    the window expired. A per-key wrapping key is used because an auth-bound
+    master key would lock the whole vault, not one key. Deleting the identity
+    must call `ImportedKeyVault.delete` to remove its wrapping key; a biometric
+    enrolment change invalidates it, and the key must be imported again.
+  - The prompt is app-enforced in exactly two cases: the plain (no
+    `CryptoObject`) prompt that renews a time-bound window, where the
+    Keystore still refuses the key operation without it; and an imported key
+    stored without a wrapping key (format `1`) whose identity was later set to
+    require auth, which is gated by Bridle until the key is imported again.
 - **Public key UX:** show the `ecdsa-sha2-nistp256 AAAA… comment` line, with
   copy, share and QR. **Install on host** logs in once with a password and
   runs an idempotent append to `~/.ssh/authorized_keys` with the right

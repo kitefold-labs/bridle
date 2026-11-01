@@ -40,21 +40,13 @@ class SessionService : LifecycleService() {
             }
         }
 
+    private var watchingTabs = false
+
     override fun onCreate() {
         super.onCreate()
         getSystemService<ConnectivityManager>()?.registerDefaultNetworkCallback(networkCallback)
         // Claude status notifications for hosts with open tabs, for as long as the service runs.
         lifecycleScope.launch { statusHub.followOpenTabs() }
-        lifecycleScope.launch {
-            coordinator.tabs.collect { tabs ->
-                if (tabs.isEmpty()) {
-                    ServiceCompat.stopForeground(this@SessionService, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                } else {
-                    goForeground(tabs.size)
-                }
-            }
-        }
     }
 
     override fun onStartCommand(
@@ -63,10 +55,25 @@ class SessionService : LifecycleService() {
         startId: Int,
     ): Int {
         super.onStartCommand(intent, flags, startId)
+        // startForegroundService() requires startForeground() before the service may stop, even if
+        // the last tab closed in the meantime; so go foreground first, then follow the tabs.
         goForeground(
             coordinator.tabs.value.size
                 .coerceAtLeast(1),
         )
+        if (!watchingTabs) {
+            watchingTabs = true
+            lifecycleScope.launch {
+                coordinator.tabs.collect { tabs ->
+                    if (tabs.isEmpty()) {
+                        ServiceCompat.stopForeground(this@SessionService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    } else {
+                        goForeground(tabs.size)
+                    }
+                }
+            }
+        }
         return START_NOT_STICKY
     }
 

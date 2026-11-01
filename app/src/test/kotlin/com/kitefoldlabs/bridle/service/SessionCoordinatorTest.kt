@@ -7,6 +7,7 @@ import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.session.HostConnector
 import com.kitefoldlabs.bridle.core.session.TerminalSession
+import com.kitefoldlabs.bridle.core.session.TerminalSink
 import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.DuplexStream
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
@@ -101,7 +102,9 @@ class SessionCoordinatorTest {
             coordinator.tabs.value shouldBe emptyList()
         }
 
-    private class Closeable : AutoCloseable {
+    private class Owned(
+        private val fail: Boolean = false,
+    ) : AutoCloseable {
         var closed = 0
 
         override fun close() {
@@ -126,6 +129,26 @@ class SessionCoordinatorTest {
                 coordinator.openTab(1, "bad", AttachSpec.Tmux("bad name"), { _, _ -> })
             }
             coordinator.tabs.value shouldBe emptyList()
+        }
+
+    @Test
+    fun `closing a tab releases its sink and emulator`() =
+        runBlocking<Unit> {
+            val sink = ClosingSink()
+            val emulator = Owned()
+            val tab = coordinator.openTab(1, "a", AttachSpec.Shell, sink, attachment = emulator)
+            tab.sink shouldBe sink
+            coordinator.closeTab(tab.id)
+            sink.closed shouldBe true
+            emulator.closed shouldBe 1
+
+            val failing = Owned(fail = true)
+            val other = Owned()
+            coordinator.openTab(1, "b", AttachSpec.Shell, { _, _ -> }, attachment = failing)
+            coordinator.openTab(1, "c", AttachSpec.Shell, { _, _ -> }, attachment = other)
+            coordinator.disconnectAll()
+            failing.closed shouldBe 1
+            other.closed shouldBe 1 // one failing close doesn't leak the rest
         }
 
     @Test

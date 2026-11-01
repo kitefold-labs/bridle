@@ -6,7 +6,6 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.annotation.ChecksSdkIntAtLeast
-import androidx.annotation.RequiresApi
 import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
 import java.security.GeneralSecurityException
 import java.security.KeyPairGenerator
@@ -147,48 +146,9 @@ public class AndroidKeyStoreBackend(
                     .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA384, KeyProperties.DIGEST_SHA512)
         }
         builder.setIsStrongBoxBacked(strongBox)
-        applyUserAuth(builder, spec.userAuth)
+        KeystoreUserAuth(platform.sdkInt).apply(builder, spec.userAuth)
         return builder.build()
     }
-
-    private fun applyUserAuth(
-        builder: KeyGenParameterSpec.Builder,
-        policy: UserAuthPolicy,
-    ) {
-        val seconds =
-            when (policy) {
-                UserAuthPolicy.None -> return
-                UserAuthPolicy.PerUse -> 0
-                is UserAuthPolicy.TimeBound -> policy.seconds
-            }
-        builder.setUserAuthenticationRequired(true)
-        if (isAtLeastR()) {
-            setAuthParameters(builder, seconds)
-        } else {
-            // Before Android 11 a validity of -1 means "every use" (biometric + CryptoObject).
-            @Suppress("DEPRECATION")
-            builder.setUserAuthenticationValidityDurationSeconds(if (seconds == 0) -1 else seconds)
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    private fun setAuthParameters(
-        builder: KeyGenParameterSpec.Builder,
-        seconds: Int,
-    ) {
-        // Per-use keys need a CryptoObject, which only biometrics can unlock; time-bound keys also
-        // accept the device PIN/pattern/password.
-        val types =
-            if (seconds == 0) {
-                KeyProperties.AUTH_BIOMETRIC_STRONG
-            } else {
-                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
-            }
-        builder.setUserAuthenticationParameters(seconds, types)
-    }
-
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.R)
-    private fun isAtLeastR(): Boolean = platform.sdkInt >= Build.VERSION_CODES.R
 
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
     private fun isAtLeastTiramisu(): Boolean = platform.sdkInt >= Build.VERSION_CODES.TIRAMISU

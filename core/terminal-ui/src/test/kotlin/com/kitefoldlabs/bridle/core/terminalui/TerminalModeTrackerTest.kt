@@ -1,7 +1,9 @@
 package com.kitefoldlabs.bridle.core.terminalui
 
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import org.junit.Test
+import kotlin.random.Random
 
 class TerminalModeTrackerTest {
     private val tracker = TerminalModeTracker()
@@ -154,6 +156,30 @@ class TerminalModeTrackerTest {
         val long = "x".repeat(TerminalModeTracker.MAX_TITLE_LENGTH + 10)
         feed("\u001b]2;$long\u0007")
         tracker.title.value shouldBe "x".repeat(TerminalModeTracker.MAX_TITLE_LENGTH)
+    }
+
+    @Test
+    fun `titles drop bidirectional formatting characters`() {
+        feed("\u001b]0;\u202Eevil\u202C txt\u2066.exe\u2069\u200E\u200F\u061C\u0007")
+        tracker.title.value shouldBe "evil txt.exe"
+        feed("\u001b]0;\u202Am\u202Bi\u202Dx\u2067e\u2068d\u0007")
+        tracker.title.value shouldBe "mixed"
+        feed("\u001b]0;\u05E9\u05DC\u05D5\u05DD \u200D\u0007") // Hebrew text and ZWJ are kept
+        tracker.title.value shouldBe "\u05E9\u05DC\u05D5\u05DD \u200D"
+    }
+
+    @Test
+    fun `arbitrary output never breaks the tracker`() {
+        val random = Random(2004)
+        repeat(200) {
+            val bytes = ByteArray(random.nextInt(1, 4096)).also(random::nextBytes)
+            tracker.feed(bytes)
+            tracker.title.value.length shouldBeLessThanOrEqual TerminalModeTracker.MAX_TITLE_LENGTH
+        }
+        // CAN aborts whatever sequence the garbage left open; tracking resumes.
+        feed("\u0018\u001b[?2004h\u001b[?1l")
+        tracker.isBracketedPasteEnabled shouldBe true
+        tracker.isApplicationCursorKeys shouldBe false
     }
 
     @Test
