@@ -21,7 +21,7 @@ The Gradle wrapper (`./gradlew`) downloads the pinned Gradle version on first us
 ./gradlew koverVerifyBridle     # fail if coverage < 95% (lines AND branches)
 ./gradlew koverHtmlReportBridle # open build/reports/kover/htmlBridle/index.html
 ./gradlew ktlintFormat          # auto-fix formatting
-./gradlew checkLicense          # every runtime dependency must be Apache-2.0-compatible
+./gradlew checkLicense --no-configuration-cache --no-parallel  # Apache-2.0-compatible deps only
 ```
 
 ## Quality gates
