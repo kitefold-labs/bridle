@@ -13,11 +13,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -71,7 +72,9 @@ public class ConnectionManager(
     private val idleGrace: Duration = 60.seconds,
 ) {
     private val mutex = Mutex()
-    private val entries = mutableMapOf<EntityId, Entry>()
+
+    // Concurrent: [state] reads it without the mutex.
+    private val entries = ConcurrentHashMap<EntityId, Entry>()
 
     /** Acquires a lease on [hostId], connecting if needed. */
     public suspend fun acquire(hostId: EntityId): ConnectionLease =
@@ -81,7 +84,7 @@ public class ConnectionManager(
             entry.closeJob?.cancel()
             entry.closeJob = null
             if (entry.state.value is HostConnectionState.Idle || entry.state.value is HostConnectionState.Failed) {
-                entry.start(resetAttempts = true)
+                entry.start()
             }
             Lease(entry)
         }
@@ -102,9 +105,9 @@ public class ConnectionManager(
             for (entry in entries.values) {
                 if (entry.leases == 0) continue
                 when (entry.state.value) {
-                    is HostConnectionState.Reconnecting -> entry.start(resetAttempts = true)
+                    is HostConnectionState.Reconnecting -> entry.start()
                     is HostConnectionState.Failed ->
-                        if ((entry.state.value as HostConnectionState.Failed).retryable) entry.start(true)
+                        if ((entry.state.value as HostConnectionState.Failed).retryable) entry.start()
                     else -> Unit
                 }
             }
@@ -113,10 +116,10 @@ public class ConnectionManager(
 
     /** Explicit "Reconnect" button. */
     public suspend fun reconnect(hostId: EntityId) {
-        mutex.withLock { entries[hostId]?.takeIf { it.leases > 0 }?.start(resetAttempts = true) }
+        mutex.withLock { entries[hostId]?.takeIf { it.leases > 0 }?.start() }
     }
 
-    /** Closes everything (app shutdown / "Disconnect all"). */
+    /** Closes everything (app shutdown / "Disconnect all"). Outstanding leases become inert. */
     public suspend fun closeAll() {
         mutex.withLock {
             entries.values.forEach { it.shutdown() }
@@ -127,37 +130,36 @@ public class ConnectionManager(
     private inner class Lease(
         private val entry: Entry,
     ) : ConnectionLease {
-        private var closed = false
+        private val closed = AtomicBoolean(false)
         override val hostId: EntityId get() = entry.hostId
         override val state: StateFlow<HostConnectionState> get() = entry.state
 
-        override suspend fun awaitConnection(): SshConnection {
-            val settled =
-                entry.state.first {
-                    it is HostConnectionState.Connected || (it is HostConnectionState.Failed)
-                }
-            if (settled is HostConnectionState.Failed) throw settled.error
-            return (settled as HostConnectionState.Connected).connection
-        }
+        override suspend fun awaitConnection(): SshConnection =
+            // Idle only follows start() after a shutdown (closeAll): don't wait forever for it.
+            when (val settled = entry.state.first { it.isSettled() }) {
+                is HostConnectionState.Connected -> settled.connection
+                is HostConnectionState.Failed -> throw settled.error
+                else -> throw ConnectionClosedException()
+            }
 
         override fun close() {
-            if (closed) return
-            closed = true
-            scope.launch { release(entry) }
+            if (closed.compareAndSet(false, true)) scope.launch { release(entry) }
         }
     }
 
     private suspend fun release(entry: Entry) {
         mutex.withLock {
             entry.leases--
-            if (entry.leases > 0) return
+            // A lease that outlived closeAll() must not schedule a close that would remove the
+            // host's *new* entry from the map.
+            if (entry.leases > 0 || entry.isShutDown) return
             entry.closeJob =
                 scope.launch {
                     delay(idleGrace)
                     mutex.withLock {
-                        if (entry.leases == 0) {
+                        if (entry.leases == 0 && !entry.isShutDown) {
                             entry.shutdown()
-                            entries.remove(entry.hostId)
+                            entries.remove(entry.hostId, entry)
                         }
                     }
                 }
@@ -170,49 +172,75 @@ public class ConnectionManager(
         val state = MutableStateFlow<HostConnectionState>(HostConnectionState.Idle)
         var leases = 0
         var closeJob: Job? = null
+        var isShutDown = false
+            private set
         private var job: Job? = null
-        private var attempt = 0
 
-        /** (Re)starts the connect loop. Caller holds the mutex. */
-        fun start(resetAttempts: Boolean) {
-            if (resetAttempts) attempt = 0
+        /**
+         * Bumped whenever a new connect loop takes over (or the entry shuts down). A cancelled loop
+         * may still be running on another thread; [publish] stops it from overwriting the state.
+         */
+        private var generation = 0
+
+        /** (Re)starts the connect loop, dropping the current connection if any. Caller holds the mutex. */
+        fun start() {
             job?.cancel()
-            // Set synchronously so waiters never observe a stale Failed/Connected state.
-            state.value = HostConnectionState.Connecting
-            job = scope.launch { connectLoop() }
+            val current = takeOver(HostConnectionState.Connecting)
+            job = scope.launch { connectLoop(current) }
         }
 
         fun shutdown() {
+            isShutDown = true
             job?.cancel()
             closeJob?.cancel()
-            (state.value as? HostConnectionState.Connected)?.connection?.close()
-            state.value = HostConnectionState.Idle
+            takeOver(HostConnectionState.Idle)
         }
 
-        private suspend fun connectLoop() {
+        /** Starts a new generation in [next], closing a connection the previous one published. */
+        private fun takeOver(next: HostConnectionState): Int =
+            synchronized(this) {
+                generation++
+                // An explicit reconnect is for a link that looks hung: never keep (and leak) it.
+                (state.value as? HostConnectionState.Connected)?.connection?.close()
+                // Set synchronously so waiters never observe a stale Failed/Connected state.
+                state.value = next
+                generation
+            }
+
+        /** Sets [value] if loop [owner] is still the current one. */
+        private fun publish(
+            owner: Int,
+            value: HostConnectionState,
+        ): Boolean =
+            synchronized(this) {
+                (owner == generation).also { current -> if (current) state.value = value }
+            }
+
+        private suspend fun connectLoop(owner: Int) {
+            var attempt = 0
             var lastError: String? = null
             while (true) {
                 val wait = policy.nextDelay(attempt)
                 if (wait == null) {
-                    state.value = HostConnectionState.Failed(GaveUpException(lastError), retryable = true)
+                    publish(owner, HostConnectionState.Failed(GaveUpException(lastError), retryable = true))
                     return
                 }
                 if (attempt > 0) {
-                    state.value = HostConnectionState.Reconnecting(attempt, wait, lastError)
+                    publish(owner, HostConnectionState.Reconnecting(attempt, wait, lastError))
                     delay(wait)
                 }
                 attempt++
-                state.value = HostConnectionState.Connecting
+                publish(owner, HostConnectionState.Connecting)
                 val connection =
                     try {
                         connector.connect(hostId)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: HostKeyException) {
-                        state.value = HostConnectionState.Failed(e, retryable = false)
+                        publish(owner, HostConnectionState.Failed(e, retryable = false))
                         return
                     } catch (e: AuthenticationFailedException) {
-                        state.value = HostConnectionState.Failed(e, retryable = false)
+                        publish(owner, HostConnectionState.Failed(e, retryable = false))
                         return
                     } catch (
                         @Suppress("TooGenericExceptionCaught") e: Exception,
@@ -220,18 +248,27 @@ public class ConnectionManager(
                         lastError = e.message ?: e.javaClass.simpleName
                         continue
                     }
-                attempt = 0
-                state.value = HostConnectionState.Connected(connection)
-                connection.state.filterNotNull().first { it == ConnectionState.DISCONNECTED }
-                connection.close()
+                try {
+                    // A loop that was superseded while connecting closes what it got (finally).
+                    if (!publish(owner, HostConnectionState.Connected(connection))) return
+                    connection.state.first { it == ConnectionState.DISCONNECTED }
+                } finally {
+                    connection.close()
+                }
                 lastError = "Connection lost"
                 attempt = 1 // first retry after a drop waits a little (the network may be flapping)
             }
         }
     }
+
+    private fun HostConnectionState.isSettled(): Boolean =
+        this is HostConnectionState.Connected || this is HostConnectionState.Failed || this is HostConnectionState.Idle
 }
 
 /** Every reconnect attempt failed. */
 public class GaveUpException(
     lastError: String?,
 ) : Exception("Could not reconnect" + (lastError?.let { ": $it" } ?: ""))
+
+/** The connection was closed for good ([ConnectionManager.closeAll]) while a lease was waiting for it. */
+public class ConnectionClosedException : Exception("Disconnected")

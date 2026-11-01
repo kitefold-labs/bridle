@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.core.session
 
+import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
@@ -14,10 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** Receives terminal output. Implemented by the emulator adapter; called on an I/O thread. */
 public fun interface TerminalSink {
@@ -69,6 +74,8 @@ public class TerminalSession(
     private val scope: CoroutineScope,
     initialSize: PtySpec = PtySpec(),
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    /** How long a failed channel open waits for the connection to report a drop before giving up. */
+    private val openFailureGrace: Duration = 3.seconds,
 ) : AutoCloseable {
     private val mutableState = MutableStateFlow<TerminalState>(TerminalState.Connecting)
     public val state: StateFlow<TerminalState> = mutableState.asStateFlow()
@@ -78,6 +85,13 @@ public class TerminalSession(
     @Volatile private var channel: ShellChannel? = null
     private val input = Channel<ByteArray>(Channel.UNLIMITED)
     private var job: Job? = null
+
+    /** Built (and so validated) up front: a bad session name fails here, not inside [scope]. */
+    private val command: String? =
+        when (attach) {
+            AttachSpec.Shell -> null
+            is AttachSpec.Tmux -> TmuxScripts.attachCommand(attach.session, attach.workingDir)
+        }
 
     /** Starts following the host connection; call once. */
     public fun start() {
@@ -90,6 +104,8 @@ public class TerminalSession(
                         is HostConnectionState.Connected -> runShell(hostState.connection)
                         is HostConnectionState.Failed ->
                             end(null, hostState.error.message ?: "Connection failed")
+                        // Only after ConnectionManager.closeAll(): nothing will reconnect.
+                        HostConnectionState.Idle -> end(null, "Disconnected")
                         else -> if (mutableState.value == TerminalState.Open) onDropped()
                     }
                 }
@@ -130,27 +146,32 @@ public class TerminalSession(
 
     private suspend fun runShell(connection: SshConnection) {
         if (mutableState.value is TerminalState.Ended) return
-        val command =
-            when (attach) {
-                AttachSpec.Shell -> null
-                is AttachSpec.Tmux -> TmuxScripts.attachCommand(attach.session, attach.workingDir)
-            }
         val shell =
             try {
                 connection.openShell(size, command)
             } catch (e: CancellationException) {
                 throw e
             } catch (
-                @Suppress("TooGenericExceptionCaught") ignored: Exception,
+                @Suppress("TooGenericExceptionCaught") e: Exception,
             ) {
-                // Likely the connection dropped while opening; the manager will report it.
+                // Usually the connection dropped while opening, and the manager will report that
+                // (cancelling this wait). If it stays up, the server refused the channel (MaxSessions,
+                // no PTY allowed…): say so instead of showing "connecting" forever.
+                val disconnected = ConnectionState.DISCONNECTED
+                val dropped = withTimeoutOrNull(openFailureGrace) { connection.state.first { it == disconnected } }
+                if (dropped == null) end(null, "Could not open a terminal: ${e.message ?: e.javaClass.simpleName}")
                 return
             }
         channel = shell
         mutableState.value = TerminalState.Open
-        val clean = pump(shell)
-        channel = null
-        shell.close()
+        val clean =
+            try {
+                pump(shell)
+            } finally {
+                // Also when collectLatest cancels us for a new host state: never leak the channel.
+                channel = null
+                shell.close()
+            }
         when {
             clean -> end(shell.exitStatus, "Session ended")
             attach is AttachSpec.Shell -> end(null, "Connection lost")

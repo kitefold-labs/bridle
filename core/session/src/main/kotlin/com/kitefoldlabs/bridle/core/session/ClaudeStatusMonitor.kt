@@ -8,13 +8,14 @@ import com.kitefoldlabs.bridle.core.tmux.SessionSummary
 import com.kitefoldlabs.bridle.core.tmux.StatusSource
 import com.kitefoldlabs.bridle.core.tmux.TmuxController
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -87,7 +88,9 @@ public class ClaudeStatusMonitor(
             ) {
                 // Transient (dropped connection, tmux restarting); try again next round.
             }
-            delay(mode.value.interval)
+            // Wake early when the mode changes: opening the app shouldn't wait out a 45 s sleep.
+            val current = mode.value
+            withTimeoutOrNull(current.interval) { mode.first { it != current } }
         }
     }
 

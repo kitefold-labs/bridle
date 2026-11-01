@@ -10,11 +10,16 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
@@ -148,6 +153,89 @@ class ConnectionManagerTest {
             m.onNetworkChanged() // no leases → nothing happens
             m.reconnect(2) // no leases → nothing happens
             GaveUpException(null).message shouldBe "Could not reconnect"
+        }
+
+    @Test
+    fun `a lease released after closeAll leaves the host's new connection alone`() =
+        runTest {
+            val connector = ScriptedConnector()
+            val m = manager(connector)
+            val stale = m.acquire(1)
+            stale.awaitConnection()
+            m.closeAll()
+            val fresh = m.acquire(1)
+            val conn = fresh.awaitConnection()
+            stale.close() // must not schedule a close (or a map removal) for the new entry
+            settle()
+            (conn as FakeConnection).closed shouldBe false
+            m.state(1).value.shouldBeInstanceOf<HostConnectionState.Connected>()
+            m.acquire(1).awaitConnection() shouldBe conn // still shared, no second connection
+            connector.made.size shouldBe 2
+            m.activeHosts() shouldBe setOf(1L)
+        }
+
+    @Test
+    fun `explicit reconnect closes the connection it replaces`() =
+        runTest {
+            val connector = ScriptedConnector()
+            val m = manager(connector)
+            val lease = m.acquire(1)
+            val old = lease.awaitConnection() as FakeConnection
+            m.reconnect(1)
+            settle()
+            old.closed shouldBe true
+            lease.state.value
+                .shouldBeInstanceOf<HostConnectionState.Connected>()
+                .connection shouldBe connector.made[1]
+            connector.made[1].closed shouldBe false
+            m.closeAll()
+        }
+
+    @Test
+    fun `waiting for a connection ends when everything is closed`() =
+        runTest {
+            val m = manager { awaitCancellation() }
+            val lease = m.acquire(1)
+            val waiting = async { runCatching { lease.awaitConnection() } }
+            runCurrent()
+            m.closeAll()
+            waiting
+                .await()
+                .exceptionOrNull()
+                .shouldBeInstanceOf<ConnectionClosedException>()
+                .message shouldBe "Disconnected"
+        }
+
+    @Test
+    fun `a superseded connect loop closes what it connected and never publishes it`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val late = FakeConnection()
+            val current = FakeConnection()
+            var calls = 0
+            val m =
+                manager {
+                    if (calls++ == 0) {
+                        // Like a blocking sshj connect that finishes after its coroutine was cancelled.
+                        withContext(NonCancellable) { gate.await() }
+                        late
+                    } else {
+                        current
+                    }
+                }
+            val lease = m.acquire(1)
+            runCurrent()
+            m.reconnect(1) // cancels the first loop while it is still connecting
+            lease.awaitConnection() shouldBe current
+            gate.complete(Unit)
+            runCurrent()
+            late.closed shouldBe true
+            lease.state.value
+                .shouldBeInstanceOf<HostConnectionState.Connected>()
+                .connection shouldBe current
+            current.closed shouldBe false
+            m.closeAll()
+            current.closed shouldBe true
         }
 
     @Test

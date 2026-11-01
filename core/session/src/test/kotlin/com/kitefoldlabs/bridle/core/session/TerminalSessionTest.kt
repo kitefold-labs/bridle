@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -155,6 +156,72 @@ class TerminalSessionTest {
             val ended = withTimeout(5.seconds) { session.state.first { it is TerminalState.Ended } }
             (ended as TerminalState.Ended).reason shouldBe "denied"
             session.close()
+        }
+
+    @Test
+    fun `a shell the server refuses on a live connection ends the tab`() =
+        runBlocking<Unit> {
+            val refusing = FakeConnection().apply { failOpen = true }
+            val manager = ConnectionManager(ScriptedConnector(refusing), scope, idleGrace = 1.seconds)
+            val session =
+                TerminalSession(
+                    manager.acquire(1),
+                    AttachSpec.Tmux("x"),
+                    sink,
+                    scope,
+                    openFailureGrace = 100.milliseconds,
+                )
+            session.start()
+            val ended = withTimeout(5.seconds) { session.state.first { it is TerminalState.Ended } }
+            (ended as TerminalState.Ended).reason shouldBe "Could not open a terminal: channel open failed"
+            session.close()
+            manager.closeAll()
+        }
+
+    @Test
+    fun `closeAll ends a tab instead of leaving it reattaching`() =
+        runBlocking<Unit> {
+            val (session, _, manager) = setUp(AttachSpec.Tmux("main"))
+            withTimeout(5.seconds) { session.state.first { it == TerminalState.Open } }
+            manager.closeAll()
+            val ended = withTimeout(5.seconds) { session.state.first { it is TerminalState.Ended } }
+            (ended as TerminalState.Ended).reason shouldBe "Disconnected"
+            session.close()
+        }
+
+    @Test
+    fun `a new connection closes the previous shell even when the drop was never seen`() =
+        runBlocking<Unit> {
+            // StateFlow conflation can turn Connected(a) → Reconnecting → Connected(b) into a → b.
+            val a = FakeConnection()
+            val b = FakeConnection()
+            val lease =
+                object : ConnectionLease {
+                    override val hostId = 1L
+                    override val state = MutableStateFlow<HostConnectionState>(HostConnectionState.Connected(a))
+
+                    override suspend fun awaitConnection() = a
+
+                    override fun close() = Unit
+                }
+            val session = TerminalSession(lease, AttachSpec.Tmux("t"), sink, scope)
+            session.start()
+            withTimeout(5.seconds) { session.state.first { it == TerminalState.Open } }
+            eventually { a.shells.size == 1 }
+            lease.state.value = HostConnectionState.Connected(b)
+            eventually { b.shells.size == 1 }
+            eventually { !a.shells.single().open }
+            session.close()
+        }
+
+    @Test
+    fun `an invalid tmux session fails at construction, not inside the scope`() =
+        runBlocking<Unit> {
+            val manager = ConnectionManager(ScriptedConnector(), scope)
+            val lease = manager.acquire(1)
+            shouldThrow<IllegalArgumentException> { TerminalSession(lease, AttachSpec.Tmux("bad name"), sink, scope) }
+            lease.close()
+            manager.closeAll()
         }
 
     @Test

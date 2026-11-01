@@ -28,6 +28,7 @@ private class ScriptedTmuxHost : SshConnection {
     var screen: String = ""
     var fail = false
     var failPreview = false
+    var lists = 0
     override val state = MutableStateFlow(ConnectionState.CONNECTED)
 
     override suspend fun exec(
@@ -42,13 +43,15 @@ private class ScriptedTmuxHost : SshConnection {
         if (fail) return ExecResult(1, "", "server exited")
         val sep = ":|:"
         return when {
-            "list-sessions" in script ->
+            "list-sessions" in script -> {
+                lists++
                 ExecResult(
                     0,
                     sessions.joinToString("\n") { "$it${sep}1${sep}0${sep}1${sep}1" } + "\n@@BRIDLE_PANES@@\n" +
                         sessions.joinToString("\n") { "$it$sep%1${sep}1${sep}1${sep}0$sep$command$sep/src" },
                     "",
                 )
+            }
             "bridle-helper' list" in script || "bridle-helper list" in script -> ExecResult(0, helper, "")
             "capture-pane" in script -> if (failPreview) ExecResult(1, "", "gone") else ExecResult(0, screen, "")
             else -> ExecResult(0, "", "")
@@ -152,6 +155,28 @@ class ClaudeStatusMonitorTest {
                     .state shouldBe ClaudeState.UNKNOWN
                 expectNoEvents()
             }
+            job.cancel()
+        }
+
+    @Test
+    fun `switching to foreground polls at once instead of finishing the background sleep`() =
+        runTest {
+            val host = ScriptedTmuxHost()
+            host.sessions = listOf("api")
+            val monitor = ClaudeStatusMonitor(1, TmuxController(host), useHelper = { false })
+            monitor.setMode(PollMode.BACKGROUND)
+            val job = launch { monitor.run() }
+            runCurrent()
+            host.lists shouldBe 1
+            advanceTimeBy(5.seconds)
+            runCurrent()
+            host.lists shouldBe 1 // asleep in background mode
+            monitor.setMode(PollMode.FOREGROUND)
+            runCurrent()
+            host.lists shouldBe 2
+            advanceTimeBy(PollMode.FOREGROUND.interval)
+            runCurrent()
+            host.lists shouldBe 3
             job.cancel()
         }
 
