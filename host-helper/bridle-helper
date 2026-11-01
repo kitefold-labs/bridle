@@ -33,7 +33,9 @@ die() {
 # are flat objects with simple string values). Prints the value still JSON-escaped (a valid JSON
 # string body), or nothing if the field is absent.
 json_field() {
-  printf '%s' "$1" | tr '\n' ' ' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\\(\\([^\"\\\\]\\|\\\\.\\)*\\)\".*/\\1/p"
+  # Extended regex (-E, in POSIX.1-2024 and every BSD/GNU/busybox sed): BRE `\|` is a GNU
+  # extension, and without it macOS sed would silently extract nothing.
+  printf '%s' "$1" | tr '\n' ' ' | sed -n -E "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"(([^\"\\\\]|\\\\.)*)\".*/\\1/p"
 }
 
 # Escape a value for embedding in a JSON string.
@@ -83,8 +85,9 @@ cmd_hook() {
   key="$(safe_name "${tmux_session:-${session_id:-unknown}}")"
   now="$(date +%s)"
 
-  mkdir -p "$STATE_DIR" || exit 0
+  # Before mkdir, so the state directory itself is private too.
   umask 077
+  mkdir -p "$STATE_DIR" || exit 0
   tmp="$STATE_DIR/.$key.$$"
   printf '{"v":%s,"state":"%s","event":"%s","tmux_session":"%s","session_id":"%s","cwd":"%s","message":"%s","ts":%s}\n' \
     "$HELPER_VERSION" "$state" "$(json_escape "$event")" "$(json_escape "$tmux_session")" \
@@ -117,9 +120,10 @@ edit_settings() {
   mkdir -p "$(dirname "$SETTINGS")"
   BRIDLE_MODE="$mode" BRIDLE_DRY_RUN="$dry_run" BRIDLE_SETTINGS="$SETTINGS" BRIDLE_SELF="$SELF_PATH" \
     BRIDLE_EVENTS="$HOOK_EVENTS" python3 - <<'PY'
-import json, os, shutil, sys, tempfile, time
+import json, os, shlex, shutil, sys, tempfile, time
 
-path = os.environ["BRIDLE_SETTINGS"]
+# Edit the file a symlinked settings.json points to (dotfile managers), not replace the link.
+path = os.path.realpath(os.environ["BRIDLE_SETTINGS"])
 mode = os.environ["BRIDLE_MODE"]
 dry = os.environ["BRIDLE_DRY_RUN"] == "1"
 helper = os.environ["BRIDLE_SELF"]
@@ -136,15 +140,20 @@ if not isinstance(settings, dict):
     sys.exit(f"bridle-helper: {path} is not a JSON object; not modified")
 
 hooks = settings.setdefault("hooks", {})
+if not isinstance(hooks, dict) or any(not isinstance(v, list) for v in hooks.values()):
+    sys.exit(f"bridle-helper: unexpected \"hooks\" layout in {path}; not modified")
 def ours(entry):
-    return any("bridle-helper" in h.get("command", "") for h in entry.get("hooks", []) if isinstance(h, dict))
+    inner = entry.get("hooks", [])
+    return isinstance(inner, list) and any(
+        isinstance(h, dict) and "bridle-helper" in str(h.get("command", "")) for h in inner
+    )
 
 changed = False
 for event in events:
     entries = [e for e in hooks.get(event, []) if isinstance(e, dict)]
     kept = [e for e in entries if not ours(e)]
     if mode == "install":
-        kept.append({"hooks": [{"type": "command", "command": f"'{helper}' hook {event}", "timeout": 5}]})
+        kept.append({"hooks": [{"type": "command", "command": f"{shlex.quote(helper)} hook {event}", "timeout": 5}]})
     if kept != hooks.get(event, []):
         changed = True
     if kept:

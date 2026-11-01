@@ -161,7 +161,18 @@ class TmuxUnitTest {
         run(TmuxScripts.attachCommand("main", "~/src/it's \$(x)")) shouldBe
             "new-session|-A|-s|main|-c|/home/me/src/it's \$(x)|"
         run(TmuxScripts.attachCommand("w", "/srv/a b")) shouldBe "new-session|-A|-s|w|-c|/srv/a b|"
+        // `~user` is not the current user's home: passed through rather than turned into /home/meuser.
+        run(TmuxScripts.attachCommand("w", "~bob/x")) shouldBe "new-session|-A|-s|w|-c|~bob/x|"
         TmuxScripts.attachCommand("main") shouldStartWith "sh -c '"
+    }
+
+    @Test
+    fun `a trailing semicolon can never end a tmux command`() {
+        TmuxScripts.tmuxArg("ls;") shouldBe "ls\\;"
+        TmuxScripts.tmuxArg("a\\;") shouldBe "a\\\\;"
+        TmuxScripts.tmuxArg(";") shouldBe "\\;"
+        TmuxScripts.tmuxArg("a;b") shouldBe "a;b"
+        TmuxScripts.sendKeys("s", listOf(";")) shouldContain "-- ''\\\\';'"
     }
 
     @Test

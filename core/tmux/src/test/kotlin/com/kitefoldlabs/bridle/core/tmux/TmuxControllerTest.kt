@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.time.Duration.Companion.seconds
 
 class TmuxControllerTest {
@@ -100,6 +101,13 @@ class TmuxControllerTest {
 
             tmux.sendText("claude-app", "hello world; \$(id)")
             screenOf("claude-app", "got:hello world; \$(id)")
+            // tmux would drop a trailing ';' (its command separator) or turn '\;' into ';'.
+            tmux.sendText("claude-app", "ls;")
+            screenOf("claude-app", "got:ls;")
+            tmux.sendText("claude-app", "a\\;")
+            screenOf("claude-app", "got:a\\;")
+            tmux.sendKeys("claude-app", ";", "Enter")
+            screenOf("claude-app", "got:;")
             tmux.sendKeys("claude-app", "C-c")
             tmux.kill("claude-app")
             tmux.listSessions().shouldBeEmpty()
@@ -146,10 +154,22 @@ class TmuxControllerTest {
         }
 
     @Test
+    fun `a working directory ending in a semicolon cannot split the tmux command`() =
+        runBlocking<Unit> {
+            // Unescaped, tmux would read `-c ~/semi` and then run the command as a tmux command.
+            val dir = Files.createDirectories(home.resolve("semi;"))
+            val p = profile(name = "semi", mode = LaunchMode.DIRECT).copy(workingDir = "~/semi;")
+            tmux.launch(p) shouldBe LaunchResult.CREATED
+            screenOf("semi", "pwd=$dir")
+            tmux.restart(p) shouldBe RestartResult.RESTARTED
+            screenOf("semi", "args=[--continue]")
+        }
+
+    @Test
     fun `helper status is merged when enabled`() =
         runBlocking<Unit> {
             tmux.installHelper(installHooks = true)
-            home.resolve(".claude/settings.json").toFile().readText() shouldContain "bridle-helper' hook Notification"
+            home.resolve(".claude/settings.json").toFile().readText() shouldContain "bridle-helper hook Notification"
             tmux.launch(profile())
             val state = Files.createDirectories(home.resolve(".local/state/bridle/sessions"))
             state.resolve("claude-app.json").toFile().writeText(
@@ -162,6 +182,58 @@ class TmuxControllerTest {
             tmux.uninstallHelper()
             tmux.probe().helperVersion shouldBe null
             home.resolve(".claude/settings.json").toFile().readText() shouldNotContain "bridle-helper"
+        }
+
+    @Test
+    fun `hook install edits a symlinked settings file in place and quotes the helper path`() =
+        runBlocking<Unit> {
+            tmux.installHelper(installHooks = false)
+            val dotfiles = Files.createDirectories(home.resolve("dotfiles"))
+            val real = dotfiles.resolve("claude-settings.json")
+            real.toFile().writeText("""{"model": "opus", "hooks": {"Stop": [{"hooks": [{"command": "say done"}]}]}}""")
+            Files.createDirectories(home.resolve(".claude"))
+            val link = Files.createSymbolicLink(home.resolve(".claude/settings.json"), real)
+            val helper = home.resolve(".local/share/bridle/bridle-helper").toString()
+
+            fun helper(vararg args: String): Pair<Int, String> {
+                val pb = ProcessBuilder(listOf("/bin/sh", helper) + args)
+                pb.environment()["HOME"] = home.toString()
+                pb.environment()["BRIDLE_HELPER_PATH"] = "$home/it's here/bridle-helper"
+                pb.environment().remove("CLAUDE_CONFIG_DIR")
+                val p = pb.redirectErrorStream(true).start()
+                val out = p.inputStream.readBytes().toString(Charsets.UTF_8)
+                return p.waitFor() to out
+            }
+            helper("install-hooks").first shouldBe 0
+            Files.isSymbolicLink(link) shouldBe true // still a link, the target was edited
+            val text = real.toFile().readText()
+            text shouldContain "say done"
+            text shouldContain "\"opus\""
+            // shlex-quoted: a quote in $HOME can't break the hook command Claude Code runs.
+            text shouldContain """"'$home/it'\"'\"'s here/bridle-helper' hook Stop""""
+
+            real.toFile().writeText("""{"hooks": ["not", "an", "object"]}""")
+            val (status, out) = helper("install-hooks")
+            status shouldNotBe 0
+            out shouldContain "not modified"
+            real.toFile().readText() shouldBe """{"hooks": ["not", "an", "object"]}"""
+        }
+
+    @Test
+    fun `hook state directory is private`() =
+        runBlocking<Unit> {
+            tmux.installHelper(installHooks = false)
+            val pb =
+                ProcessBuilder("/bin/sh", home.resolve(".local/share/bridle/bridle-helper").toString(), "hook", "Stop")
+            pb.environment()["HOME"] = home.toString()
+            pb.environment().remove("XDG_STATE_HOME")
+            pb.environment().remove("TMUX")
+            val p = pb.start()
+            p.outputStream.use { it.write("""{"session_id":"abc"}""".toByteArray()) }
+            p.waitFor() shouldBe 0
+            val dir = home.resolve(".local/state/bridle/sessions")
+            PosixFilePermissions.toString(Files.getPosixFilePermissions(dir)) shouldBe "rwx------"
+            PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve("abc.json"))) shouldBe "rw-------"
         }
 
     @Test

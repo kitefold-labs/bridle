@@ -166,7 +166,7 @@ public object TmuxScripts {
         require(workingDir.none { it.isISOControl() }) { "Working directory may not contain control characters" }
         val program =
             "$PATH_PRELUDE; " +
-                "case \"\$2\" in \"~\"*) d=\"\$HOME\${2#?}\" ;; *) d=\"\$2\" ;; esac; " +
+                "case \"\$2\" in \"~\" | \"~/\"*) d=\"\$HOME\${2#?}\" ;; *) d=\"\$2\" ;; esac; " +
                 "exec tmux new-session -A -s \"\$1\" -c \"\$d\""
         return "sh -c '$program' bridle ${ShellQuote.quote(session)} ${ShellQuote.quote(workingDir)}"
     }
@@ -219,8 +219,16 @@ public object TmuxScripts {
     private fun tmux(args: List<Any>): String =
         "tmux " +
             args.joinToString(" ") {
-                if (it is PathArg) ShellQuote.quotePath(it.path) else ShellQuote.quote(it.toString())
+                if (it is PathArg) ShellQuote.quotePath(tmuxArg(it.path)) else ShellQuote.quote(tmuxArg(it.toString()))
             }
+
+    /**
+     * tmux (3.0+) treats a command-line argument that *ends* in `;` as a command separator: the
+     * `;` is dropped and the arguments after it run as a new tmux command (a trailing `\;` stands
+     * for a literal `;`). Writing a trailing `;` as `\;` keeps every argument literal, so text typed
+     * with `send-keys -l`, a path or a command can never end the tmux command early.
+     */
+    internal fun tmuxArg(value: String): String = if (value.endsWith(';')) value.dropLast(1) + "\\;" else value
 
     private fun script(vararg lines: String): String = script(lines.asList())
 
