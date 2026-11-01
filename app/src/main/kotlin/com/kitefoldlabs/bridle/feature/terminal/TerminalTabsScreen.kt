@@ -1,7 +1,5 @@
 package com.kitefoldlabs.bridle.feature.terminal
 
-import android.view.WindowManager
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,10 +56,7 @@ fun TerminalTabsRoute(
     val selected by viewModel.selectedTabId.collectAsStateWithLifecycle()
     val screens by viewModel.screens.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    TerminalWindowFlags(
-        keepScreenOn = settings?.keepScreenOn == true,
-        secure = settings?.secureScreenEnabled == true,
-    )
+    TerminalWindowFlags(keepScreenOn = settings?.keepScreenOn == true)
     LifecycleStartEffect(selected) {
         viewModel.setVisibleTab(selected)
         onStopOrDispose { viewModel.setVisibleTab(null) }
@@ -206,22 +201,17 @@ private fun NoTerminals(onBack: () -> Unit) {
 }
 
 /**
- * Keeps the screen on and blocks screenshots (FLAG_SECURE, which also blanks the recents
- * thumbnail) while the terminal is shown, as the settings ask. Both are undone on leaving.
+ * Keeps the screen on while the terminal is shown, as the settings ask; undone on leaving.
+ *
+ * FLAG_SECURE is deliberately not touched here: [com.kitefoldlabs.bridle.ui.SecureScreen] applies
+ * the "secure screen" setting to the whole window (the sessions screen shows pane previews too),
+ * and clearing the flag on leaving the terminal would switch that protection off app-wide.
  */
 @Composable
-fun TerminalWindowFlags(
-    keepScreenOn: Boolean,
-    secure: Boolean,
-) {
+fun TerminalWindowFlags(keepScreenOn: Boolean) {
     val view = LocalView.current
     DisposableEffect(view, keepScreenOn) {
         view.keepScreenOn = keepScreenOn
         onDispose { view.keepScreenOn = false }
-    }
-    val window = LocalActivity.current?.window
-    DisposableEffect(window, secure) {
-        if (secure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { if (secure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
 }

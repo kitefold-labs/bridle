@@ -165,35 +165,33 @@ class TerminalTabsScreenTest {
     }
 
     @Test
-    fun `window flags keep the screen on and block screenshots until left`() {
+    fun `the terminal keeps the screen on until left and leaves the secure flag alone`() {
         var keep by mutableStateOf(true)
-        var secure by mutableStateOf(true)
         var shown by mutableStateOf(true)
         lateinit var view: View
         var activity: Activity? = null
         rule.setContent {
             view = LocalView.current
             activity = LocalActivity.current
-            if (shown) TerminalWindowFlags(keepScreenOn = keep, secure = secure)
+            if (shown) TerminalWindowFlags(keepScreenOn = keep)
         }
 
         fun secured() = (activity!!.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
         rule.waitForIdle()
+        // As SecureScreen sets it for the whole app when "secure screen" is on.
+        rule.runOnUiThread { activity!!.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE) }
         view.keepScreenOn shouldBe true
-        secured() shouldBe true
 
-        secure = false
         keep = false
         rule.waitForIdle()
         view.keepScreenOn shouldBe false
-        secured() shouldBe false
 
         keep = true
-        secure = true
         rule.waitForIdle()
+        view.keepScreenOn shouldBe true
         shown = false
         rule.waitForIdle()
         view.keepScreenOn shouldBe false
-        secured() shouldBe false
+        secured() shouldBe true // leaving the terminal must not undo the app-wide setting
     }
 }
