@@ -18,9 +18,11 @@ Claude Code: hook errors are swallowed and the hook always exits 0.
 
 ## Installing
 
-In Bridle: **Host → Claude status → Install helper**. Bridle shows the script's SHA-256 and
-asks for confirmation, then uploads it to `~/.local/share/bridle/bridle-helper`, verifies the
-checksum on the host, and (if you agree) runs `bridle-helper install-hooks`.
+In Bridle: **Sessions → (pick the host) → This host → Install bridle-helper**. Bridle shows the
+script's SHA-256 and asks for confirmation, then uploads it to
+`~/.local/share/bridle/bridle-helper`, verifies the checksum on the host, and (if you agree) runs
+`bridle-helper install-hooks`. See the
+[status and notifications tutorial](tutorials/03-claude-status-notifications.md).
 
 `install-hooks` edits `~/.claude/settings.json` with Python's JSON module (never with text
 substitution), keeps a timestamped backup next to it, keeps your existing hooks, and is
@@ -36,8 +38,9 @@ cp host-helper/bridle-helper ~/.local/share/bridle/ && chmod 700 ~/.local/share/
 
 ## Removing
 
-**Host → Claude status → Remove helper**, or run `bridle-helper uninstall-hooks` and delete the
-script. State files can be deleted with `rm -r ~/.local/state/bridle`.
+**Sessions → (pick the host) → This host → Remove helper**, or run
+`bridle-helper uninstall-hooks` and delete the script. State files can be deleted with
+`rm -r ~/.local/state/bridle`.
 
 ## Protocol
 

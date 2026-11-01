@@ -32,6 +32,14 @@ from your phone.
 | [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 
+## Tutorials
+
+- [Run Claude Code in tmux from your phone](docs/tutorials/02-claude-in-tmux.md): a Launch
+  Profile for Claude, restarting with `--continue`, quick replies, reattaching after network drops
+- [Claude status and notifications](docs/tutorials/03-claude-status-notifications.md): installing
+  bridle-helper, what the badges mean, Approve/Deny from notifications, and the limits (only while
+  connected)
+
 ## Decisions
 
 - **Platform:** Android, native Kotlin + Jetpack Compose. Phones come first;
