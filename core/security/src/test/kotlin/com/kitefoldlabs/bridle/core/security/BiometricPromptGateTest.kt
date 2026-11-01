@@ -17,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.security.Signature
+import javax.crypto.Cipher
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -71,17 +72,20 @@ class BiometricPromptGateTest {
             val looper = shadowOf(Looper.getMainLooper())
             val plain = async { gate.authenticate("r") }
             val crypto = async { gate.authenticate("r", Signature.getInstance("SHA256withECDSA")) }
+            val cipher = async { gate.authenticate("r", Cipher.getInstance("AES/GCM/NoPadding")) }
             yield()
             looper.idle()
             plain.isActive shouldBe true
             crypto.isActive shouldBe true
+            cipher.isActive shouldBe true
             // Cancelled before the main thread got to it: no prompt is shown at all.
             val early = async { gate.authenticate("r") }
             yield()
             early.cancel()
             plain.cancel()
             crypto.cancel()
+            cipher.cancel()
             looper.idle()
-            listOf(plain, crypto, early).all { it.isCancelled } shouldBe true
+            listOf(plain, crypto, cipher, early).all { it.isCancelled } shouldBe true
         }
 }

@@ -9,10 +9,17 @@ import java.security.GeneralSecurityException
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.Signature
+import javax.crypto.Cipher
 
 /**
  * Asks the user to prove presence (biometric or device credential) before a key is used.
  * [BiometricPromptGate] is the production implementation.
+ *
+ * Wherever possible the prompt is bound to the key operation it authorises (`CryptoObject`), so
+ * the Keystore, not Bridle, enforces it. The unbound [authenticate] is used only where the
+ * Keystore enforces authentication by time instead (time-bound keys: the prompt renews the
+ * window and the key operation fails without it), and for imported keys stored before they were
+ * bound to a Keystore wrapping key, where Bridle enforces it (see [ImportedKeyVault.signer]).
  */
 public interface BiometricGate {
     /** Shows a prompt explaining [reason]; true if the user authenticated, false otherwise. */
@@ -26,6 +33,16 @@ public interface BiometricGate {
     public suspend fun authenticate(
         reason: String,
         signature: Signature,
+    ): Boolean = authenticate(reason)
+
+    /**
+     * Authenticates exactly one operation on [cipher], which is already initialised. Imported
+     * keys that need authentication for every use are unwrapped this way (see [KeyWrappingStore]);
+     * the default falls back to [authenticate].
+     */
+    public suspend fun authenticate(
+        reason: String,
+        cipher: Cipher,
     ): Boolean = authenticate(reason)
 }
 
