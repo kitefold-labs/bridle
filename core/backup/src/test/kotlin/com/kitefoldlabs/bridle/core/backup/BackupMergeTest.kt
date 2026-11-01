@@ -198,6 +198,48 @@ class BackupMergeTest {
     }
 
     @Test
+    fun `group default usernames are validated like user input`() {
+        val plan =
+            BackupMerge.plan(
+                ExistingData(),
+                backup(
+                    groups =
+                        listOf(
+                            Group(id = 1, name = "Ok", defaultUsername = "deploy"),
+                            Group(id = 2, name = "Bad", defaultUsername = "root;reboot"),
+                        ),
+                ),
+            )
+        plan.groups.map { it.name } shouldBe listOf("Ok")
+        plan.issues shouldContainExactly
+            listOf(
+                Invalid(
+                    EntityKind.GROUP,
+                    "Bad",
+                    Validation.Invalid("username", Validation.Reason.ILLEGAL_CHARACTERS),
+                ),
+            )
+    }
+
+    @Test
+    fun `identities without a key never match each other`() {
+        val blank = existingIdentity(40, filler = 9).copy(publicKeyOpenSsh = "  ")
+        val plan =
+            BackupMerge.plan(
+                ExistingData(identities = listOf(blank)),
+                backup(
+                    identities = listOf(identity(7, filler = 9).copy(publicKeyOpenSsh = "")),
+                    hosts = listOf(host(1, identity = 7)),
+                ),
+            )
+        plan.hosts
+            .single()
+            .identityId
+            .shouldBeNull()
+        plan.issues.single().kind shouldBe EntityKind.IDENTITY
+    }
+
+    @Test
     fun `duplicate hosts keep the existing host and attach children to it`() {
         val existingHost = Host(id = 50, label = "Mine", hostname = "H1.Example.Test", username = "dev")
         val existing =
@@ -276,6 +318,19 @@ class BackupMergeTest {
                 ReferenceCleared(EntityKind.HOST, "h1", "jumpHostId"),
                 ReferenceCleared(EntityKind.HOST, "h3", "jumpHostId"),
             )
+    }
+
+    @Test
+    fun `a host that only jumps into a cycle keeps its jump host`() {
+        // h4 is listed first and waits on the h1 <-> h2 cycle; only a host on the cycle is cut.
+        val plan =
+            BackupMerge.plan(
+                ExistingData(),
+                backup(hosts = listOf(host(4, jump = 1), host(1, jump = 2), host(2, jump = 1))),
+            )
+        plan.hosts.map { it.label to it.jumpHostId } shouldBe
+            listOf("h1" to null, "h4" to -2L, "h2" to -2L)
+        plan.issues shouldContainExactly listOf(ReferenceCleared(EntityKind.HOST, "h1", "jumpHostId"))
     }
 
     @Test
@@ -361,19 +416,9 @@ class BackupMergeTest {
         val plan =
             BackupMerge.plan(
                 ExistingData(knownHosts = listOf(trusted)),
-                backup(
-                    knownHosts =
-                        listOf(
-                            trusted,
-                            changed,
-                            knownHost(keyType = "ecdsa-sha2-nistp256", filler = 3),
-                            knownHost(keyType = "ecdsa-sha2-nistp256", filler = 4),
-                            knownHost(host = "new.example.test"),
-                        ),
-                ),
+                backup(knownHosts = listOf(trusted, changed, knownHost(host = "new.example.test"))),
             )
-        plan.knownHosts shouldContainExactly
-            listOf(knownHost(keyType = "ecdsa-sha2-nistp256", filler = 3), knownHost(host = "new.example.test"))
+        plan.knownHosts shouldContainExactly listOf(knownHost(host = "new.example.test"))
         val conflict =
             KnownHostKeyConflict(
                 host = "devbox.example.test",
@@ -383,19 +428,53 @@ class BackupMergeTest {
                 backupFingerprint = changed.fingerprintSha256,
             )
         plan.issues shouldContainExactly
+            listOf(Duplicate(EntityKind.KNOWN_HOST, "devbox.example.test:22 ssh-ed25519"), conflict)
+        conflict.kind shouldBe EntityKind.KNOWN_HOST
+        conflict.label shouldBe "devbox.example.test:22 ssh-ed25519"
+    }
+
+    @Test
+    fun `a trusted host is never given a key of another type`() {
+        // The TOFU verifier refuses an unknown key type for a known host, so an import must not
+        // quietly make it acceptable.
+        val trusted = knownHost(filler = 1)
+        val ecdsa = knownHost(keyType = "ecdsa-sha2-nistp256", filler = 3)
+        val otherPort = knownHost(port = 2222, keyType = "ecdsa-sha2-nistp256", filler = 4)
+        val plan =
+            BackupMerge.plan(
+                ExistingData(knownHosts = listOf(trusted)),
+                backup(knownHosts = listOf(ecdsa, otherPort)),
+            )
+        plan.knownHosts shouldContainExactly listOf(otherPort)
+        plan.issues shouldContainExactly
             listOf(
-                Duplicate(EntityKind.KNOWN_HOST, "devbox.example.test:22 ssh-ed25519"),
-                conflict,
                 KnownHostKeyConflict(
                     host = "devbox.example.test",
                     port = 22,
                     keyType = "ecdsa-sha2-nistp256",
-                    existingFingerprint = knownHost(keyType = "ecdsa-sha2-nistp256", filler = 3).fingerprintSha256,
-                    backupFingerprint = knownHost(keyType = "ecdsa-sha2-nistp256", filler = 4).fingerprintSha256,
+                    existingFingerprint = trusted.fingerprintSha256,
+                    backupFingerprint = ecdsa.fingerprintSha256,
                 ),
             )
-        conflict.kind shouldBe EntityKind.KNOWN_HOST
-        conflict.label shouldBe "devbox.example.test:22 ssh-ed25519"
+    }
+
+    @Test
+    fun `a new host keeps every key type of the backup, and the first of conflicting keys`() {
+        val ed25519 = knownHost(host = "new.example.test", filler = 1)
+        val ecdsa = knownHost(host = "new.example.test", keyType = "ecdsa-sha2-nistp256", filler = 3)
+        val ecdsaChanged = knownHost(host = "new.example.test", keyType = "ecdsa-sha2-nistp256", filler = 4)
+        val plan = BackupMerge.plan(ExistingData(), backup(knownHosts = listOf(ed25519, ecdsa, ecdsaChanged)))
+        plan.knownHosts shouldContainExactly listOf(ed25519, ecdsa)
+        plan.issues shouldContainExactly
+            listOf(
+                KnownHostKeyConflict(
+                    host = "new.example.test",
+                    port = 22,
+                    keyType = "ecdsa-sha2-nistp256",
+                    existingFingerprint = ecdsa.fingerprintSha256,
+                    backupFingerprint = ecdsaChanged.fingerprintSha256,
+                ),
+            )
     }
 
     @Test
