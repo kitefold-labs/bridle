@@ -1,0 +1,46 @@
+# Bridle detekt configuration. Builds on detekt's defaults; only deliberate deviations are listed.
+build:
+  maxIssues: 0
+
+complexity:
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 12
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+    ignoreAnnotatedParameter: ['Composable']
+  TooManyFunctions:
+    thresholdInFiles: 30
+    thresholdInClasses: 25
+    thresholdInInterfaces: 20
+    thresholdInObjects: 25
+    ignorePrivate: true
+  LongMethod:
+    threshold: 80
+  CyclomaticComplexMethod:
+    threshold: 18
+    ignoreSimpleWhenEntries: true
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable', 'Test', 'ParameterizedTest']
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    excludes: ['**/test/**', '**/androidTest/**', '**/*Test.kt']
+  MaxLineLength:
+    maxLineLength: 120
+  ReturnCount:
+    max: 4
+  ForbiddenComment:
+    active: false
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+
+exceptions:
+  TooGenericExceptionCaught:
+    excludes: ['**/test/**']

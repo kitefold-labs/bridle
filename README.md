@@ -11,7 +11,7 @@ from your phone.
 > the kite and sets its angle. Bridle is how you steer sessions running far
 > away.
 
-> Status: **design phase**. No app code yet.
+> Status: **in development**. See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 
 - **Package id:** `com.kitefoldlabs.bridle`
 - **License:** [Apache License 2.0](LICENSE)
@@ -26,6 +26,7 @@ from your phone.
 | [docs/01-product-and-competitive-review.md](docs/01-product-and-competitive-review.md) | Goals, users, decisions, review of Termius / JuiceSSH / ConnectBot / Termux / Blink / Prompt / Claude-specific tools, feature list |
 | [docs/02-architecture.md](docs/02-architecture.md) | System architecture, modules, data model, SSH and terminal layers, tmux and Claude session model, host helper, security |
 | [docs/03-implementation-plan.md](docs/03-implementation-plan.md) | Phased plan, milestones, spikes, testing strategy, risks |
+| [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 
 ## Decisions

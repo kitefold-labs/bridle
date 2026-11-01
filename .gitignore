@@ -1,0 +1,26 @@
+# Gradle / build
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Android
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets — never commit signing material
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+*.p12
