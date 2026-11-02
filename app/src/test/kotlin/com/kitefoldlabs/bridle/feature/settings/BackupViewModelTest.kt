@@ -16,6 +16,7 @@ import com.kitefoldlabs.bridle.core.model.KeySource
 import com.kitefoldlabs.bridle.core.model.Snippet
 import com.kitefoldlabs.bridle.core.model.Validation
 import com.kitefoldlabs.bridle.feature.FakeDocuments
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.sftp.clear
 import com.kitefoldlabs.bridle.feature.testData
@@ -29,8 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -51,7 +50,7 @@ class BackupViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         source = testData(context)
         target = testData(context)
         runBlocking {
@@ -64,7 +63,7 @@ class BackupViewModelTest {
     fun tearDown() {
         source.close()
         target.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     private fun viewModel(data: DataModule) =

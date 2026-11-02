@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.data.DataModule
 import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.crash.CrashReporter
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingStore
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingViewModel
@@ -23,8 +24,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -44,14 +43,14 @@ class AppLockAndCrashTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(context)
     }
 
     @After
     fun tearDown() {
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.kitefoldlabs.bridle.core.tmux.TmuxPane
 import com.kitefoldlabs.bridle.core.tmux.TmuxSession
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.FakeSession
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
 import com.kitefoldlabs.bridle.feature.terminal.TerminalLauncher
@@ -34,8 +35,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
@@ -73,7 +72,7 @@ class SessionsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(main)
+        TestMain.set(main)
         vm =
             store.hold(
                 SessionsViewModel(
@@ -94,7 +93,7 @@ class SessionsViewModelTest {
     fun tearDown() {
         store.clear()
         runBlocking { world.coordinator.disconnectAll() }
-        Dispatchers.resetMain()
+        TestMain.reset()
         main.close()
         world.data.close()
         scope.cancel()

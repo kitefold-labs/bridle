@@ -15,6 +15,7 @@ import com.kitefoldlabs.bridle.core.data.settings.ThemeMode
 import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
 import com.kitefoldlabs.bridle.core.terminal.KeyBarLayout
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.matchers.nulls.shouldBeNull
@@ -25,8 +26,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -44,14 +43,14 @@ class SettingsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(ApplicationProvider.getApplicationContext())
     }
 
     @After
     fun tearDown() {
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     private fun viewModel() = SettingsViewModel(data.settings, { available }, data.composeHistory)

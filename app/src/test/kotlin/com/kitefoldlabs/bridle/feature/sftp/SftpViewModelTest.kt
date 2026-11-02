@@ -15,6 +15,7 @@ import com.kitefoldlabs.bridle.feature.FakeConnection
 import com.kitefoldlabs.bridle.feature.FakeDocuments
 import com.kitefoldlabs.bridle.feature.FakeSftpSession
 import com.kitefoldlabs.bridle.feature.FakeSftpSession.Companion.HOME
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.connections
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
@@ -28,8 +29,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -65,7 +64,7 @@ class SftpViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        TestMain.set(UnconfinedTestDispatcher())
         sftp.dir("$HOME/src")
         sftp.file("$HOME/notes.md", "hello")
         sftp.file("$HOME/.bashrc", "export X=1")
@@ -74,7 +73,7 @@ class SftpViewModelTest {
     }
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() = TestMain.reset()
 
     private fun viewModel(saved: SavedStateHandle = SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L))) =
         SftpViewModel(saved, manager, queue, unconfined, Dispatchers.Unconfined)

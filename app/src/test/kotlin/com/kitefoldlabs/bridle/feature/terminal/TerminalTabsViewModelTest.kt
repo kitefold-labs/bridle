@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
 import com.kitefoldlabs.bridle.core.terminalui.PendingSend
 import com.kitefoldlabs.bridle.feature.FakeEngine
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
 import io.kotest.matchers.nulls.shouldBeNull
@@ -25,8 +26,6 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Before
@@ -71,14 +70,14 @@ class TerminalTabsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(main)
+        TestMain.set(main)
     }
 
     @After
     fun tearDown() {
         store.clear()
         runBlocking { world.coordinator.disconnectAll() }
-        Dispatchers.resetMain()
+        TestMain.reset()
         main.close()
         // Fire-and-forget work (e.g. clearing history) must finish before the database closes, or
         // it fails later and the uncaught error lands in whichever test runs next.
