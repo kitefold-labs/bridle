@@ -61,7 +61,7 @@ class SftpViewModelTest {
     private var next: () -> SshConnection = { connection }
     private val manager: ConnectionManager = connections({ next() }, unconfined)
     private val documents = FakeDocuments()
-    private val queue = TransferQueue(manager, documents, unconfined)
+    private val queue = TransferQueue(manager, documents, unconfined, {})
 
     @Before
     fun setUp() {
@@ -301,7 +301,7 @@ class SftpViewModelTest {
             SftpViewModel(
                 SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L)),
                 manager,
-                TransferQueue(manager, bad, unconfined),
+                TransferQueue(manager, bad, unconfined, {}),
                 unconfined,
                 Dispatchers.Unconfined,
             )

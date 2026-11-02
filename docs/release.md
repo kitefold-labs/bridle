@@ -156,8 +156,8 @@ declare **Special use** and give:
   interactive terminal session or a file transfer open to their own server,
   a foreground service keeps that network connection alive when the app is in
   the background, so typing and output are not lost. The service shows an
-  ongoing notification with the open sessions and a 'Disconnect all' action,
-  and it stops as soon as the last session or transfer ends."
+  ongoing notification with the open sessions and transfers and a 'Disconnect
+  all' action, and it stops as soon as the last session or transfer ends."
 - **User impact if deferred:** the SSH connection drops when the user
   switches apps; any running transfer fails.
 - **Video:** connect to a host, switch to another app, return to the

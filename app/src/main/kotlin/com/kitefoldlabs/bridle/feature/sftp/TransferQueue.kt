@@ -7,6 +7,8 @@ import com.kitefoldlabs.bridle.core.ssh.Sftp
 import com.kitefoldlabs.bridle.core.ssh.SftpSession
 import com.kitefoldlabs.bridle.core.ssh.TransferProgress
 import com.kitefoldlabs.bridle.di.ApplicationScope
+import com.kitefoldlabs.bridle.feature.sftp.TransferStatus.CANCELLED
+import com.kitefoldlabs.bridle.feature.terminal.SessionServiceStarter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -51,7 +53,8 @@ data class Transfer(
  *
  * Transfers run one at a time, in order, in the application scope, so they continue when the user
  * leaves the file browser. Each holds a [ConnectionManager] lease while it runs, which keeps the
- * host's shared connection open (and reconnects it) for as long as the transfer needs it.
+ * host's shared connection open (and reconnects it) for as long as the transfer needs it, and
+ * queueing one starts the foreground service, which stays up while [hasActiveWork].
  */
 @Singleton
 class TransferQueue
@@ -60,6 +63,7 @@ class TransferQueue
         private val connections: ConnectionManager,
         private val documents: DocumentAccess,
         @param:ApplicationScope private val scope: CoroutineScope,
+        private val service: SessionServiceStarter,
     ) {
         private val state = MutableStateFlow<List<Transfer>>(emptyList())
         private val jobs = ConcurrentHashMap<Long, Job>()
@@ -134,6 +138,7 @@ class TransferQueue
             block: suspend (SftpSession, TransferProgress) -> Unit,
         ) {
             state.update { it + transfer }
+            service.ensureRunning()
             val job =
                 scope.launch(start = CoroutineStart.LAZY) {
                     try {
@@ -150,11 +155,15 @@ class TransferQueue
                             it.copy(status = TransferStatus.FAILED, error = e.message ?: e.javaClass.simpleName)
                         }
                         onFailure()
-                    } finally {
-                        jobs.remove(transfer.id)
                     }
                 }
             jobs[transfer.id] = job
+            job.invokeOnCompletion { cause ->
+                jobs.remove(transfer.id)
+                // Cancelled before its body ever ran, so nothing above recorded it; left QUEUED, it
+                // would keep the foreground service up for good.
+                if (cause != null) update(transfer.id) { if (it.isActive) it.copy(status = CANCELLED) else it }
+            }
             job.start()
         }
 

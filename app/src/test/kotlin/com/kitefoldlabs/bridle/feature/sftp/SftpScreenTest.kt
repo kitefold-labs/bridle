@@ -59,7 +59,7 @@ class SftpScreenTest {
             SftpViewModel(
                 SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 1L)),
                 manager,
-                TransferQueue(manager, documents, scope),
+                TransferQueue(manager, documents, scope, {}),
                 scope,
                 Dispatchers.Unconfined,
             )

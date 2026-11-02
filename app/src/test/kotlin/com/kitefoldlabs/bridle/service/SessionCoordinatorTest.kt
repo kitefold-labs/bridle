@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.service
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.ConnectionManager
@@ -15,6 +16,8 @@ import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import com.kitefoldlabs.bridle.feature.FakeDocuments
+import com.kitefoldlabs.bridle.feature.sftp.TransferQueue
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -26,6 +29,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -110,6 +114,24 @@ class SessionCoordinatorTest {
             coordinator.closeTab("missing")
             coordinator.closeTab(tab.id)
             coordinator.tabs.value shouldBe emptyList()
+        }
+
+    @Test
+    fun `foreground work counts open tabs and unfinished transfers`() =
+        runBlocking<Unit> {
+            val unreachable = ConnectionManager(HostConnector { awaitCancellation() }, scope)
+            val queue = TransferQueue(unreachable, FakeDocuments(), scope) {}
+            val work = ForegroundWork(coordinator, queue)
+            work.current shouldBe ActiveWork()
+            work.current.isIdle shouldBe true
+            val tab = coordinator.openTab(1, "devbox", AttachSpec.Shell, { _, _ -> })
+            withTimeout(5.seconds) { work.changes.first { it == ActiveWork(tabs = 1) } }
+            coordinator.closeTab(tab.id)
+            val transfer = queue.download(2, "/srv/log.txt", Uri.parse("content://docs/log.txt"))
+            work.current shouldBe ActiveWork(transfers = 1) // still connecting: active
+            work.current.isIdle shouldBe false
+            queue.cancel(transfer.id)
+            withTimeout(5.seconds) { work.changes.first { it.isIdle } }
         }
 
     private class Owned(

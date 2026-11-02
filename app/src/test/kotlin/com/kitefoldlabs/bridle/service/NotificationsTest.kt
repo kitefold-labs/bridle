@@ -94,8 +94,13 @@ class NotificationsTest {
 
     @Test
     fun `session notification shows the count and a disconnect action`() {
-        val n = SessionService.notification(context, 3)
+        val n = SessionService.notification(context, ActiveWork(tabs = 3))
         NotificationCompat.getContentText(n).toString() shouldBe "3 sessions open"
+
+        fun text(work: ActiveWork) = NotificationCompat.getContentText(SessionService.notification(context, work))
+        text(ActiveWork(tabs = 1, transfers = 2)) shouldBe "1 session open · 2 transfers"
+        text(ActiveWork(transfers = 1)) shouldBe "1 transfer"
+        text(ActiveWork()) shouldBe "1 session open" // a start for a tab that already closed
         n.actions
             .single()
             .title
