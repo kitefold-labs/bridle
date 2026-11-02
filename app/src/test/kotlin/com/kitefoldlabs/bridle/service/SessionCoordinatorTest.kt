@@ -8,6 +8,7 @@ import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.session.HostConnector
 import com.kitefoldlabs.bridle.core.session.TerminalSession
 import com.kitefoldlabs.bridle.core.session.TerminalSink
+import com.kitefoldlabs.bridle.core.ssh.AuthenticationFailedException
 import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.DuplexStream
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
@@ -22,7 +23,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -193,6 +197,30 @@ class SessionCoordinatorTest {
                     .putExtra(SessionActionReceiver.EXTRA_HOST, 1L)
                     .putExtra(SessionActionReceiver.EXTRA_SESSION, "api")
             withTimeout(5.seconds) { actions.handle(context, approve) }
+        }
+
+    @Test
+    fun `notification actions swallow failures but not cancellation`() =
+        runBlocking<Unit> {
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val approve =
+                Intent(SessionActionReceiver.ACTION_APPROVE)
+                    .putExtra(SessionActionReceiver.EXTRA_HOST, 1L)
+                    .putExtra(SessionActionReceiver.EXTRA_SESSION, "api")
+            val rejected = HostConnector { throw AuthenticationFailedException("denied") }
+            SessionActions(SessionCoordinator(ConnectionManager(rejected, scope), scope)).handle(context, approve)
+
+            val hanging = SessionCoordinator(ConnectionManager(HostConnector { awaitCancellation() }, scope), scope)
+            var finished = false
+            val job =
+                launch {
+                    SessionActions(hanging).handle(context, approve)
+                    finished = true
+                }
+            delay(100)
+            job.cancelAndJoin()
+            job.isCancelled shouldBe true
+            finished shouldBe false
         }
 
     @Test

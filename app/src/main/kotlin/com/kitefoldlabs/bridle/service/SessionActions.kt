@@ -7,7 +7,8 @@ import androidx.core.content.getSystemService
 import com.kitefoldlabs.bridle.core.tmux.ClaudeScreen
 import com.kitefoldlabs.bridle.core.tmux.ClaudeState
 import com.kitefoldlabs.bridle.core.tmux.TmuxController
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -39,13 +40,31 @@ class SessionActions
                     if (hostId < 0) return
                     // Claude Code's permission menu: "1" selects "Yes"; Escape declines.
                     val key = if (intent.action == SessionActionReceiver.ACTION_APPROVE) "1" else "Escape"
-                    runCatching {
-                        withTimeout(timeout) { coordinator.withTmux(hostId) { answerIfStillAsking(it, session, key) } }
-                    }
+                    answer(hostId, session, key)
                     context
                         .getSystemService<NotificationManager>()
                         ?.cancel(ClaudeNotifier.notificationId(hostId, session))
                 }
+            }
+        }
+
+        /**
+         * Answers within [timeout], or not at all: an unreachable host or a vanished session just
+         * dismisses the notification (it is stale whatever went wrong). Cancellation of the caller
+         * is not a failure and propagates.
+         */
+        @Suppress("TooGenericExceptionCaught", "SwallowedException")
+        private suspend fun answer(
+            hostId: Long,
+            session: String,
+            key: String,
+        ) {
+            try {
+                withTimeoutOrNull(timeout) { coordinator.withTmux(hostId) { answerIfStillAsking(it, session, key) } }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not logged: the message may name the host.
             }
         }
 
