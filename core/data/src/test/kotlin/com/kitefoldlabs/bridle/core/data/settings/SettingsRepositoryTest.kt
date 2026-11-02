@@ -180,11 +180,12 @@ class SettingsRepositoryTest {
         }
 
     @Test
-    fun `read errors give the defaults`() =
+    fun `read errors give the defaults, but with app lock on`() =
         runTest {
             val failing = FailingStore(IOException("disk on fire"))
 
-            SettingsRepository(failing).settings.toList() shouldBe listOf(Settings())
+            SettingsRepository(failing).settings.toList() shouldBe listOf(SettingsRepository.UNREADABLE)
+            SettingsRepository.UNREADABLE shouldBe Settings().copy(appLockEnabled = true)
         }
 
     @Test

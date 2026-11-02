@@ -139,7 +139,8 @@ Terminal appearance and app preferences are not tables: they live in a DataStore
 dynamic), terminal font size and font id, the key-bar layout (Termux-style JSON, validated
 with `KeyBarLayout.parse`, falling back to the default), Backspace mode, app lock, FLAG_SECURE,
 keep-screen-on, notifications (master switch plus one toggle per event), crash-report opt-in,
-and whether to use bridle-helper.
+and whether to use bridle-helper. If the file can't be read (an I/O error), the defaults
+apply, except that app lock is treated as on: the lock fails closed and can still be unlocked.
 
 **The database holds no plaintext secrets.** Generated private keys live
 only in the Keystore. Imported keys are stored only as ciphertext, encrypted
