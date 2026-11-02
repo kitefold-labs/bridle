@@ -56,6 +56,11 @@ class CrashScrubListTest {
             val text = reporter.pending()!!.text
             for (secret in listOf("nate", "devbox", "Work box", "pay-api", "night")) text shouldNotContain secret
             text shouldContain "IllegalStateException"
+            CrashScrubList.valuesOf(
+                listOf(Host(label = "v6", hostname = "[fd7a::1]", username = "pi")),
+                emptyList(),
+            ) shouldBe
+                setOf("v6", "[fd7a::1]", "fd7a::1", "pi")
             following.cancelAndJoin() // before the database closes
             data.close()
         }

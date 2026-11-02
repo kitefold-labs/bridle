@@ -55,6 +55,8 @@ class CrashScrubList(
                 for (host in hosts) {
                     add(host.label)
                     add(host.hostname)
+                    // An IPv6 literal may be saved bracketed but appear bare in messages.
+                    add(host.hostname.removeSurrounding("[", "]"))
                     add(host.username)
                     host.defaultTmuxSession?.let(::add)
                 }

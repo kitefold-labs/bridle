@@ -6,7 +6,9 @@ package com.kitefoldlabs.bridle.core.backup
  * `<host>` in place of a file name is still useful; one that leaks a hostname is not.
  *
  * Replaced, in this order:
- * 1. caller-supplied [sensitive] values (configured hostnames, usernames, labels…) → `<redacted>`
+ * 1. caller-supplied [sensitive] values (configured hostnames, usernames, labels…) → `<redacted>`,
+ *    ignoring case, in one pass (so a value can't match inside the placeholder that replaced
+ *    another); two-character values (a username such as `pi`) only as whole words
  * 2. URLs (any scheme) → `<url>`
  * 3. email addresses (also with `@` URL-encoded as `%40`) → `<email>`, then `user@host` → `<user>@<host>`
  * 4. `SHA256:` and MD5 colon-hex fingerprints → `<fingerprint>`
@@ -32,10 +34,18 @@ public object Scrubber {
     public const val USER_AT_HOST: String = "<user>@<host>"
     public const val FINGERPRINT: String = "<fingerprint>"
 
-    /** Sensitive values shorter than this are ignored: replacing every "a" would destroy the text. */
+    /** Sensitive values this long are replaced wherever they appear, even inside a longer word. */
     public const val MIN_SENSITIVE_LENGTH: Int = 3
 
+    /**
+     * Shorter sensitive values, down to this length, are replaced only as whole words (not next to
+     * a letter or digit). Single characters are ignored: replacing every "a" would destroy the text.
+     */
+    public const val MIN_SENSITIVE_WORD_LENGTH: Int = 2
+
     private const val MIN_IPV6_COLONS = 5
+    private const val NOT_IN_WORD = """(?<![\p{L}\p{N}])"""
+    private const val NOT_BEFORE_WORD = """(?![\p{L}\p{N}])"""
 
     /** Blobs without a digit are only redacted from this length on, to spare long identifiers. */
     private const val MIN_BLOB_WITHOUT_DIGIT = 40
@@ -72,13 +82,7 @@ public object Scrubber {
         text: String,
         sensitive: Collection<String> = emptyList(),
     ): String {
-        var out = text
-        sensitive
-            .map(String::trim)
-            .filter { it.length >= MIN_SENSITIVE_LENGTH }
-            .distinct()
-            .sortedByDescending(String::length)
-            .forEach { value -> out = out.replace(value, REDACTED, ignoreCase = true) }
+        var out = sensitivePattern(sensitive)?.replace(text, REDACTED) ?: text
         out = url.replace(out, URL)
         out = email.replace(out, EMAIL)
         out = userAtHost.replace(out, USER_AT_HOST)
@@ -93,6 +97,22 @@ public object Scrubber {
         out = hex.replace(out, REDACTED)
         out = blob.replace(out) { if (isBlob(it.value)) REDACTED else it.value }
         return out
+    }
+
+    /** One alternation of [sensitive], longest first so a value wins over its own prefix. */
+    private fun sensitivePattern(sensitive: Collection<String>): Regex? {
+        val alternatives =
+            sensitive
+                .map(String::trim)
+                .filter { it.length >= MIN_SENSITIVE_WORD_LENGTH }
+                .distinctBy { it.lowercase() }
+                .sortedByDescending(String::length)
+                .map { value ->
+                    val literal = Regex.escape(value)
+                    if (value.length >= MIN_SENSITIVE_LENGTH) literal else "$NOT_IN_WORD$literal$NOT_BEFORE_WORD"
+                }
+        if (alternatives.isEmpty()) return null
+        return Regex(alternatives.joinToString("|"), RegexOption.IGNORE_CASE) // Unicode-aware on the JVM
     }
 
     /** Colon-separated hex is an address (rather than a time like `12:34:56`) if compressed or long. */
