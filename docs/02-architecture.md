@@ -90,6 +90,23 @@ Key ideas:
 host-helper/              POSIX sh helper + hook installer (shipped as an app asset)
 ```
 
+Features plug into each other through small seams, so each stays testable on its own:
+
+- **Terminal tabs** are opened by `TerminalLauncher` (the Hosts list, the Sessions screen,
+  notification taps). Each time it opens a tab it runs `HostAutoStart` in the background, which
+  starts the host's auto-start port forwards (`ForwardManager`; idempotent, failures never
+  reach the terminal). Forwards stop when "Disconnect all" closes the host's connection.
+- **Snippets** paste through `SnippetTarget`, an optional binding that the terminal fills with
+  `TerminalSnippetTarget`: it picks the host's tab on screen, else the selected one, else its
+  newest open tab, sends the text through `BracketedPaste` (never with Enter) and shows the
+  terminal. A multi-line paste without bracketed-paste mode goes to the tab's screen instead,
+  which asks before sending it, as for any paste.
+- **Host tools** (files, snippets, port forwards) are app-level routes. The Hosts row menu and
+  the terminal's menu open them with `HostTools` on the app's nav controller, since the Hosts
+  tab has a back stack of its own.
+- **Onboarding**'s "Generate a key" and "Add a host" bring up the Keys or Hosts tab with a
+  one-shot `TabRequest`, and the tab opens the screen in its own back stack.
+
 ## 4. Data model (Room)
 
 `:core:data` holds one Room database (`bridle.db`, schema version 1, exported to

@@ -33,7 +33,7 @@ Start at the [documentation index](docs/README.md), which also lists the tutoria
 | [docs/backup-and-privacy.md](docs/backup-and-privacy.md) | What encrypted backups contain (and never contain), how they are encrypted, how crash reports are scrubbed and filed |
 | [docs/tutorials/01-first-connection.md](docs/tutorials/01-first-connection.md) | Tutorial: generate a key, add a host (with Tailscale tips), install the key, connect and verify the fingerprint |
 | [PRIVACY.md](PRIVACY.md) | Privacy policy: no data collection, no servers, opt-in crash reports you file yourself |
-| [docs/tutorials/04-files-and-forwards.md](docs/tutorials/04-files-and-forwards.md) | Tutorial: browse, edit and transfer files over SFTP; preview a dev server through a local port forward |
+| [docs/tutorials/04-files-and-forwards.md](docs/tutorials/04-files-and-forwards.md) | Tutorial: browse, edit and transfer files over SFTP; save and run snippets; preview a dev server through a local port forward |
 | [docs/tutorials/05-backup-and-new-phone.md](docs/tutorials/05-backup-and-new-phone.md) | Tutorial: encrypted export and import, why keys aren't included, getting keys working on a new phone |
 | [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
 | [docs/release.md](docs/release.md) | Signing, the release workflow, Play Console (foreground service, Data Safety), F-Droid |

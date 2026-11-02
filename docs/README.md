@@ -10,8 +10,8 @@ Step-by-step guides for using the app.
    terminal's key bar and compose box, attach, restart with `--continue`.
 3. [Claude status and notifications](tutorials/03-claude-status-notifications.md):
    the Sessions screen, status badges, the host helper, Approve / Deny.
-4. [Files and port forwards](tutorials/04-files-and-forwards.md): SFTP,
-   transfers, the editor, local and SOCKS forwards.
+4. [Files, snippets and port forwards](tutorials/04-files-and-forwards.md):
+   SFTP, transfers, the editor, saved commands, local and SOCKS forwards.
 5. [Backups and a new phone](tutorials/05-backup-and-new-phone.md):
    encrypted export and import.
 
