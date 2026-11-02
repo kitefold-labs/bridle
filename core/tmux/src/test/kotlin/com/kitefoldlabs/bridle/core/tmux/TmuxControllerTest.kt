@@ -92,6 +92,8 @@ class TmuxControllerTest {
             tmux.listSessions().shouldBeEmpty() // no server yet
             tmux.launch(profile(), columns = 100, rows = 30) shouldBe LaunchResult.CREATED
             tmux.launch(profile()) shouldBe LaunchResult.ALREADY_RUNNING
+            // The phone's size mustn't stick to a desktop client attached to the same window.
+            shell.exec("tmux show-options -wv -t '=claude-app:' window-size").stdout.trim() shouldBe "latest"
 
             val screen = screenOf("claude-app", "fake-claude started")
             screen shouldContain "model=[it's-fine]"

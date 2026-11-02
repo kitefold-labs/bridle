@@ -367,7 +367,7 @@ All agentless. Every operation is one `exec` on the shared connection.
 - **Phone and desktop attached together:** per session the app sets
   `window-size latest`, so the window follows whichever client was used most
   recently and the phone's small size doesn't shrink the desktop view
-  permanently. It sets this per session with `set-option -t`, so the user's
+  permanently. It sets this on the session's window with `set-option -w`, so the user's
   `~/.tmux.conf` is never edited.
 - **Agentless Claude detection:** if `pane_current_command` is `claude` or
   `node` and the cwd matches the profile, the card shows a "Claude running"

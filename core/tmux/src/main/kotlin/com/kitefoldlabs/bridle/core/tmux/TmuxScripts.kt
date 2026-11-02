@@ -276,7 +276,7 @@ public object TmuxScripts {
             }
         val record = if (profile.env.isEmpty()) emptyList() else listOf(recordEnvironment(profile))
         return start + record + run +
-            "${tmux("set-option", "-t", "=$name", "window-size", "latest")} 2>/dev/null || true"
+            "${tmux("set-option", "-w", "-t", "=$name:", "window-size", "latest")} 2>/dev/null || true"
     }
 
     private fun typeCommand(
