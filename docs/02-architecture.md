@@ -95,12 +95,14 @@ Features plug into each other through small seams, so each stays testable on its
 - **Terminal tabs** are opened by `TerminalLauncher` (the Hosts list, the Sessions screen,
   notification taps). Each time it opens a tab it runs `HostAutoStart` in the background, which
   starts the host's auto-start port forwards (`ForwardManager`; idempotent, failures never
-  reach the terminal). Forwards stop when "Disconnect all" closes the host's connection.
+  reach the terminal). It only starts forwards while the host still has a tab, checked again
+  once each forward holds its lease, so an auto-start racing "Disconnect all" can't connect the
+  host again. Forwards stop when "Disconnect all" closes the host's connection.
 - **Snippets** paste through `SnippetTarget`, an optional binding that the terminal fills with
   `TerminalSnippetTarget`: it picks the host's tab on screen, else the selected one, else its
   newest open tab, sends the text through `BracketedPaste` (never with Enter) and shows the
   terminal. A multi-line paste without bracketed-paste mode goes to the tab's screen instead,
-  which asks before sending it, as for any paste.
+  which asks before sending it, as for any paste; it is dropped if the tab closes first.
 - **Host tools** (files, snippets, port forwards) are app-level routes. The Hosts row menu and
   the terminal's menu open them with `HostTools` on the app's nav controller, since the Hosts
   tab has a back stack of its own.

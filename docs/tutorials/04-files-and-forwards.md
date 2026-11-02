@@ -102,7 +102,8 @@ will run.
 Pasting is as safe as any paste into Bridle's terminal: control characters are removed, so a
 snippet can't send keystrokes or escape sequences of its own. When the program in the terminal
 doesn't support bracketed paste (a plain `sh`, for example) and the snippet has several lines,
-each line would run as it arrived, so the terminal asks first.
+each line would run as it arrived, so the terminal asks first: confirm only if you want the lines
+to run right away.
 
 ## Preview a dev server with a local forward
 
@@ -132,8 +133,9 @@ network: a database at `db.internal:5432`, or a dashboard on another box.
 
 To have a forward start whenever you connect to the host, edit it and turn on **Start
 automatically when connected**. It starts each time you open a terminal on the host (if it isn't
-running already) and keeps running when you close the terminal, until you turn it off or tap
-**Disconnect all**.
+running already) and keeps running when you close the terminal, until you switch it off on the
+**Port forwards** screen or tap **Disconnect all**. If it can't start (say another app already
+uses the port), that screen shows it as **Failed** with the reason.
 
 ### Why only this phone can use it
 
