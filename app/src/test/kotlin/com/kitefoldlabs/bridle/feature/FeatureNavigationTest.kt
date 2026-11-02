@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.feature
 
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -119,8 +120,28 @@ class FeatureNavigationTest {
         coordinator.tabs.value
             .single()
             .title shouldBe "Dev"
+        // The terminal's menu opens the tab's host's files and snippets; back returns to the terminal.
+        val files = hasContentDescription("Upload files")
+        val snippets = hasText("No snippets yet", substring = true)
+        for ((tool, shown) in listOf("Files" to files, "Snippets" to snippets)) {
+            rule.onNodeWithContentDescription("More options").performClick()
+            rule.onNodeWithText(tool).performClick()
+            rule.waitUntil(10_000) { rule.onAllNodes(shown).fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithContentDescription("Back").performClick()
+            rule.waitUntil(10_000) { rule.onAllNodesWithTag(FakeEngine.TAG).fetchSemanticsNodes().isNotEmpty() }
+        }
         rule.onNodeWithContentDescription("Back").performClick()
         waitFor("Dev")
+        // The host's menu opens its tools; back returns to the list.
+        val forwards = hasText("No port forwards yet.")
+        for ((tool, shown) in listOf("Files" to files, "Snippets" to snippets, "Port forwards" to forwards)) {
+            rule.onNodeWithContentDescription("More actions for Dev").performClick()
+            rule.onNodeWithText(tool).performClick()
+            rule.waitUntil(10_000) { rule.onAllNodes(shown).fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithText("Hosts").assertDoesNotExist() // full screen, no bottom bar
+            rule.onNodeWithContentDescription("Back").performClick()
+            waitFor("nate@dev.example")
+        }
         rule.onNodeWithContentDescription("More actions for Dev").performClick()
         waitFor("Edit")
         rule.onNodeWithText("Edit").performClick()

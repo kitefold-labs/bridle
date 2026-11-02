@@ -141,9 +141,11 @@ class SnippetsViewModelTest {
             .command shouldBe "cd /srv && ls -la"
         vm.paste()
         pasted shouldBe listOf(3L to "cd /srv && ls -la")
+        // The terminal comes up with the command, so the dialog just closes.
         vm.state.value.run
             .shouldBeNull()
-        vm.state.value.notice shouldBe SnippetNotice.PASTED
+        vm.state.value.notice
+            .shouldBeNull()
     }
 
     @Test

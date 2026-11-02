@@ -27,8 +27,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -121,6 +123,18 @@ class TerminalTabsViewModel
             viewModelScope.launch {
                 combine(coordinator.tabs, settings.filterNotNull(), ::Pair).collect { (tabs, current) ->
                     syncScreens(tabs, current)
+                }
+            }
+            // A paste that must be confirmed (a snippet): its screen asks once it exists. If the tab
+            // closes first, the paste is dropped, not kept for later.
+            viewModelScope.launch {
+                navigator.pendingPaste.filterNotNull().collectLatest { paste ->
+                    val (open, screen) =
+                        combine(coordinator.tabs, mutableScreens) { tabs, screens ->
+                            tabs.any { it.id == paste.tabId } to screens[paste.tabId]
+                        }.first { (open, screen) -> !open || screen != null }
+                    navigator.pasteTaken(paste)
+                    if (open) screen?.paste(paste.text)
                 }
             }
         }

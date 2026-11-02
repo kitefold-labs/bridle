@@ -11,6 +11,9 @@ You need:
   port forwarding, no public IP, and the machine gets a stable name.
 - `tmux` on the machine if you want sessions that survive disconnects (recommended).
 
+On first start, Bridle shows a short introduction. Its last page has **Generate a key** and
+**Add a host**, which open steps 1 and 2 below directly.
+
 ## 1. Generate a key on the phone
 
 1. Open the **Keys** tab and tap **+** (Generate key).

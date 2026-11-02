@@ -55,7 +55,8 @@ class SessionsViewModelTest {
     private val world = TestWorld(context, scope)
     private val host = world.host
     private val navigator = TerminalNavigator()
-    private val launcher = TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator)
+    private val launcher =
+        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator, { _, _ -> }, scope)
     private val hub =
         ClaudeStatusHub(
             world.coordinator,

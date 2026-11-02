@@ -9,6 +9,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kitefoldlabs.bridle.core.model.EntityId
+import com.kitefoldlabs.bridle.ui.nav.OnTabRequest
+import com.kitefoldlabs.bridle.ui.nav.TabRequest
 
 private const val ROUTE_LIST = "keys/list"
 private const val ROUTE_GENERATE = "keys/generate"
@@ -23,7 +25,10 @@ private fun NavHostController.showCreated(id: EntityId) {
     navigate(detailRoute(id)) { popUpTo(ROUTE_LIST) }
 }
 
-/** The Keys tab: identities, generate, import, key details, and trusted host keys. */
+/**
+ * The Keys tab: identities, generate, import, key details, and trusted host keys. Opens the
+ * generate screen when onboarding asks for it ([TabRequest.GENERATE_KEY]).
+ */
 @Composable
 fun KeysFeature() {
     val nav = rememberNavController()
@@ -47,4 +52,5 @@ fun KeysFeature() {
         }
         composable(ROUTE_KNOWN_HOSTS) { KnownHostsRoute(onBack = back) }
     }
+    OnTabRequest(TabRequest.GENERATE_KEY) { nav.navigate(ROUTE_GENERATE) { launchSingleTop = true } }
 }

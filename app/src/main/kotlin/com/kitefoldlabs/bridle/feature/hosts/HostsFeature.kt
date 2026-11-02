@@ -8,6 +8,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.kitefoldlabs.bridle.core.model.EntityId
+import com.kitefoldlabs.bridle.ui.nav.HostTools
+import com.kitefoldlabs.bridle.ui.nav.LocalNavController
+import com.kitefoldlabs.bridle.ui.nav.OnTabRequest
+import com.kitefoldlabs.bridle.ui.nav.TabRequest
 
 private const val ROUTE_LIST = "hosts/list"
 private const val ROUTE_EDIT = "hosts/edit/{${HostEditorViewModel.ARG_HOST_ID}}"
@@ -17,11 +21,15 @@ private fun editRoute(id: EntityId) = "hosts/edit/$id"
 
 /**
  * The Hosts tab: the host list, the host editor and the `~/.ssh/config` import, on their own
- * back stack. Tapping a host calls [onOpenTerminal], which the terminal feature provides.
+ * back stack. Tapping a host calls [onOpenTerminal], which the terminal feature provides. A
+ * host's tools (files, snippets, port forwards) are app destinations, opened on the app's
+ * navigation ([LocalNavController]). Opens the editor for a new host when onboarding asks for it
+ * ([TabRequest.ADD_HOST]).
  */
 @Composable
 fun HostsFeature(onOpenTerminal: (EntityId) -> Unit) {
     val nav = rememberNavController()
+    val tools = HostTools(LocalNavController.current)
     val back: () -> Unit = { nav.popBackStack(ROUTE_LIST, inclusive = false) }
     NavHost(nav, startDestination = ROUTE_LIST) {
         composable(ROUTE_LIST) {
@@ -32,6 +40,7 @@ fun HostsFeature(onOpenTerminal: (EntityId) -> Unit) {
                     onAdd = { nav.navigate(editRoute(0)) },
                     onEdit = { nav.navigate(editRoute(it)) },
                     onImport = { nav.navigate(ROUTE_IMPORT) },
+                    onOpenTool = tools::open,
                 ),
             )
         }
@@ -40,4 +49,5 @@ fun HostsFeature(onOpenTerminal: (EntityId) -> Unit) {
         }
         composable(ROUTE_IMPORT) { SshConfigImportRoute(hiltViewModel(), onDone = back) }
     }
+    OnTabRequest(TabRequest.ADD_HOST) { nav.navigate(editRoute(0)) { launchSingleTop = true } }
 }

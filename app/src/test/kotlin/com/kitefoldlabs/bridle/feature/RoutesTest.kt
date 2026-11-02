@@ -47,7 +47,8 @@ class RoutesTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val world = TestWorld(context, scope)
     private val navigator = TerminalNavigator()
-    private val launcher = TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator)
+    private val launcher =
+        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator, { _, _ -> }, scope)
     private val store = ViewModelStore()
 
     @After
