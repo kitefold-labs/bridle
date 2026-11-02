@@ -167,4 +167,17 @@ class TerminalDeepLinks
                 }
             }
         }
+
+        /**
+         * Opens a terminal on [hostId] from the Hosts list (a tap or "Connect"), attaching to the
+         * host's default tmux session if it has one. A host deleted in the meantime opens nothing.
+         */
+        fun openHost(hostId: EntityId): Job =
+            scope.launch {
+                try {
+                    launcher.openTerminal(hostId)
+                } catch (_: IllegalArgumentException) {
+                    // Deleted host (UnknownHostException) or an invalid default session name.
+                }
+            }
     }

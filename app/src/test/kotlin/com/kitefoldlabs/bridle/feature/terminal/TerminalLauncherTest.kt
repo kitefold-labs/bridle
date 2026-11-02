@@ -214,6 +214,19 @@ class TerminalLauncherTest {
         }
 
     @Test
+    fun `hosts list taps open a terminal on the host`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            val links = TerminalDeepLinks(launcher, SessionLinks(context), scope)
+            links.openHost(id).join()
+            world.coordinator.tabs.value
+                .single()
+                .hostId shouldBe id
+            links.openHost(999).join() // deleted host: nothing opens, nothing crashes
+            world.coordinator.tabs.value.size shouldBe 1
+        }
+
+    @Test
     fun `the module provides termlib engines and starts the session service`() {
         val engine = TerminalModule.engineFactory().create()
         engine.shouldBeInstanceOf<TermlibEngine>()
