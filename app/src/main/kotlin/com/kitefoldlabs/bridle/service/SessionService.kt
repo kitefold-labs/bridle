@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -103,10 +104,25 @@ class SessionService : LifecycleService() {
     }
 
     companion object {
-        /** Starts (or refreshes) the service; call after opening a tab. */
-        fun ensureRunning(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, SessionService::class.java))
-        }
+        /**
+         * Starts (or refreshes) the service; call after opening a tab. Returns false when Android
+         * won't start a foreground service right now: from the background on Android 12+ (say, a
+         * reconnect or a notification action) it throws `ForegroundServiceStartNotAllowedException`,
+         * an [IllegalStateException]. That is not worth failing for: the tab still works while
+         * Bridle runs, the work itself lives in tmux on the host, and the next start (opening a
+         * tab with the app in front) brings the service back. Only a fixed line is logged.
+         */
+        @Suppress("SwallowedException")
+        fun ensureRunning(context: Context): Boolean =
+            try {
+                ContextCompat.startForegroundService(context, Intent(context, SessionService::class.java))
+                true
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Foreground service start not allowed now; continuing without it")
+                false
+            }
+
+        private const val TAG = "SessionService"
 
         /**
          * `specialUse` exists from Android 14; earlier versions take no type for this service. The

@@ -406,7 +406,11 @@ helper uninstall
   sessions with a Disconnect-all action. Android 14+ requires a declared
   type. `specialUse` (with a Play Console justification) is the likely fit,
   because `dataSync` is capped at 6 hours per day on Android 15+. Because the
-  work lives in tmux, nothing is lost if the OS kills the service.
+  work lives in tmux, nothing is lost if the OS kills the service. For the
+  same reason a start Android refuses (`ForegroundServiceStartNotAllowedException`
+  when started from the background on Android 12+) is caught and skipped: the
+  tab keeps working while the process lives, and the next start from the
+  foreground brings the service back.
 - **Doze/battery:** we never hold wake locks. If the OS kills the connection,
   the app reconnects when the user returns.
 - **Phone first:** layouts are designed for one-handed portrait use, with the

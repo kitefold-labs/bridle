@@ -19,7 +19,10 @@ fun interface TerminalEngineFactory {
     fun create(): TerminalEngine
 }
 
-/** Starts (or refreshes) the foreground service that keeps open tabs alive in the background. */
+/**
+ * Starts (or refreshes) the foreground service that keeps open tabs alive in the background. Safe
+ * to call from anywhere: when Android refuses the start, it does nothing.
+ */
 fun interface SessionServiceStarter {
     fun ensureRunning()
 }
@@ -49,5 +52,7 @@ object TerminalModule {
     @Provides
     fun serviceStarter(
         @ApplicationContext context: Context,
-    ): SessionServiceStarter = SessionServiceStarter { SessionService.ensureRunning(context) }
+    ): SessionServiceStarter =
+        // Never throws: a start Android refuses (background start on Android 12+) is skipped.
+        SessionServiceStarter { SessionService.ensureRunning(context) }
 }
