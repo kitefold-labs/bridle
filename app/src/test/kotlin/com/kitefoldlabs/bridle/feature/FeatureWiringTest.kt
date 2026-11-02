@@ -9,11 +9,18 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import com.kitefoldlabs.bridle.MainActivity
 import com.kitefoldlabs.bridle.core.data.HostRepository
+import com.kitefoldlabs.bridle.core.data.PortForwardRepository
 import com.kitefoldlabs.bridle.core.model.Host
+import com.kitefoldlabs.bridle.core.model.PortForward
+import com.kitefoldlabs.bridle.core.model.PortForwardType
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.feature.forwards.ForwardManager
+import com.kitefoldlabs.bridle.feature.snippets.SnippetTarget
 import com.kitefoldlabs.bridle.feature.terminal.SessionServiceStarter
 import com.kitefoldlabs.bridle.feature.terminal.TerminalEngineFactory
+import com.kitefoldlabs.bridle.feature.terminal.TerminalLauncher
 import com.kitefoldlabs.bridle.feature.terminal.TerminalModule
+import com.kitefoldlabs.bridle.feature.terminal.TerminalSnippetTarget
 import com.kitefoldlabs.bridle.service.SessionCoordinator
 import com.kitefoldlabs.bridle.service.SessionLink
 import com.kitefoldlabs.bridle.service.SessionLinks
@@ -23,6 +30,7 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -31,6 +39,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.net.ServerSocket
+import java.util.Optional
 import javax.inject.Inject
 
 /** The feature screens wired through Hilt in the real activity, with a fake emulator. */
@@ -62,6 +72,14 @@ class FeatureWiringTest {
 
     @Inject lateinit var links: SessionLinks
 
+    @Inject lateinit var snippetTarget: Optional<SnippetTarget>
+
+    @Inject lateinit var launcher: TerminalLauncher
+
+    @Inject lateinit var forwards: ForwardManager
+
+    @Inject lateinit var portForwards: PortForwardRepository
+
     @Before
     fun setUp() = hilt.inject()
 
@@ -88,6 +106,25 @@ class FeatureWiringTest {
             awaitTerminal()
         }
     }
+
+    @Test
+    fun `snippets paste into terminals, and a host's terminal starts its auto-start forwards`() =
+        runBlocking<Unit> {
+            snippetTarget.get().shouldBeInstanceOf<TerminalSnippetTarget>()
+            val id = hosts.upsert(Host(label = "devbox", hostname = "127.0.0.1", port = 1, username = "me"))
+            val port = ServerSocket(0).use { it.localPort }
+            val forward =
+                portForwards.upsert(
+                    PortForward(hostId = id, type = PortForwardType.DYNAMIC, bindPort = port, autoStart = true),
+                )
+            launcher.openTerminal(id)
+            forwards.statuses.await { forward in it }
+            // Nothing listens on port 1, so the paste has no open terminal to go to.
+            snippetTarget.get().paste(id, "uptime") shouldBe false
+            // "Disconnect all" stops it, also if it does not hold its lease yet (no tab is left).
+            coordinator.disconnectAll()
+            forwards.statuses.await { it.isEmpty() }
+        }
 
     /** Screens fill in as their data loads from the database. */
     private fun awaitText(text: String) {

@@ -131,7 +131,6 @@ fun SnippetsScreen(
 
 private fun noticeText(notice: SnippetNotice): Int =
     when (notice) {
-        SnippetNotice.PASTED -> R.string.snippets_pasted
         SnippetNotice.NO_TERMINAL -> R.string.snippets_no_terminal
         SnippetNotice.SAVED -> R.string.snippets_saved
         SnippetNotice.DELETED -> R.string.snippets_deleted

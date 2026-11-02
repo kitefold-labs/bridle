@@ -8,19 +8,16 @@ import dagger.hilt.components.SingletonComponent
 
 /**
  * Where a snippet is typed when the user picks "Paste into terminal". The terminal feature
- * implements this for its open tabs and binds it in a Hilt module:
- *
- * ```
- * @Binds fun snippetTarget(impl: TerminalSnippetTarget): SnippetTarget
- * ```
- *
- * Until it does, [SnippetTargetModule] leaves the binding absent and snippets fall back to
- * [None], which reports that no terminal is open.
+ * implements this for its open tabs
+ * ([com.kitefoldlabs.bridle.feature.terminal.TerminalSnippetTarget]) and binds it. The binding is
+ * optional ([SnippetTargetModule]): without it, snippets fall back to [None], which reports that
+ * no terminal is open.
  */
 fun interface SnippetTarget {
     /**
      * Pastes [text] (as a bracketed paste, not executed until the user presses Enter) into the
-     * focused terminal tab on [hostId]. Returns false if no terminal on that host is open.
+     * focused terminal tab on [hostId] and shows that tab. Returns false if no terminal on that
+     * host is open.
      */
     suspend fun paste(
         hostId: EntityId,

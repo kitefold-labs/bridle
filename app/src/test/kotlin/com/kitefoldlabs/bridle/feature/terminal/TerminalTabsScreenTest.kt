@@ -27,6 +27,7 @@ import com.kitefoldlabs.bridle.core.terminalui.TerminalConnection
 import com.kitefoldlabs.bridle.core.terminalui.rememberTerminalScreenState
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.recomposeThrough
+import com.kitefoldlabs.bridle.ui.nav.HostTool
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
@@ -53,6 +54,14 @@ class RecordingTabActions : TerminalTabsActions {
 
     override fun clearHistory(hostId: EntityId) {
         calls += "clear $hostId"
+    }
+
+    /** Not part of [TerminalTabsActions]: the screen's onOpenTool. */
+    fun openTool(
+        hostId: EntityId,
+        tool: HostTool,
+    ) {
+        calls += "tool $hostId $tool"
     }
 }
 
@@ -89,7 +98,15 @@ class TerminalTabsScreenTest {
     fun `without tabs it says how to open one`() {
         rule.setContent {
             MaterialTheme {
-                TerminalTabsScreen(emptyList(), null, emptyMap(), KeyBarLayout.DEFAULT, actions, onBack = { backs++ })
+                TerminalTabsScreen(
+                    emptyList(),
+                    null,
+                    emptyMap(),
+                    KeyBarLayout.DEFAULT,
+                    actions,
+                    onBack = { backs++ },
+                    onOpenTool = actions::openTool,
+                )
             }
         }
         rule.onNodeWithText("No open terminals").assertExists()
@@ -109,7 +126,15 @@ class TerminalTabsScreenTest {
                         StaticConnection(TerminalState.Ended(null, "Session ended")),
                         ComposeHistory(),
                     )
-                TerminalTabsScreen(tabs, "b", mapOf("b" to state), KeyBarLayout.CLAUDE, actions, onBack = { backs++ })
+                TerminalTabsScreen(
+                    tabs,
+                    "b",
+                    mapOf("b" to state),
+                    KeyBarLayout.CLAUDE,
+                    actions,
+                    onBack = { backs++ },
+                    onOpenTool = actions::openTool,
+                )
             }
         }
         rule.onNodeWithTag(FakeEngine.TAG).assertExists()
@@ -119,9 +144,17 @@ class TerminalTabsScreenTest {
         rule.onNodeWithContentDescription("Ended").assertExists()
         rule.onNodeWithContentDescription("Connecting").assertExists()
         rule.onNodeWithText("Reconnect").performClick()
+        // The menu's host tools are for the selected tab's host (2), and the menu closes after each.
+        rule.onNodeWithContentDescription("More options").performClick()
+        rule.onNodeWithText("Port forwards").assertDoesNotExist()
+        rule.onNodeWithText("Files").performClick()
+        rule.onNodeWithText("Files").assertDoesNotExist()
+        rule.onNodeWithContentDescription("More options").performClick()
+        rule.onNodeWithText("Snippets").performClick()
         rule.onNodeWithContentDescription("More options").performClick()
         rule.onNodeWithText("Clear message history for this host").performClick()
-        actions.calls shouldBe listOf("select a", "close c", "reconnect b", "clear 2")
+        actions.calls shouldBe
+            listOf("select a", "close c", "reconnect b", "tool 2 FILES", "tool 2 SNIPPETS", "clear 2")
         rule.onAllNodesWithContentDescription("Close devbox").fetchSemanticsNodes().size shouldBe 1
     }
 
@@ -146,6 +179,7 @@ class TerminalTabsScreenTest {
                     if (tick % 2 == 0) KeyBarLayout.DEFAULT else KeyBarLayout.CLAUDE,
                     current,
                     onBack = { backs++ },
+                    onOpenTool = current::openTool,
                     modifier = Modifier.testTag("tick-$tick"),
                 )
             }
@@ -157,7 +191,15 @@ class TerminalTabsScreenTest {
     fun `a tab whose screen is not ready shows nothing yet`() {
         rule.setContent {
             MaterialTheme {
-                TerminalTabsScreen(tabs, "missing", emptyMap(), KeyBarLayout.DEFAULT, actions, onBack = {})
+                TerminalTabsScreen(
+                    tabs,
+                    "missing",
+                    emptyMap(),
+                    KeyBarLayout.DEFAULT,
+                    actions,
+                    onBack = {},
+                    onOpenTool = actions::openTool,
+                )
             }
         }
         rule.onNodeWithTag(FakeEngine.TAG).assertDoesNotExist()

@@ -117,8 +117,9 @@ class SnippetsScreenTest {
         waitForText("Up")
         rule.onNodeWithContentDescription("Run Up").performClick()
         rule.onAllNodesWithText("Paste into terminal")[0].performClick()
-        waitForText("Pasted into the terminal")
+        rule.waitUntil(20_000) { pasted.isNotEmpty() }
         pasted shouldBe listOf("uptime\nwho")
+        rule.onNodeWithText("Paste into terminal").assertDoesNotExist() // the dialog closed
         rule.onNodeWithContentDescription("Run Up").performClick()
         rule.onAllNodesWithText("Run and show output")[0].performClick()
         waitForText("ok")

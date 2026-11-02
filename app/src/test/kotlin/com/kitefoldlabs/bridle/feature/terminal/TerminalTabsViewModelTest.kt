@@ -7,11 +7,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.core.session.TerminalSink
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
+import com.kitefoldlabs.bridle.core.terminalui.PendingSend
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +58,15 @@ class TerminalTabsViewModelTest {
     private val navigator = TerminalNavigator()
     private val engines = CopyOnWriteArrayList<FakeEngine>()
     private val launcher =
-        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine().also { engines += it } }, {}, navigator)
+        TerminalLauncher(
+            world.coordinator,
+            world.data.hosts,
+            { FakeEngine().also { engines += it } },
+            {},
+            navigator,
+            { _, _ -> },
+            scope,
+        )
     private val store = ViewModelStore()
 
     @Before
@@ -191,5 +202,44 @@ class TerminalTabsViewModelTest {
             world.coordinator.tabs.value
                 .single()
                 .session.attach shouldBe AttachSpec.Tmux("api")
+        }
+
+    @Test
+    fun `a paste that needs confirming reaches its tab's screen, which asks first`() =
+        runBlocking<Unit> {
+            val vm = viewModel()
+            navigator.requestPaste("closed", "never shown") // no such tab: dropped
+            awaitUntil { navigator.pendingPaste.value == null }
+            val tab = launcher.openTerminal(world.addHost())
+            awaitUntil { vm.screens.value[tab.id] != null && tab.session.state.value == TerminalState.Open }
+            val screen = vm.screens.value.getValue(tab.id)
+            engines.single().isBracketedPasteEnabled = false
+
+            navigator.requestPaste(tab.id, "cd /srv\nmake")
+            awaitUntil { navigator.pendingPaste.value == null }
+            val asked = PendingSend("cd /srv\nmake", submit = false)
+            awaitUntil { runBlocking { withContext(main) { screen.pendingSend } } == asked }
+            val shell = world.host.shells.single()
+            shell.typed() shouldBe ""
+            withContext(main) { screen.confirmPendingSend() }
+            awaitUntil { shell.typed() == "cd /srv\rmake" }
+        }
+
+    @Test
+    fun `a paste whose tab closes before its screen exists is dropped, not pasted later`() =
+        runBlocking<Unit> {
+            val vm = viewModel()
+            val dev = world.addHost()
+            // Without an emulator, so it never gets a screen: the paste waits for one.
+            val bare = world.coordinator.openTab(dev, "bare", AttachSpec.Tmux("bare"), TerminalSink { _, _ -> })
+            navigator.requestPaste(bare.id, "cd /srv\nmake")
+            val tab = launcher.openTerminal(dev)
+            awaitUntil { vm.screens.value[tab.id] != null }
+            navigator.pendingPaste.value shouldBe PendingPaste(bare.id, "cd /srv\nmake")
+
+            world.coordinator.closeTab(bare.id)
+            awaitUntil { navigator.pendingPaste.value == null }
+            val screen = vm.screens.value.getValue(tab.id)
+            withContext(main) { screen.pendingSend }.shouldBeNull()
         }
 }

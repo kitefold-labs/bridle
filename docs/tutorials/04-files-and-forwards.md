@@ -1,11 +1,15 @@
-# Tutorial 4: Files and port forwards
+# Tutorial 4: Files, snippets and port forwards
 
-This tutorial covers two host tools: the **file browser** (SFTP), for looking at, editing and
-moving files, and **port forwards**, for opening a web app that runs on your server in your
-phone's browser.
+This tutorial covers the three host tools: the **file browser** (SFTP), for looking at, editing
+and moving files; **snippets**, for commands you run often; and **port forwards**, for opening a
+web app that runs on your server in your phone's browser.
 
-Both work over the connection you already have to the host. If a terminal is open on that host,
-they share it; if not, Bridle connects for them.
+Open them from the host's **⋮** menu on the **Hosts** tab: **Files**, **Snippets** and **Port
+forwards**. In a terminal, the **⋮** menu next to the tabs also has **Files** and **Snippets**
+for the host of the tab you are looking at; **Back** returns to the terminal.
+
+They all work over the connection you already have to the host. If a terminal is open on that
+host, they share it; if not, Bridle connects for them.
 
 You need a host you can already connect to (see the earlier tutorials).
 
@@ -66,6 +70,41 @@ and Bridle deletes the partial file of a failed download from your phone (where 
 allows it). For very large transfers, keep Bridle open until they finish: Android may stop
 background work.
 
+## Save and run commands with snippets
+
+A snippet is a command you save once and run on any host: a deploy, a log tail, the way you
+start Claude in a project.
+
+1. Open the host's **⋮** menu and choose **Snippets** (or **Snippets** in the terminal's **⋮**
+   menu).
+2. Tap **+**, give the snippet a name and type the command. Write `{{name}}` for a value to fill
+   in each time, or `{{name:default}}` to suggest one, for example:
+
+   ```sh
+   cd {{project:~/src/app}} && git log --oneline -{{count:10}}
+   ```
+
+3. Under **When run**, choose what tapping the snippet does: **Paste into terminal** or **Run
+   and show output**. You can always pick the other one in the run dialog.
+4. Tap **Save**.
+
+Tap a snippet (or its ▶ button) to run it. Fill in the values; the dialog shows the command as it
+will run.
+
+- **Paste into terminal** types the command into a terminal on this host and switches to it. It
+  goes to the tab you were last looking at if that tab is on this host, otherwise to the host's
+  newest tab. **Nothing runs until you press Enter**, so you can check or edit the command
+  first. If no terminal is open on the host, Bridle says so: open one, or use **Run and show
+  output** instead.
+- **Run and show output** runs the command on its own, without a terminal, and shows what it
+  printed and its exit status. Long output is cut to its end.
+
+Pasting is as safe as any paste into Bridle's terminal: control characters are removed, so a
+snippet can't send keystrokes or escape sequences of its own. When the program in the terminal
+doesn't support bracketed paste (a plain `sh`, for example) and the snippet has several lines,
+each line would run as it arrived, so the terminal asks first: confirm only if you want the lines
+to run right away.
+
 ## Preview a dev server with a local forward
 
 Say you are working on a web app on your server (or Claude is) and its dev server listens on
@@ -93,7 +132,10 @@ The destination is resolved **on the server**, so you can also reach other machi
 network: a database at `db.internal:5432`, or a dashboard on another box.
 
 To have a forward start whenever you connect to the host, edit it and turn on **Start
-automatically when connected**.
+automatically when connected**. It starts each time you open a terminal on the host (if it isn't
+running already) and keeps running when you close the terminal, until you switch it off on the
+**Port forwards** screen or tap **Disconnect all**. If it can't start (say another app already
+uses the port), that screen shows it as **Failed** with the reason.
 
 ### Why only this phone can use it
 

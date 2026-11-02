@@ -10,6 +10,11 @@ import com.kitefoldlabs.bridle.core.ssh.PortForwardHandle
 import com.kitefoldlabs.bridle.core.ssh.PortForwarder
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.di.ApplicationScope
+import com.kitefoldlabs.bridle.feature.terminal.HostAutoStart
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -54,12 +59,24 @@ class ForwardManager
         /** Status of every started forward, by forward id. Stopped forwards are absent. */
         val statuses: StateFlow<Map<EntityId, ForwardStatus>> = mutable.asStateFlow()
 
-        /** Starts [forward] (no-op if it is already running). */
-        fun start(forward: PortForward) {
-            if (jobs.containsKey(forward.id)) return
+        /**
+         * Starts [forward] (no-op if it is already running), unless [wanted] says no: it is asked
+         * before and again once the forward holds its host's lease. From then on "Disconnect all"
+         * stops the forward (its connection goes [HostConnectionState.Idle]), so an auto-start
+         * racing "Disconnect all" can't bring the host back up.
+         */
+        fun start(
+            forward: PortForward,
+            wanted: () -> Boolean = { true },
+        ) {
+            if (jobs.containsKey(forward.id) || !wanted()) return
             val job =
                 scope.launch(start = CoroutineStart.LAZY) {
                     connections.acquire(forward.hostId).use { lease ->
+                        if (!wanted()) {
+                            stop(forward.id)
+                            return@launch
+                        }
                         lease.state.collectLatest { state ->
                             when (state) {
                                 is HostConnectionState.Connected -> serve(forward, state.connection)
@@ -82,13 +99,20 @@ class ForwardManager
             mutable.update { it - id }
         }
 
-        /** Starts the forwards of [hostId] marked "start automatically"; call when the host connects. */
-        suspend fun startAutoForwards(hostId: EntityId) {
+        /**
+         * Starts the forwards of [hostId] marked "start automatically" (those already running are
+         * left alone) while [wanted] holds (see [start]). Runs whenever a terminal opens on the
+         * host ([ForwardsModule]), wanted while the host still has a terminal tab.
+         */
+        suspend fun startAutoForwards(
+            hostId: EntityId,
+            wanted: () -> Boolean = { true },
+        ) {
             repository
                 .observeForHost(hostId)
                 .first()
                 .filter { it.autoStart }
-                .forEach(::start)
+                .forEach { start(it, wanted) }
         }
 
         private suspend fun serve(
@@ -136,3 +160,12 @@ class ForwardManager
             if (jobs.containsKey(id)) mutable.update { it + (id to status) }
         }
     }
+
+/** A host's auto-start forwards come up with its terminal: the terminal launcher runs this hook. */
+@Module
+@InstallIn(SingletonComponent::class)
+object ForwardsModule {
+    @Provides
+    fun hostAutoStart(forwards: ForwardManager): HostAutoStart =
+        HostAutoStart { hostId, wanted -> forwards.startAutoForwards(hostId, wanted) }
+}

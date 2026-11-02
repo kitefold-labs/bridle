@@ -96,6 +96,7 @@ class HostsScreensTest {
             onAdd = { navigationCalls += "add" },
             onEdit = { navigationCalls += "edit:$it" },
             onImport = { navigationCalls += "import" },
+            onOpenTool = { id, tool -> navigationCalls += "$tool:$id" },
         )
 
     private fun host(
@@ -156,7 +157,12 @@ class HostsScreensTest {
         rule.onNodeWithText("Edit").performClick()
         rule.onNodeWithContentDescription("More actions for Found").performClick()
         rule.onNodeWithText("Delete").performClick()
-        navigationCalls shouldBe listOf("open:1", "edit:4")
+        for (tool in listOf("Files", "Snippets", "Port forwards")) {
+            rule.onNodeWithContentDescription("More actions for InLab").performClick()
+            rule.onNodeWithText(tool).performClick()
+            rule.onNodeWithText(tool).assertDoesNotExist() // the menu closed
+        }
+        navigationCalls shouldBe listOf("open:1", "edit:4", "FILES:3", "SNIPPETS:3", "FORWARDS:3")
         actions.calls shouldBe listOf("query:gpu", "favorite:1", "favorite:2", "delete:5")
 
         state = state.copy(pendingDelete = fav)
