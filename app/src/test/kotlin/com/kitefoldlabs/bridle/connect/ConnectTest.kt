@@ -163,6 +163,21 @@ class ConnectTest {
         }
 
     @Test
+    fun `a password typed into a withdrawn question is zeroed`() =
+        runBlocking<Unit> {
+            val broker = InteractionBroker(timeout = 10.seconds)
+            val attempt = broker.questions()
+            val asked = async(Dispatchers.IO) { attempt.requestPassword("Dev", "nate") }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            val shown = broker.pending.value!!
+            attempt.withdraw()
+            asked.await() shouldBe null
+            val late = "hunter2".toCharArray()
+            broker.answer(shown, late) // the dialog's OK, tapped as it closed
+            late.all { it == '\u0000' } shouldBe true
+        }
+
+    @Test
     fun `cancelling a connection attempt closes its password question`() =
         runBlocking<Unit> {
             val hostId = data.hosts.upsert(Host(label = "Dev", hostname = "dev.example.com", username = "nate"))
