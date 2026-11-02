@@ -70,6 +70,16 @@ class TmuxUnitTest {
         TmuxVersion.parse("") shouldBe null
         TmuxVersion.parse("tmux weird") shouldBe null
         TmuxVersion.parse("screen 4.0") shouldBe null
+        TmuxVersion.parse("tmux 3.2a") shouldBe TmuxVersion.SESSION_ENV_FLAG
+        TmuxVersion.parse("tmux next-3.5") shouldBe TmuxVersion(3, 5)
+        TmuxVersion.parse("tmux 99999999999.1") shouldBe null
+        // OpenBSD reports its own release, which is not a tmux version.
+        TmuxVersion.parse("tmux openbsd-7.4") shouldBe TmuxVersion.SESSION_ENV_FLAG
+        TmuxVersion.parse("tmux openbsd-6.9") shouldBe TmuxVersion.SESSION_ENV_FLAG
+        TmuxVersion.parse("tmux openbsd-6.8") shouldBe TmuxVersion(3, 1)
+        TmuxVersion.parse("tmux openbsd-6.6") shouldBe TmuxVersion.MINIMUM
+        HostProbe(TmuxVersion.parse("tmux openbsd-6.5"), null, null).tmuxSupported shouldBe false
+        TmuxVersion.parse("tmux openbsd-99999999999.0") shouldBe null
         (TmuxVersion(2, 9) < TmuxVersion.MINIMUM) shouldBe true
         TmuxVersion(3, 1).toString() shouldBe "3.1"
         HostProbe(TmuxVersion(2, 8), null, null).tmuxSupported shouldBe false
@@ -190,7 +200,10 @@ class TmuxUnitTest {
             script shouldContain "new-session -d -s s -c ~/src cat"
             script shouldContain "set-environment -t '=s' ANTHROPIC_API_KEY sk-ant-123"
             script shouldContain "respawn-pane -k -t '=s:' -c ~/src 'exec \"\$SHELL\" -l'"
+            // A failed respawn takes the session down rather than leave it on the placeholder.
+            script shouldContain "; }; then\n  tmux kill-session -t '=s' 2>/dev/null\n  exit 1\nfi"
         }
+        modern shouldContain "ANTHROPIC_API_KEY=sk-ant-123 || exit 1"
         val restarts = RestartMode.entries.map { TmuxScripts.restart(p.copy(restartMode = it)) }
         restarts.forEach { it shouldContain "set-environment -t '=s' ANTHROPIC_API_KEY sk-ant-123" }
         (listOf(modern, TmuxScripts.launch(p)) + restarts).flatMap(::typed).forEach {

@@ -225,7 +225,42 @@ class TmuxControllerTest {
             tmux.launch(p)
             screenOf("secret", "secret=[${SECRET.length}]")
             tmux.restart(p.copy(env = mapOf("BRIDLE_SECRET" to "xy"))) shouldBe RestartResult.RESTARTED
-            screenOf("secret", "secret=[2]")
+            screenOf("secret", "model=[] secret=[2]") // the removed ANTHROPIC_MODEL is unset
+            tmux.restart(p.copy(env = emptyMap())) shouldBe RestartResult.RESTARTED
+            screenOf("secret", "model=[] secret=[0]")
+        }
+
+    @Test
+    fun `a respawn restart after a placeholder launch reruns the login shell, not the placeholder`() =
+        runBlocking<Unit> {
+            val old = TmuxVersion(3, 1)
+            val p = secretProfile(LaunchMode.SHELL_HOSTED)
+            shell.runScript(TmuxScripts.launch(p, tmuxVersion = old)).stdout.trim() shouldBe "created"
+            screenOf("secret", "secret=[${SECRET.length}]")
+            val changed = p.copy(env = mapOf("BRIDLE_SECRET" to "xy"))
+            shell.runScript(TmuxScripts.restart(changed, old)).stdout.trim() shouldBe "restarted"
+            // ANTHROPIC_MODEL was removed from the profile, so it is gone from the session too.
+            screenOf("secret", "args=[--continue] model=[] secret=[2]")
+            everythingVisible("secret") shouldNotContain "s3cr3t"
+        }
+
+    @Test
+    fun `a placeholder that can't be respawned takes its session down`() =
+        runBlocking<Unit> {
+            val real = shell.exec("command -v tmux").stdout.trim()
+            val bin = Files.createDirectories(home.resolve("broken-bin"))
+            val wrapper = bin.resolve("tmux").toFile()
+            wrapper.writeText("#!/bin/sh\n[ \"\$1\" = respawn-pane ] && exit 1\nexec '$real' \"\$@\"\n")
+            wrapper.setExecutable(true)
+            val p = secretProfile(LaunchMode.SHELL_HOSTED)
+            val result =
+                LocalShell(
+                    home,
+                    extraPath = bin,
+                ).runScript(TmuxScripts.launch(p, tmuxVersion = TmuxVersion(3, 1)))
+            result.exitStatus shouldBe 1
+            result.stdout shouldNotContain "created"
+            shell.exec("tmux has-session -t '=secret'").exitStatus shouldNotBe 0
         }
 
     @Test

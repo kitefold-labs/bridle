@@ -344,7 +344,7 @@ All agentless. Every operation is one `exec` on the shared connection.
   any command line), and anything running as you in that tmux session can
   read them (`tmux show-environment`). The gentle restart types into the
   running shell, which keeps the variables it started with; a respawn picks
-  up changed values.
+  up changed values, and variables removed from the profile are unset.
 - **Phone and desktop attached together:** per session the app sets
   `window-size latest`, so the window follows whichever client was used most
   recently and the phone's small size doesn't shrink the desktop view
