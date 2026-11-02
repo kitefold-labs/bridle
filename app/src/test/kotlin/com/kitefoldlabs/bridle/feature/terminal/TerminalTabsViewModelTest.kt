@@ -19,7 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -68,8 +69,10 @@ class TerminalTabsViewModelTest {
         runBlocking { world.coordinator.disconnectAll() }
         Dispatchers.resetMain()
         main.close()
+        // Fire-and-forget work (e.g. clearing history) must finish before the database closes, or
+        // it fails later and the uncaught error lands in whichever test runs next.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         world.data.close()
-        scope.cancel()
     }
 
     private fun viewModel(): TerminalTabsViewModel =
