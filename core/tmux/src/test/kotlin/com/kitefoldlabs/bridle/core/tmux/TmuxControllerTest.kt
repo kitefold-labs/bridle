@@ -94,6 +94,9 @@ class TmuxControllerTest {
             val screen = screenOf("claude-app", "fake-claude started")
             screen shouldContain "model=[it's-fine]"
             screen shouldContain "pwd=$project"
+            val batch = tmux.previews(listOf("claude-app", "gone"), lines = 20)
+            batch.getValue("claude-app") shouldContain "fake-claude started"
+            batch.getValue("gone").trim() shouldBe "" // no such session: empty, the others still come
 
             val sessions = tmux.listSessions(claudeHint = { it == "claude-app" })
             sessions.single().session.name shouldBe "claude-app"

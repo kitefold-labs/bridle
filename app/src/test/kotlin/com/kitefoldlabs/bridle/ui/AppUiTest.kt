@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.ui
 
 import android.app.Application
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -18,6 +19,8 @@ import com.kitefoldlabs.bridle.ui.theme.BridleTheme
 import com.kitefoldlabs.bridle.ui.theme.DarkColors
 import com.kitefoldlabs.bridle.ui.theme.LightColors
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +41,25 @@ class AppUiTest {
         rule.onNodeWithText("keys screen").assertExists()
         rule.onNodeWithText("Settings").performClick()
         rule.onAllNodesWithText("Settings").fetchSemanticsNodes().size shouldBe 2
+    }
+
+    @Test
+    fun `the terminal destination is full screen and goes back`() {
+        val requests = Channel<Unit>(Channel.CONFLATED)
+        rule.setContent {
+            BridleTheme {
+                BridleNavHost(
+                    terminal = { onBack -> Button(onClick = onBack) { Text("terminal screen") } },
+                    showTerminal = requests.receiveAsFlow(),
+                )
+            }
+        }
+        rule.onNodeWithText("terminal screen").assertDoesNotExist()
+        requests.trySend(Unit)
+        rule.onNodeWithText("terminal screen").assertExists()
+        rule.onNodeWithText("Keys").assertDoesNotExist() // no bottom bar
+        rule.onNodeWithText("terminal screen").performClick()
+        rule.onNodeWithText("Keys").assertExists()
     }
 
     @Test

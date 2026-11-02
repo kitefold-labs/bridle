@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="terminal_title">Terminal</string>
+    <string name="terminal_back">Back</string>
+    <string name="terminal_more">More options</string>
+    <string name="terminal_close_tab">Close %1$s</string>
+    <string name="terminal_tab_connecting">Connecting</string>
+    <string name="terminal_tab_ended">Ended</string>
+    <string name="terminal_clear_history">Clear message history for this host</string>
+    <string name="terminal_empty_title">No open terminals</string>
+    <string name="terminal_empty_body">Open one from Hosts, or attach to a tmux session from Sessions.</string>
+</resources>

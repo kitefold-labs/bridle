@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Sessions screen -->
+    <string name="sessions_no_hosts">Add a host on the Hosts tab to see its tmux sessions and Claude status.</string>
+    <plurals name="sessions_open_terminals">
+        <item quantity="one">%d terminal open</item>
+        <item quantity="other">%d terminals open</item>
+    </plurals>
+    <string name="sessions_show">Show</string>
+    <string name="sessions_connecting">Connecting…</string>
+    <string name="sessions_reconnecting">Connection lost. Reconnecting (attempt %1$d)…</string>
+    <string name="sessions_failed">Couldn\'t connect: %1$s</string>
+    <string name="sessions_retry">Retry</string>
+    <string name="sessions_read_error">Couldn\'t read sessions: %1$s</string>
+    <string name="sessions_refresh">Refresh</string>
+    <string name="sessions_profiles">Launch profiles</string>
+    <string name="sessions_new_profile">New profile</string>
+    <string name="sessions_no_profiles">No launch profiles yet. Create one to start Claude Code in tmux with one tap.</string>
+    <string name="sessions_tmux_sessions">tmux sessions</string>
+    <string name="sessions_loading">Loading…</string>
+    <string name="sessions_none">No tmux sessions on this host.</string>
+
+    <!-- Session cards -->
+    <string name="session_last_active">Last active %1$s</string>
+    <plurals name="session_windows">
+        <item quantity="one">%d window</item>
+        <item quantity="other">%d windows</item>
+    </plurals>
+    <string name="session_attached">attached</string>
+    <string name="session_attach">Attach</string>
+    <string name="session_restart">Restart</string>
+    <string name="session_restart_continue">Restart (continue)</string>
+    <string name="session_restart_fresh">Restart fresh</string>
+    <string name="session_stop">Stop</string>
+    <string name="session_quick_reply">Quick reply</string>
+    <string name="claude_badge">Claude</string>
+    <string name="claude_badge_description">Claude Code is running</string>
+    <string name="claude_state_working">Working</string>
+    <string name="claude_state_permission">Needs permission</string>
+    <string name="claude_state_input">Waiting for input</string>
+    <string name="claude_state_idle">Idle</string>
+    <string name="claude_state_exited">Exited</string>
+    <string name="claude_state_unknown">Unknown</string>
+    <string name="claude_source_hooks">hooks</string>
+    <string name="claude_source_guess">guess</string>
+    <string name="claude_status_hooks">Claude status: %1$s, reported by hooks</string>
+    <string name="claude_status_guess">Claude status: %1$s, guessed from the screen</string>
+
+    <!-- Quick replies -->
+    <string name="reply_yes" translatable="false">y</string>
+    <string name="reply_no" translatable="false">n</string>
+    <string name="reply_escape">Esc</string>
+    <string name="reply_shift_tab">⇧Tab</string>
+    <string name="reply_ctrl_c">Ctrl+C</string>
+    <string name="reply_compact" translatable="false">/compact</string>
+    <string name="reply_clear" translatable="false">/clear</string>
+    <string name="reply_yes_description">Send y (yes)</string>
+    <string name="reply_no_description">Send n (no)</string>
+    <string name="reply_escape_description">Send Escape</string>
+    <string name="reply_shift_tab_description">Send Shift+Tab (cycle permission mode)</string>
+    <string name="reply_ctrl_c_description">Send Ctrl+C</string>
+    <string name="reply_compact_description">Send /compact</string>
+    <string name="reply_clear_description">Send /clear</string>
+
+    <!-- Profile cards -->
+    <string name="profile_summary">%1$s · %2$s</string>
+    <string name="profile_running">Running</string>
+    <string name="profile_not_running">Not running</string>
+    <string name="profile_start">Start</string>
+    <string name="profile_edit">Edit %1$s</string>
+    <string name="profile_delete">Delete %1$s</string>
+
+    <!-- Host capability card -->
+    <string name="host_card_title">This host</string>
+    <string name="host_tmux_version">tmux %1$s</string>
+    <string name="host_tmux_missing">tmux isn\'t installed.</string>
+    <string name="host_tmux_too_old">tmux %1$s is too old: Bridle needs 3.0 or newer.</string>
+    <string name="host_tmux_install">Install it with the package manager, then tap Refresh:\nDebian/Ubuntu: sudo apt install tmux\nFedora: sudo dnf install tmux\nArch: sudo pacman -S tmux\nmacOS: brew install tmux</string>
+    <string name="host_claude_found">Claude Code: %1$s</string>
+    <string name="host_claude_missing">Claude Code isn\'t on the PATH of non-interactive shells. Profiles that type the command into a login shell still work.</string>
+    <string name="host_helper_installed">Installed: bridle-helper (protocol %1$d). Claude status comes from hooks.</string>
+    <string name="host_helper_disabled">Using bridle-helper is turned off in Settings, so status is guessed from the screen.</string>
+    <string name="host_helper_missing">Install bridle-helper for accurate Claude status. Without it, status is guessed from the screen.</string>
+    <string name="host_helper_install">Install bridle-helper</string>
+    <string name="host_helper_remove">Remove helper</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_cancel">Cancel</string>
+    <string name="stop_title">Stop %1$s?</string>
+    <string name="stop_body">This kills the tmux session and everything running in it.</string>
+    <string name="stop_confirm">Stop</string>
+    <string name="delete_profile_title">Delete %1$s?</string>
+    <string name="delete_profile_body">The profile is removed. A running tmux session keeps running.</string>
+    <string name="delete_confirm">Delete</string>
+    <string name="install_title">Install bridle-helper?</string>
+    <string name="install_body">Bridle uploads a small shell script to ~/.local/share/bridle/bridle-helper and checks its SHA-256 on the host. It needs no root, runs no daemon and never connects to the network.</string>
+    <string name="install_checksum">SHA-256</string>
+    <string name="install_hooks">Also add Claude Code hooks to ~/.claude/settings.json (a backup is kept). Without hooks the helper has no status to report.</string>
+    <string name="install_confirm">Install</string>
+    <string name="uninstall_title">Remove bridle-helper?</string>
+    <string name="uninstall_body">Removes its Claude Code hooks and the script. Claude status goes back to being guessed from the screen.</string>
+    <string name="uninstall_confirm">Remove</string>
+
+    <!-- Messages -->
+    <string name="sessions_restarted">Restarted %1$s</string>
+    <string name="sessions_stopped">Stopped %1$s</string>
+    <string name="sessions_profile_saved">Saved %1$s</string>
+    <string name="sessions_profile_deleted">Deleted %1$s</string>
+    <string name="sessions_helper_installed">bridle-helper installed</string>
+    <string name="sessions_helper_removed">bridle-helper removed</string>
+    <string name="sessions_error_no_tmux">tmux isn\'t installed on this host</string>
+    <string name="sessions_error">Failed: %1$s</string>
+
+    <!-- Profile editor -->
+    <string name="profile_new_title">New launch profile</string>
+    <string name="profile_edit_title">Edit launch profile</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_name">Name</string>
+    <string name="profile_session">tmux session name</string>
+    <string name="profile_working_dir">Working directory</string>
+    <string name="profile_command">Command</string>
+    <string name="profile_restart_command">Restart command</string>
+    <!-- A command-line flag, not a dash. -->
+    <string name="profile_restart_command_hint" tools:ignore="TypographyDashes">Used by Restart (continue), e.g. claude --continue</string>
+    <string name="profile_restart_mode">Restart</string>
+    <string name="restart_mode_continue">Respawn and continue the conversation</string>
+    <string name="restart_mode_fresh">Respawn with a fresh conversation</string>
+    <string name="restart_mode_keys">Press Ctrl+C twice, then type the command</string>
+    <string name="profile_launch_mode">Launch</string>
+    <string name="launch_mode_shell">Type the command into a login shell (keeps PATH and nvm; the pane stays after exit)</string>
+    <string name="launch_mode_direct">Run the command directly</string>
+    <string name="profile_env">Environment variables</string>
+    <string name="profile_env_name">Name</string>
+    <string name="profile_env_value">Value</string>
+    <string name="profile_env_add">Add variable</string>
+    <string name="profile_env_remove">Remove variable</string>
+    <string name="profile_pinned">Pin to the top</string>
+    <string name="profile_error_required">Required</string>
+    <string name="profile_error_too_long">Too long</string>
+    <string name="profile_error_session_chars">Use letters, digits, - and _ only</string>
+    <string name="profile_error_control_chars">Remove control characters</string>
+    <string name="profile_error_env_chars">Use letters, digits and _, not starting with a digit</string>
+    <string name="profile_error_env_duplicate">Duplicate name</string>
+
+    <!-- Notification permission -->
+    <string name="notify_title">Get notified when Claude needs you</string>
+    <string name="notify_body">Bridle can tell you when Claude Code asks for permission, finishes or exits, while a connection is open. Android needs your permission to show notifications.</string>
+    <string name="notify_allow">Allow</string>
+    <string name="notify_not_now">Not now</string>
+</resources>

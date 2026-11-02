@@ -21,6 +21,8 @@ from your phone.
 
 ## Documents
 
+Start at the [documentation index](docs/README.md), which also lists the tutorials.
+
 | Doc | What it covers |
 |-----|----------------|
 | [docs/01-product-and-competitive-review.md](docs/01-product-and-competitive-review.md) | Goals, users, decisions, review of Termius / JuiceSSH / ConnectBot / Termux / Blink / Prompt / Claude-specific tools, feature list |
@@ -29,11 +31,21 @@ from your phone.
 | [docs/host-helper.md](docs/host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
 | [docs/terminal-input.md](docs/terminal-input.md) | Key encodings, safe bracketed paste, and customising the extra-keys bar (JSON format) |
 | [docs/backup-and-privacy.md](docs/backup-and-privacy.md) | What encrypted backups contain (and never contain), how they are encrypted, how crash reports are scrubbed and filed |
+| [docs/tutorials/01-first-connection.md](docs/tutorials/01-first-connection.md) | Tutorial: generate a key, add a host (with Tailscale tips), install the key, connect and verify the fingerprint |
 | [PRIVACY.md](PRIVACY.md) | Privacy policy: no data collection, no servers, opt-in crash reports you file yourself |
 | [docs/tutorials/04-files-and-forwards.md](docs/tutorials/04-files-and-forwards.md) | Tutorial: browse, edit and transfer files over SFTP; preview a dev server through a local port forward |
 | [docs/tutorials/05-backup-and-new-phone.md](docs/tutorials/05-backup-and-new-phone.md) | Tutorial: encrypted export and import, why keys aren't included, getting keys working on a new phone |
 | [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
+| [docs/release.md](docs/release.md) | Signing, the release workflow, Play Console (foreground service, Data Safety), F-Droid |
 | [docs/adr/](docs/adr/) | Architecture decision records |
+
+## Tutorials
+
+- [Run Claude Code in tmux from your phone](docs/tutorials/02-claude-in-tmux.md): a Launch
+  Profile for Claude, restarting with `--continue`, quick replies, reattaching after network drops
+- [Claude status and notifications](docs/tutorials/03-claude-status-notifications.md): installing
+  bridle-helper, what the badges mean, Approve/Deny from notifications, and the limits (only while
+  connected)
 
 ## Decisions
 

@@ -29,6 +29,7 @@ private class ScriptedTmuxHost : SshConnection {
     var fail = false
     var failPreview = false
     var lists = 0
+    var captureScripts = 0
     override val state = MutableStateFlow(ConnectionState.CONNECTED)
 
     override suspend fun exec(
@@ -53,9 +54,26 @@ private class ScriptedTmuxHost : SshConnection {
                 )
             }
             "bridle-helper' list" in script || "bridle-helper list" in script -> ExecResult(0, helper, "")
-            "capture-pane" in script -> if (failPreview) ExecResult(1, "", "gone") else ExecResult(0, screen, "")
+            "capture-pane" in script ->
+                if (failPreview) {
+                    ExecResult(
+                        1,
+                        "",
+                        "gone",
+                    )
+                } else {
+                    ExecResult(0, captures(script), "")
+                }
             else -> ExecResult(0, "", "")
         }
+    }
+
+    /** Each `echo '<marker> <session>'` line of a batched capture, followed by [screen]. */
+    private fun captures(script: String): String {
+        captureScripts++
+        return Regex("""echo '(@@\w+@@ \S+)'""")
+            .findAll(script)
+            .joinToString("") { "${it.groupValues[1]}\n$screen\n" }
     }
 
     override suspend fun openShell(
@@ -178,6 +196,20 @@ class ClaudeStatusMonitorTest {
             runCurrent()
             host.lists shouldBe 3
             job.cancel()
+        }
+
+    @Test
+    fun `screens for every guess come in one round trip`() =
+        runTest {
+            val host = ScriptedTmuxHost()
+            host.sessions = listOf("api", "web", "docs")
+            host.screen = "✻ Working… (esc to interrupt)"
+            val monitor = ClaudeStatusMonitor(1, TmuxController(host), useHelper = { false })
+            monitor.pollOnce()
+            host.captureScripts shouldBe 1
+            monitor.sessions.value
+                .map { it.claude!!.state }
+                .toSet() shouldBe setOf(ClaudeState.WORKING)
         }
 
     @Test

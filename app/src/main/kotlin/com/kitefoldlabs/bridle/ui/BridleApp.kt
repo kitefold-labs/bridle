@@ -19,16 +19,23 @@ import com.kitefoldlabs.bridle.feature.snippets.snippetsDestination
 import com.kitefoldlabs.bridle.ui.nav.BridleNavHost
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * The whole UI: the theme from settings, the app-lock gate, first-run onboarding, the
  * crash-report prompt, and navigation. [screens] are the top-level tabs; [routes] adds further
  * destinations (pass `{}` for none) next to the built-in host tools (files, snippets, forwards).
+ * [terminal] and [showTerminal] are the full-screen terminal (see [BridleNavHost]); [overlay] is
+ * drawn above navigation (connection dialogs), inside the lock so nothing shows while locked.
  */
 @Composable
 fun BridleApp(
     screens: Map<TopLevel, @Composable () -> Unit>,
     routes: NavGraphBuilder.(NavHostController) -> Unit,
+    terminal: @Composable (onBack: () -> Unit) -> Unit = {},
+    showTerminal: Flow<Unit> = emptyFlow(),
+    overlay: @Composable () -> Unit = {},
 ) {
     val settings: SettingsViewModel = hiltViewModel()
     val nav = rememberNavController()
@@ -40,12 +47,13 @@ fun BridleApp(
                 onAddHost = { nav.navigate(TopLevel.HOSTS.route) },
                 viewModel = hiltViewModel(),
             ) {
-                BridleNavHost(screens, nav) {
+                BridleNavHost(screens, nav, terminal = terminal, showTerminal = showTerminal) {
                     sftpDestination(onBack = nav::popBackStack)
                     snippetsDestination(onBack = nav::popBackStack)
                     forwardsDestination(onBack = nav::popBackStack)
                     routes(nav)
                 }
+                overlay()
                 CrashReportPrompt(hiltViewModel())
             }
         }
