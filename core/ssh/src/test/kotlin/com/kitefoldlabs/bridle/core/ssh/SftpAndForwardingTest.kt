@@ -231,6 +231,9 @@ class SftpAndForwardingTest {
                 sftp.writeText("/new.md", "fresh", opened = null).size shouldBe 5
                 shouldThrow<RemoteFileTooLargeException> { sftp.readText("/notes.md", limit = 4) }.size shouldBe 33
                 shouldThrow<IOException> { sftp.readText("/nope.md") }
+                // Not a regular file (like a device or FIFO, whose size of 0 says nothing).
+                Files.createDirectories(home.resolve("folder"))
+                shouldThrow<IOException> { sftp.readText("/folder") }.message shouldBe "/folder is not a regular file"
             }
         }
 

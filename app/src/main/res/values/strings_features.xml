@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings for the files, snippets, port forwards, settings and onboarding screens. -->
+<resources>
+    <!-- Common actions -->
+    <string name="action_close">Close</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- SFTP -->
+    <string name="sftp_title">Files</string>
+    <string name="sftp_upload">Upload files</string>
+    <string name="sftp_new_folder">New folder</string>
+    <string name="sftp_view_options">View options</string>
+    <string name="sftp_sort_name">Sort by name</string>
+    <string name="sftp_sort_size">Sort by size</string>
+    <string name="sftp_sort_date">Sort by date</string>
+    <string name="sftp_show_hidden">Show hidden files</string>
+    <string name="sftp_parent_folder">Open the parent folder</string>
+    <string name="sftp_empty">This folder is empty.</string>
+    <string name="sftp_file_actions">Actions for %1$s</string>
+    <string name="sftp_edit">Edit</string>
+    <string name="sftp_download">Download</string>
+    <string name="sftp_rename">Rename</string>
+    <string name="sftp_permissions">Permissions</string>
+    <string name="sftp_permissions_octal">Mode (octal, e.g. 644)</string>
+    <string name="sftp_delete">Delete</string>
+    <string name="sftp_delete_title">Delete %1$s?</string>
+    <string name="sftp_delete_file_message">The file is deleted on the host. This can\'t be undone.</string>
+    <string name="sftp_delete_folder_message">The folder and everything inside it are deleted on the host. This can\'t be undone.</string>
+    <string name="sftp_name">Name</string>
+    <string name="sftp_connect_failed">Couldn\'t open files on this host</string>
+    <string name="sftp_failed">Failed: %1$s</string>
+    <string name="sftp_too_large">This file is %1$s; the editor opens files up to %2$s. Download it instead.</string>
+    <string name="sftp_invalid_name">Enter a name without “/”.</string>
+    <string name="sftp_invalid_mode">Enter three or four octal digits, such as 644 or 0755.</string>
+    <string name="sftp_saved">Saved</string>
+    <string name="sftp_transfers">Transfers</string>
+    <string name="sftp_clear_finished">Clear finished</string>
+    <string name="sftp_cancel_transfer">Cancel transfer of %1$s</string>
+    <string name="sftp_transfer_queued">Waiting</string>
+    <string name="sftp_transfer_done">Done</string>
+    <string name="sftp_transfer_cancelled">Cancelled</string>
+    <string name="sftp_close_editor">Close the editor</string>
+    <string name="sftp_save">Save file</string>
+    <string name="sftp_binary_warning">This file doesn\'t look like UTF-8 text. Saving it from the editor may damage it.</string>
+    <string name="sftp_edit_anyway">Edit anyway</string>
+    <string name="sftp_conflict_title">Changed on the host</string>
+    <string name="sftp_conflict_message">Someone changed this file since you opened it. Overwrite their changes with yours, or reload the file and lose your edits?</string>
+    <string name="sftp_overwrite">Overwrite</string>
+    <string name="sftp_reload">Reload</string>
+    <string name="sftp_discard_title">Discard your changes?</string>
+    <string name="sftp_discard_message">Your edits haven\'t been saved.</string>
+    <string name="sftp_discard">Discard</string>
+    <string name="sftp_keep_editing">Keep editing</string>
+
+    <!-- Snippets -->
+    <string name="snippets_title">Snippets</string>
+    <string name="snippets_add">New snippet</string>
+    <string name="snippets_edit">Edit snippet</string>
+    <string name="snippets_empty">No snippets yet. Save commands you run often, with {{variables}} to fill in each time.</string>
+    <string name="snippets_run">Run %1$s</string>
+    <string name="snippets_actions">Actions for %1$s</string>
+    <string name="snippets_delete_title">Delete the snippet %1$s?</string>
+    <string name="snippets_name">Name</string>
+    <string name="snippets_name_required">Give the snippet a name.</string>
+    <string name="snippets_command">Command</string>
+    <string name="snippets_variables_hint">Write {{name}} or {{name:default}} for values to fill in when you run it.</string>
+    <string name="snippets_variables">Variables: %1$s</string>
+    <string name="snippets_package">Package (optional)</string>
+    <string name="snippets_default_action">When run</string>
+    <string name="snippets_mode_paste">Paste into terminal</string>
+    <string name="snippets_mode_exec">Run and show output</string>
+    <string name="snippets_preview">Command</string>
+    <string name="snippets_exit_status">Exit status: %1$s</string>
+    <string name="snippets_no_output">(no output)</string>
+    <string name="snippets_output_shortened">Long output: only its end is shown, without terminal colours and control codes.</string>
+    <string name="snippets_run_failed">Couldn\'t run: %1$s</string>
+    <string name="snippets_pasted">Pasted into the terminal. Press Enter there to run it.</string>
+    <string name="snippets_no_terminal">No terminal is open on this host. Open one first, or run the snippet and show its output.</string>
+    <string name="snippets_saved">Snippet saved</string>
+    <string name="snippets_deleted">Snippet deleted</string>
+
+    <!-- Port forwards -->
+    <string name="forwards_title">Port forwards</string>
+    <string name="forwards_add">New port forward</string>
+    <string name="forwards_edit">Edit port forward</string>
+    <string name="forwards_explanation">Forwards listen on this phone\'s loopback address (127.0.0.1) only, so apps on this phone can use them but other devices on your network can\'t.</string>
+    <string name="forwards_empty">No port forwards yet.</string>
+    <string name="forwards_local_label">localhost:%1$d → %2$s:%3$s</string>
+    <string name="forwards_dynamic_label">SOCKS proxy on localhost:%1$d</string>
+    <string name="forwards_stopped">Stopped</string>
+    <string name="forwards_starting">Starting…</string>
+    <plurals name="forwards_running">
+        <item quantity="one">Running · %d connection</item>
+        <item quantity="other">Running · %d connections</item>
+    </plurals>
+    <string name="forwards_failed">Failed: %1$s</string>
+    <string name="forwards_toggle">Run %1$s</string>
+    <string name="forwards_actions">Actions for %1$s</string>
+    <string name="forwards_delete_title">Delete %1$s?</string>
+    <string name="forwards_auto_start">Start automatically when connected</string>
+    <string name="forwards_auto_start_short">Starts automatically</string>
+    <string name="forwards_local">Local (-L)</string>
+    <string name="forwards_dynamic">SOCKS (-D)</string>
+    <string name="forwards_local_help">Opens a port on this phone that reaches a host and port as seen from the server, such as a dev server on localhost:3000.</string>
+    <string name="forwards_dynamic_help">Opens a SOCKS5 proxy on this phone. Point a browser or app at it to reach anything the server can reach.</string>
+    <string name="forwards_bind_port">Port on this phone</string>
+    <string name="forwards_dest_host">Destination host (from the server)</string>
+    <string name="forwards_dest_host_help">localhost means the server itself.</string>
+    <string name="forwards_dest_port">Destination port</string>
+    <string name="forwards_port_invalid">Enter a port number. Ports on this phone must be 1024–65535.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_dynamic">Wallpaper colors (Android 12+)</string>
+    <string name="settings_font">Terminal font</string>
+    <string name="font_monospace">System monospace</string>
+    <string name="font_serif_monospace">Serif monospace</string>
+    <string name="settings_font_size">Terminal font size: %1$d sp</string>
+    <string name="settings_keep_screen_on">Keep the screen on in terminals</string>
+    <string name="settings_keyboard">Keyboard</string>
+    <string name="settings_key_bar">Extra keys bar</string>
+    <string name="key_bar_default">Default</string>
+    <string name="key_bar_claude">Claude Code</string>
+    <string name="key_bar_custom">Custom (JSON)</string>
+    <string name="settings_key_bar_edit">Edit key bar JSON</string>
+    <string name="settings_key_bar_edit_summary">Rows of keys, actions and swipe-up keys</string>
+    <string name="key_bar_editor_help">The format is described in docs/terminal-input.md. Invalid layouts are not saved.</string>
+    <string name="key_bar_json">Layout JSON</string>
+    <string name="key_bar_invalid">Not saved: %1$s</string>
+    <string name="settings_backspace">Backspace sends</string>
+    <string name="backspace_del">DEL (^?), the usual default</string>
+    <string name="backspace_ctrl_h">Ctrl-H (^H)</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_app_lock_summary">Ask for your fingerprint, face or screen lock when Bridle opens, and after a minute in the background</string>
+    <string name="settings_app_lock_unavailable">Set up a screen lock or fingerprint on this phone first</string>
+    <string name="settings_secure_screen">Block screenshots</string>
+    <string name="settings_secure_screen_summary">Hide Bridle from screenshots, screen recordings and the recent apps list</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_all">Notifications while connected</string>
+    <string name="event_permission">Claude needs permission</string>
+    <string name="event_waiting">Claude is waiting for you</string>
+    <string name="event_exited">A Claude session exited</string>
+    <string name="event_connection_lost">A connection was lost</string>
+    <string name="settings_claude">Claude Code</string>
+    <string name="settings_use_helper">Use bridle-helper when installed</string>
+    <string name="settings_use_helper_summary">Read Claude\'s status from the optional helper script rather than from the screen</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_crash_reports">Offer to report crashes</string>
+    <string name="settings_crash_reports_summary">After a crash, show the scrubbed report and let you file it as a GitHub issue. Nothing is sent automatically.</string>
+    <string name="settings_backup">Backup</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_licences">Open-source licences</string>
+    <string name="settings_privacy_statement">Privacy statement</string>
+    <string name="settings_source">Source code</string>
+    <string name="licences_intro">Bridle is free software under the Apache License 2.0, built with these open-source components. Their licence texts are included in the app.</string>
+    <string name="privacy_statement">Bridle collects no data. It has no accounts, no analytics, no ads and no servers: it only connects to the SSH hosts you add.\n\nYour hosts, keys and settings stay on this phone. Keys you generate never leave its secure hardware.\n\nCrash reports never leave the phone on their own. After a crash, Bridle offers to show you the scrubbed report, and only you can file it, as a GitHub issue in your browser.\n\nBackups are files you export yourself, encrypted with your passphrase. They never contain private keys or passwords.</string>
+    <string name="privacy_full_policy">Read the full privacy policy</string>
+
+    <!-- Backup -->
+    <string name="backup_export">Export encrypted backup</string>
+    <string name="backup_export_summary">Hosts, groups, profiles, snippets, forwards and trusted host keys. Never private keys.</string>
+    <string name="backup_import">Import backup</string>
+    <string name="backup_import_summary">Restore a backup from another phone. Nothing is changed until you confirm.</string>
+    <string name="backup_export_message">Choose a long passphrase (minimum length: %1$d). A few random words work well. Without it, the backup can\'t be opened.</string>
+    <string name="backup_passphrase">Passphrase</string>
+    <string name="backup_passphrase_confirm">Repeat passphrase</string>
+    <string name="backup_passphrase_too_short">Too short. The minimum length is %1$d.</string>
+    <string name="backup_passphrase_mismatch">The passphrases don\'t match.</string>
+    <string name="backup_choose_file">Choose file</string>
+    <string name="backup_decrypt">Open</string>
+    <string name="backup_review_title">Import this backup?</string>
+    <string name="backup_review_add">To add:</string>
+    <string name="backup_count_hosts">Hosts: %1$d</string>
+    <string name="backup_count_groups">Groups: %1$d</string>
+    <string name="backup_count_profiles">Launch Profiles: %1$d</string>
+    <string name="backup_count_snippets">Snippets: %1$d</string>
+    <string name="backup_count_forwards">Port forwards: %1$d</string>
+    <string name="backup_count_known_hosts">Trusted host keys: %1$d</string>
+    <plurals name="backup_review_duplicates">
+        <item quantity="one">%d entry is already on this phone and will be kept as it is.</item>
+        <item quantity="other">%d entries are already on this phone and will be kept as they are.</item>
+    </plurals>
+    <string name="backup_review_conflict">Host key conflict for %1$s. This phone\'s key is kept.\nThis phone: %2$s\nBackup: %3$s</string>
+    <string name="backup_review_missing_key">Key “%1$s” isn\'t on this phone (private keys are never backed up). Generate or import a key and install it on: %2$s</string>
+    <string name="backup_review_skipped">Skipped or changed: %1$s</string>
+    <string name="backup_import_apply">Import</string>
+    <string name="backup_import_failed">Couldn\'t import</string>
+    <string name="backup_wrong_passphrase">Wrong passphrase, or the backup file is damaged.</string>
+    <string name="backup_newer_version">This backup was made by a newer version of Bridle. Update the app and try again.</string>
+    <string name="backup_not_a_backup">This file isn\'t a Bridle backup.</string>
+    <string name="backup_too_large">This file is too large to be a Bridle backup.</string>
+    <string name="backup_unreadable">The file couldn\'t be read.</string>
+    <string name="backup_not_enough_memory">This phone doesn\'t have enough free memory to open this backup. Close other apps and try again.</string>
+    <string name="backup_export_interrupted">Android closed Bridle while you were choosing the file, so nothing was saved. Your passphrase is never stored: please export again.</string>
+    <string name="backup_exported">Backup saved</string>
+    <string name="backup_exported_message">Keep the file and its passphrase somewhere safe. Keys aren\'t included: on a new phone, generate or import keys again.</string>
+    <string name="backup_imported">Backup imported</string>
+    <plurals name="backup_imported_message">
+        <item quantity="one">Added %1$d entry, including %2$d hosts.</item>
+        <item quantity="other">Added %1$d entries, including %2$d hosts.</item>
+    </plurals>
+    <string name="backup_failed">Backup failed</string>
+
+    <!-- App lock -->
+    <string name="lock_title">Bridle is locked</string>
+    <string name="lock_message">Unlock to see your sessions.</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_prompt_title">Unlock Bridle</string>
+    <string name="lock_prompt_reason">Confirm it\'s you</string>
+
+    <!-- Crash reports -->
+    <string name="crash_title">Bridle closed unexpectedly</string>
+    <string name="crash_ask_message">Bridle saved a crash report on this phone, with hostnames, usernames and paths removed. Would you like to review it and report the problem on GitHub?</string>
+    <string name="crash_review">Review report</string>
+    <string name="crash_no_thanks">No thanks</string>
+    <string name="crash_review_message">This is the full report. Nothing is sent until you submit the issue on GitHub, where you can still edit it.</string>
+    <string name="crash_notes">What were you doing? (optional)</string>
+    <string name="crash_open_issue">Open GitHub issue</string>
+    <string name="crash_no_browser">No app on this phone can open the GitHub page. The report is kept until you file or discard it.</string>
+    <string name="crash_discard">Discard</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_page">%1$d of %2$d</string>
+    <string name="onboarding_welcome_title">Your servers, in your pocket</string>
+    <string name="onboarding_welcome_body">Bridle is an SSH client for keeping an eye on long-running work, like Claude Code, on your own Linux machines.</string>
+    <string name="onboarding_keys_title">Keys stay on this phone</string>
+    <string name="onboarding_keys_body">Bridle makes SSH keys inside your phone\'s secure hardware. They can\'t be copied off it, and there are no accounts or servers.</string>
+    <string name="onboarding_tmux_title">tmux keeps work alive</string>
+    <string name="onboarding_tmux_body">Sessions run in tmux on the host, so they keep going when your phone sleeps or the network drops. Bridle reattaches when you return.</string>
+    <string name="onboarding_generate_key">Generate a key</string>
+    <string name="onboarding_add_host">Add a host</string>
+</resources>

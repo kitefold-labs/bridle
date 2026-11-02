@@ -81,6 +81,12 @@ modules stay thin.
   (e.g. `SessionActions`, `SessionCoordinator`), where it is tested and measured. Entry points
   are still exercised by Robolectric tests.
 
+- **Compose lambdas that capture a composable's parameters** (typically the ViewModel) are written
+  `@DontMemoize { ... }` in the feature screens. Memoizing them gains nothing measurable on these
+  screens, and the code the Compose compiler generates to memoize them branches on how *callers*
+  pass each parameter, which no test can fully exercise. Lambdas that capture only locals are
+  left memoized.
+
 - `explicitApi()` is on for library modules, so public API is deliberate.
 - Warnings are errors.
 - Anything interpolated into a remote command **must** go through `ShellQuote` and be validated

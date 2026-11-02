@@ -12,13 +12,13 @@ import com.kitefoldlabs.bridle.feature.keys.InteractionHost
 import com.kitefoldlabs.bridle.feature.keys.KeysFeature
 import com.kitefoldlabs.bridle.feature.keys.ResumedActivityTracker
 import com.kitefoldlabs.bridle.feature.sessions.SessionsRoute
+import com.kitefoldlabs.bridle.feature.settings.SettingsRoute
 import com.kitefoldlabs.bridle.feature.terminal.TerminalDeepLinks
 import com.kitefoldlabs.bridle.feature.terminal.TerminalNavigator
 import com.kitefoldlabs.bridle.feature.terminal.TerminalTabsRoute
+import com.kitefoldlabs.bridle.ui.BridleApp
 import com.kitefoldlabs.bridle.ui.SecureScreen
-import com.kitefoldlabs.bridle.ui.nav.BridleNavHost
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
-import com.kitefoldlabs.bridle.ui.theme.BridleTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -46,16 +46,16 @@ class MainActivity : FragmentActivity() {
                 TopLevel.HOSTS to { HostsFeature(onOpenTerminal = deepLinks::openHost) },
                 TopLevel.SESSIONS to { SessionsRoute() },
                 TopLevel.KEYS to { KeysFeature() },
+                TopLevel.SETTINGS to { SettingsRoute() },
             )
         setContent {
-            BridleTheme {
-                BridleNavHost(
-                    screens = screens,
-                    terminal = { onBack -> TerminalTabsRoute(onBack) },
-                    showTerminal = navigator.showRequests,
-                )
-                InteractionHost()
-            }
+            BridleApp(
+                screens = screens,
+                routes = {},
+                terminal = { onBack -> TerminalTabsRoute(onBack) },
+                showTerminal = navigator.showRequests,
+                overlay = { InteractionHost() },
+            )
         }
     }
 

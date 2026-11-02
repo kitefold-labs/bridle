@@ -179,6 +179,15 @@ public object BackupCrypto {
         }
     }
 
+    /**
+     * The key-derivation parameters a backup file asks for, read from its header without any
+     * key derivation. Lets the caller check it can afford [Argon2Params.memoryKiB] before calling
+     * [decrypt]: the range check alone still admits more memory than small phones have.
+     * @throws MalformedBackupException as [decrypt] does for a malformed header.
+     * @throws UnsupportedBackupVersionException if it was written by a newer format.
+     */
+    public fun kdfParams(bytes: ByteArray): Argon2Params = parseHeader(bytes)
+
     private fun encodeHeader(
         params: Argon2Params,
         salt: ByteArray,
