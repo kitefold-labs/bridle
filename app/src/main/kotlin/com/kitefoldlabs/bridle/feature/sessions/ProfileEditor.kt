@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,11 +28,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DontMemoize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.LaunchMode
@@ -182,12 +191,26 @@ private fun EnvRow(
             keyboardOptions = PlainText.copy(capitalization = KeyboardCapitalization.Characters),
             modifier = Modifier.weight(1f),
         )
+        // Values are often API keys: masked until asked, and kept out of the keyboard's dictionary.
+        var shown by remember(index) { mutableStateOf(false) }
         OutlinedTextField(
             value = row.value,
             onValueChange = @DontMemoize { actions.updateEditor(form.withEnv(index, row.copy(value = it))) },
             label = { Text(stringResource(R.string.profile_env_value)) },
             singleLine = true,
-            keyboardOptions = PlainText,
+            visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { shown = !shown }) {
+                    Icon(
+                        if (shown) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription =
+                            stringResource(
+                                if (shown) R.string.profile_env_value_hide else R.string.profile_env_value_show,
+                            ),
+                    )
+                }
+            },
+            keyboardOptions = PlainText.copy(keyboardType = KeyboardType.Password),
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = @DontMemoize { actions.updateEditor(form.withoutEnv(index)) }) {
@@ -206,14 +229,12 @@ internal fun fieldError(
     when (reason) {
         Validation.Reason.BLANK -> R.string.profile_error_required
         Validation.Reason.TOO_LONG -> R.string.profile_error_too_long
-        // Only names and session names are checked for characters (and nothing for range).
+        // Names, session names and working directories are checked for characters (nothing for range).
         else ->
-            if (field ==
-                ProfileField.SESSION_NAME
-            ) {
-                R.string.profile_error_session_chars
-            } else {
-                R.string.profile_error_control_chars
+            when (field) {
+                ProfileField.SESSION_NAME -> R.string.profile_error_session_chars
+                ProfileField.WORKING_DIR -> R.string.profile_error_dir_chars
+                else -> R.string.profile_error_control_chars
             }
     }
 

@@ -158,7 +158,10 @@ Terminal appearance and app preferences are not tables: they live in a DataStore
 dynamic), terminal font size and font id, the key-bar layout (Termux-style JSON, validated
 with `KeyBarLayout.parse`, falling back to the default), Backspace mode, app lock, FLAG_SECURE,
 keep-screen-on, notifications (master switch plus one toggle per event), crash-report opt-in,
-and whether to use bridle-helper.
+and whether to use bridle-helper. If the file can't be read (an I/O error), the defaults
+apply, except that the privacy settings fail closed: app lock and FLAG_SECURE are treated as on
+(the lock can still be unlocked) and compose history is kept in memory only. Changing a setting
+then does nothing, rather than crashing the app.
 
 **The database holds no plaintext secrets.** Generated private keys live
 only in the Keystore. Imported keys are stored only as ciphertext, encrypted
@@ -166,7 +169,7 @@ with a key that never leaves the Keystore. Passwords are typed once, used only
 to install a key, and never stored. The one exception is user-typed text: compose-box history
 records what the user submitted, which may include something secret. It is kept per host,
 deleted with the host, never exported in backups, and can be cleared per entry, per host or
-entirely.
+entirely; with "Remember compose history" off it stays in memory only.
 The DB is excluded from Android cloud backup (`dataExtractionRules`). Users
 back up with an explicit, passphrase-encrypted export instead.
 
@@ -192,7 +195,10 @@ interface SshConnection : Closeable {
   grace period after the last channel closes.
 - **Reconnect policy:** the app listens for network changes
   (`ConnectivityManager.NetworkCallback`) and reconnects immediately when the
-  network changes. Otherwise it uses exponential backoff (1s → 30s) while a
+  network changes. A connection that still looks up is probed with a no-op
+  `exec` (`true`, 5-second timeout) and reconnected if it doesn't answer, so a
+  Wi-Fi/LTE switch doesn't wait for the keepalive to notice the dead link.
+  Otherwise it uses exponential backoff (1s → 30s) while a
   terminal tab is visible. After reconnecting, each TerminalSession reopens its
   shell and re-runs its attach command. tmux redraws the full screen, so no
   state needs to be replayed.
@@ -341,6 +347,7 @@ All agentless. Every operation is one `exec` on the shared connection.
 | Attach (interactive) | shell channel running `tmux new-session -A -s S -c DIR` |
 | Restart (respawn) | `tmux respawn-pane -k -t =S: -c DIR` → send `claude --continue` (or a fresh `claude`) |
 | Restart (gentle) | send `C-c` twice, wait for the prompt, send the command |
+| Profile environment | tmux ≥ 3.2: `new-session … -e K=V`; older: `new-session … cat` → `set-environment -t =S K V` → `respawn-pane -k -t =S: -c DIR 'exec "$SHELL" -l'` (or `CMD`). Restarts run `set-environment` before respawning |
 | Stop | `tmux kill-session -t =S` |
 | Send keys | `tmux send-keys -t =S: …` (used by notification actions and quick replies) |
 
@@ -348,10 +355,21 @@ All agentless. Every operation is one `exec` on the shared connection.
   shell, and the app types the command into it. The user's normal `PATH`,
   nvm and similar setup apply, and when Claude exits the pane stays at a shell
   prompt instead of disappearing.
+- **Profile environment variables never go through the pane.** Values such as
+  `ANTHROPIC_API_KEY` are put in the tmux *session environment* and inherited
+  by the pane's process, so they never show on screen, in scrollback, in the
+  Sessions preview, in `pane_start_command` or in the host's shell history.
+  The tmux version comes from the probe. Limits: the values travel as
+  arguments of a short-lived `tmux` client process, so another account on
+  the host that can list processes could see them for that instant (as with
+  any command line), and anything running as you in that tmux session can
+  read them (`tmux show-environment`). The gentle restart types into the
+  running shell, which keeps the variables it started with; a respawn picks
+  up changed values, and variables removed from the profile are unset.
 - **Phone and desktop attached together:** per session the app sets
   `window-size latest`, so the window follows whichever client was used most
   recently and the phone's small size doesn't shrink the desktop view
-  permanently. It sets this per session with `set-option -t`, so the user's
+  permanently. It sets this on the session's window with `set-option -w`, so the user's
   `~/.tmux.conf` is never edited.
 - **Agentless Claude detection:** if `pane_current_command` is `claude` or
   `node` and the cwd matches the profile, the card shows a "Claude running"
@@ -410,7 +428,11 @@ helper uninstall
   sessions with a Disconnect-all action. Android 14+ requires a declared
   type. `specialUse` (with a Play Console justification) is the likely fit,
   because `dataSync` is capped at 6 hours per day on Android 15+. Because the
-  work lives in tmux, nothing is lost if the OS kills the service.
+  work lives in tmux, nothing is lost if the OS kills the service. For the
+  same reason a start Android refuses (`ForegroundServiceStartNotAllowedException`
+  when started from the background on Android 12+) is caught and skipped: the
+  tab keeps working while the process lives, and the next start from the
+  foreground brings the service back.
 - **Doze/battery:** we never hold wake locks. If the OS kills the connection,
   the app reconnects when the user returns.
 - **Phone first:** layouts are designed for one-handed portrait use, with the

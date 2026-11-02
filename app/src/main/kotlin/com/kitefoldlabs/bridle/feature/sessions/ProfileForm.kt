@@ -44,7 +44,8 @@ data class ProfileForm(
             buildMap {
                 reason(Validators.label(name))?.let { put(ProfileField.NAME, it) }
                 reason(Validators.sessionName(sessionName))?.let { put(ProfileField.SESSION_NAME, it) }
-                if (workingDir.isBlank()) put(ProfileField.WORKING_DIR, Validation.Reason.BLANK)
+                // The same rule as attaching: a directory Start can't attach in is refused here.
+                reason(Validators.workingDirectory(workingDir.trim()))?.let { put(ProfileField.WORKING_DIR, it) }
                 if (command.isBlank()) put(ProfileField.COMMAND, Validation.Reason.BLANK)
             }
 

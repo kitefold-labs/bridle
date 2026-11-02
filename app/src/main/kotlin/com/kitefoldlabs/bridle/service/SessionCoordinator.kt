@@ -40,7 +40,8 @@ data class TerminalTab(
 
 /**
  * Owns everything that must outlive the UI: shared host connections and open terminal tabs. The
- * [SessionService] keeps the process in the foreground while [hasActiveWork] is true.
+ * [SessionService] keeps the process in the foreground while tabs are open (or transfers run, see
+ * [ForegroundWork]).
  */
 @Singleton
 class SessionCoordinator
@@ -52,7 +53,7 @@ class SessionCoordinator
         private val mutableTabs = MutableStateFlow<List<TerminalTab>>(emptyList())
         val tabs: StateFlow<List<TerminalTab>> = mutableTabs.asStateFlow()
 
-        /** True while any tab is open (drives the foreground service). */
+        /** True while any tab is open (one of the things that drive the foreground service). */
         val hasActiveWork: Boolean get() = mutableTabs.value.isNotEmpty()
 
         /**

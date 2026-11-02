@@ -15,6 +15,11 @@ import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.core.ssh.SshEngine
 import com.kitefoldlabs.bridle.core.ssh.SshKeySigner
 import com.kitefoldlabs.bridle.core.ssh.TofuHostKeyVerifier
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -34,7 +39,16 @@ class HostCredentials
         private val signers: SignerSource,
         private val broker: InteractionBroker,
     ) : CredentialProvider {
-        override suspend fun credentialsFor(host: Host): List<Credential> {
+        override suspend fun credentialsFor(host: Host): List<Credential> = credentialsFor(host, broker.questions())
+
+        /** Credentials whose password question belongs to one connection attempt's [questions]. */
+        fun forAttempt(questions: InteractionBroker.Questions): CredentialProvider =
+            CredentialProvider { credentialsFor(it, questions) }
+
+        private suspend fun credentialsFor(
+            host: Host,
+            questions: InteractionBroker.Questions,
+        ): List<Credential> {
             val key =
                 host.identityId
                     ?.let { identities.get(it) }
@@ -42,7 +56,7 @@ class HostCredentials
                     ?.let { Credential.Key(it) }
             val password =
                 Credential.Password {
-                    broker.requestPassword(host.label, host.username) ?: CharArray(0)
+                    questions.requestPassword(host.label, host.username) ?: CharArray(0)
                 }
             return listOfNotNull(key, password)
         }
@@ -65,16 +79,40 @@ class DefaultHostConnector
         private val engine: SshEngine,
         private val clock: () -> Long,
     ) : HostConnector {
+        @Suppress("TooGenericExceptionCaught") // rethrown unless the attempt was cancelled
         override suspend fun connect(hostId: EntityId): SshConnection {
             val host = hosts.get(hostId) ?: throw UnknownHostException(hostId)
-            val target = TargetResolver({ hosts.get(it) }, credentials).resolve(host)
-            val connection =
-                engine.connect(
-                    target,
-                    TofuHostKeyVerifier(knownHosts, broker, clock),
-                    ConnectOptions(keepAlive = host.keepAliveSeconds.seconds),
-                )
-            hosts.markConnected(hostId, clock())
-            return connection
+            val questions = broker.questions()
+            return coroutineScope {
+                // The SSH thread asking a question is blocked in it, so the attempt's cancellation
+                // can't reach it; this closes the question (and its dialog) as soon as it happens.
+                val withdrawOnCancel =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            questions.withdraw()
+                        }
+                    }
+                try {
+                    val target = TargetResolver({ hosts.get(it) }, credentials.forAttempt(questions)).resolve(host)
+                    val connection =
+                        engine.connect(
+                            target,
+                            TofuHostKeyVerifier(knownHosts, questions, clock),
+                            ConnectOptions(keepAlive = host.keepAliveSeconds.seconds),
+                        )
+                    hosts.markConnected(hostId, clock())
+                    connection
+                } catch (e: Exception) {
+                    // Withdrawing answers the question (no password, host not trusted), and the SSH
+                    // thread can act on that before the cancellation reaches it: report the
+                    // cancellation, not the authentication failure it caused.
+                    ensureActive()
+                    throw e
+                } finally {
+                    withdrawOnCancel.cancel() // the attempt is over either way: nothing more to ask
+                }
+            }
         }
     }

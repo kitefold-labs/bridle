@@ -67,8 +67,10 @@ Transfers run one at a time in the background. They keep going if you leave the 
 switch to a terminal. Tap the transfers icon (two arrows, with a count while transfers are
 running) to see progress and cancel a transfer. A cancelled upload leaves nothing on the server,
 and Bridle deletes the partial file of a failed download from your phone (where the storage app
-allows it). For very large transfers, keep Bridle open until they finish: Android may stop
-background work.
+allows it). While a transfer is queued or running, Bridle's "connected" notification stays up (it
+counts the transfers), which keeps the transfer going when you switch to another app. For very
+large transfers, keep Bridle open until they finish anyway: Android may still stop background
+work.
 
 ## Save and run commands with snippets
 

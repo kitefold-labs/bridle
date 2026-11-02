@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.ssh.AuthenticationFailedException
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.feature.FakeConnection
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.connections
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
@@ -27,8 +28,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -53,7 +52,7 @@ class ForwardsTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(ApplicationProvider.getApplicationContext())
         forwards = ForwardManager(manager, data.portForwards, scope)
         hostId = runBlocking { data.hosts.upsert(Host(label = "dev", hostname = "dev.example.com", username = "me")) }
@@ -64,7 +63,7 @@ class ForwardsTest {
         // Forwards' coroutines must stop before the database they read closes.
         runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     private fun freePort(): Int = ServerSocket(0).use { it.localPort }

@@ -1,9 +1,13 @@
 package com.kitefoldlabs.bridle.feature.settings
 
 import android.app.Application
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.data.DataModule
+import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.crash.CrashReporter
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingStore
 import com.kitefoldlabs.bridle.feature.onboarding.OnboardingViewModel
@@ -16,16 +20,17 @@ import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -38,14 +43,14 @@ class AppLockAndCrashTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(context)
     }
 
     @After
     fun tearDown() {
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     @Test
@@ -89,6 +94,21 @@ class AppLockAndCrashTest {
         available = false
         lock.onForeground()
         eventually { vm.screen.value == LockScreen.UNLOCKED && !lock.locked.value }
+    }
+
+    @Test
+    fun `unreadable settings lock the app, and it can still be unlocked`() {
+        val unreadable =
+            object : DataStore<Preferences> {
+                override val data: Flow<Preferences> = flow { throw IOException("disk on fire") }
+
+                override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                    throw IOException("disk on fire")
+            }
+        val vm = AppLockViewModel(SettingsRepository(unreadable), lock) { true }
+        eventually { vm.screen.value == LockScreen.LOCKED }
+        vm.unlock()
+        eventually { vm.screen.value == LockScreen.UNLOCKED }
     }
 
     @Test

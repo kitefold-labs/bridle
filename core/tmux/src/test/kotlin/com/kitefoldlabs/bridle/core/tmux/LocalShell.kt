@@ -78,12 +78,17 @@ class LocalShell(
     }
 
     companion object {
-        /** A stand-in `claude` that echoes its arguments and waits for input like the real TUI. */
+        /**
+         * A stand-in `claude` that echoes its arguments and waits for input like the real TUI. It
+         * prints only the *length* of `BRIDLE_SECRET`, so tests can see it arrived without the
+         * value ever reaching the screen.
+         */
         fun fakeClaude(bin: Path): Path {
             Files.createDirectories(bin)
             val script = bin.resolve("claude")
             script.writeText(
-                "#!/bin/sh\necho \"fake-claude started args=[\$*] model=[\${ANTHROPIC_MODEL:-}] pwd=\$(pwd)\"\n" +
+                "#!/bin/sh\necho \"fake-claude started args=[\$*] model=[\${ANTHROPIC_MODEL:-}] " +
+                    "secret=[\${#BRIDLE_SECRET}] pwd=\$(pwd)\"\n" +
                     "while read -r line; do echo \"got:\$line\"; done\n",
             )
             script.toFile().setExecutable(true)

@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
 import com.kitefoldlabs.bridle.core.terminalui.PendingSend
 import com.kitefoldlabs.bridle.feature.FakeEngine
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
 import io.kotest.matchers.nulls.shouldBeNull
@@ -25,8 +26,6 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Before
@@ -71,14 +70,14 @@ class TerminalTabsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(main)
+        TestMain.set(main)
     }
 
     @After
     fun tearDown() {
         store.clear()
         runBlocking { world.coordinator.disconnectAll() }
-        Dispatchers.resetMain()
+        TestMain.reset()
         main.close()
         // Fire-and-forget work (e.g. clearing history) must finish before the database closes, or
         // it fails later and the uncaught error lands in whichever test runs next.
@@ -190,6 +189,40 @@ class TerminalTabsViewModelTest {
             awaitUntil { runBlocking { world.data.composeHistory.get(id) }.isEmpty() }
             state.history.entries shouldBe emptyList()
             withContext(main) { vm.clearHistory(999) }
+        }
+
+    @Test
+    fun `with compose history off nothing is read from or written to disk`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            world.data.composeHistory.save(id, listOf("older"))
+            world.data.settings.setRememberComposeHistory(false)
+            val vm = viewModel()
+            val tab = launcher.openTerminal(id)
+            awaitUntil { vm.screens.value[tab.id] != null }
+            val state = vm.screens.value.getValue(tab.id)
+            state.history.entries shouldBe emptyList()
+
+            withContext(main) { state.updateComposeText("hunter2") }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } } == "hunter2" }
+            withContext(main) { state.submitCompose() }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } }.isEmpty() }
+            Thread.sleep(200)
+            state.history.entries shouldBe listOf("hunter2") // ↑ still works until Bridle closes
+            world.data.composeHistory.get(id) shouldBe listOf("older")
+
+            // Turned back on, the next line is saved, but never what was sent while it was off.
+            world.data.settings.setRememberComposeHistory(true)
+            awaitUntil { vm.settings.value?.rememberComposeHistory == true }
+            awaitUntil { state.history.entries.isEmpty() }
+            withContext(main) { state.updateComposeText("ls") }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } } == "ls" }
+            withContext(main) { state.submitCompose() }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { world.data.composeHistory.get(id) } == listOf("ls") }
         }
 
     @Test

@@ -30,13 +30,20 @@ Under **Launch profiles**, tap **+** (New profile). The form starts from the Cla
 |-------|--------|--------------|
 | Name | `Claude · ~` | Shown on the card. |
 | tmux session name | `claude` | The tmux session the profile runs in. Letters, digits, `-` and `_` only. |
-| Working directory | `~` | Where Claude starts, e.g. `~/src/api`. |
+| Working directory | `~` | Where Claude starts, e.g. `~/src/api`. Backslashes and control characters aren't allowed. |
 | Command | `claude` | What **Start** and **Restart fresh** run. |
 | Restart command | `claude --continue` | What **Restart (continue)** runs, so Claude picks up the last conversation. |
 | Restart | Respawn and continue | How **Restart** works (see below). |
 | Launch | Type the command into a login shell | The pane runs your shell and Bridle types the command, so the pane stays at a prompt when Claude exits. *Run the command directly* starts Claude as the pane's program instead. |
-| Environment variables | none | Set for the command, e.g. `ANTHROPIC_MODEL`. Names use letters, digits and `_`. |
+| Environment variables | none | Set for the command, e.g. `ANTHROPIC_MODEL`. Names use letters, digits and `_`. Values are masked; tap the eye to show one. |
 | Pin to the top | off | Pinned profiles are listed first. |
+
+Environment variables are set in the tmux session's environment, not typed into the pane, so a
+value such as an `ANTHROPIC_API_KEY` never appears on screen, in the Sessions preview or in your
+shell history on the host. Two limits: it is passed to `tmux` as a command-line argument for an
+instant, which other users on a shared host could see in a process list, and programs running in
+that tmux session can read it. *Press Ctrl+C twice, then type the command* restarts keep the
+values the shell started with; the respawn restarts pick up edited values.
 
 Set the working directory to your project and give the session a name you'll recognise, such as
 `claude-api`. Fields with a problem are marked and explain what to fix; **Save** is enabled once
@@ -53,6 +60,8 @@ In the terminal:
 - the **key bar** has the keys Claude Code needs (Esc, ⇧Tab, Ctrl+C, arrows);
 - the **compose box** (pencil button) is the easiest way to write a long prompt. **Send** pastes
   it as one block and presses Enter, and ↑/↓ go through what you sent before on this host.
+  That history is saved on the phone, so type passwords on the terminal keyboard, not in the
+  compose box (or turn off **Settings → Remember compose history**).
 
 The tmux session also appears under **tmux sessions** with a **Claude** badge. You can attach to
 any session there with **Attach**, including ones you started on your desktop. If your desktop is
@@ -100,7 +109,8 @@ where they were:
 
 - When the connection drops, the terminal shows **Connection lost. Reattaching…**. Bridle
   reconnects with backoff, and immediately when the phone gets a network again, then reattaches
-  to the same tmux session. Claude kept running on the host the whole time.
+  to the same tmux session. When you move between Wi-Fi and mobile data, Bridle checks each
+  connection within a few seconds and replaces the ones that no longer answer. Claude kept running on the host the whole time.
 - A tab that ended (say, after you detached tmux) shows **Session ended** with a **Reconnect**
   button, which opens the same session again.
 - Plain shell tabs (not tmux) can't survive a drop. To make every connection to a host land in

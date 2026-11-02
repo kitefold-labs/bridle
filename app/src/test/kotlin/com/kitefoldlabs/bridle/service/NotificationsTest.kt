@@ -1,11 +1,16 @@
 package com.kitefoldlabs.bridle.service
 
 import android.app.Application
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.NotificationManager
+import android.content.ComponentName
+import android.content.ContextWrapper
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.ClaudeStatusEvent
 import com.kitefoldlabs.bridle.core.tmux.ClaudeState
+import com.kitefoldlabs.bridle.feature.terminal.TerminalModule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -22,6 +27,19 @@ class NotificationsTest {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     private fun event(to: ClaudeState) = ClaudeStatusEvent(7, "claude-api", ClaudeState.WORKING, to, "Allow Bash?")
+
+    @Test
+    fun `a foreground service start that Android refuses is skipped`() {
+        val refusing =
+            object : ContextWrapper(context) {
+                override fun startForegroundService(service: Intent): ComponentName? =
+                    throw ForegroundServiceStartNotAllowedException("app is in the background")
+            }
+        SessionService.ensureRunning(refusing) shouldBe false
+        TerminalModule.serviceStarter(refusing).ensureRunning() // doesn't throw either
+        SessionService.ensureRunning(context) shouldBe true
+        shadowOf(context).nextStartedService.component!!.className shouldContain "SessionService"
+    }
 
     @Test
     fun `channels are created with the right importance`() {
@@ -76,8 +94,13 @@ class NotificationsTest {
 
     @Test
     fun `session notification shows the count and a disconnect action`() {
-        val n = SessionService.notification(context, 3)
+        val n = SessionService.notification(context, ActiveWork(tabs = 3))
         NotificationCompat.getContentText(n).toString() shouldBe "3 sessions open"
+
+        fun text(work: ActiveWork) = NotificationCompat.getContentText(SessionService.notification(context, work))
+        text(ActiveWork(tabs = 1, transfers = 2)) shouldBe "1 session open · 2 transfers"
+        text(ActiveWork(transfers = 1)) shouldBe "1 transfer"
+        text(ActiveWork()) shouldBe "1 session open" // a start for a tab that already closed
         n.actions
             .single()
             .title

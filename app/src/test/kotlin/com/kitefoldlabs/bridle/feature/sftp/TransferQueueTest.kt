@@ -20,6 +20,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -35,7 +36,8 @@ class TransferQueueTest {
     private val sftp = FakeSftpSession()
     private val connection = FakeConnection(sftp)
     private val documents = FakeDocuments()
-    private val queue = TransferQueue(connections({ connection }, scope), documents, scope)
+    private var serviceStarts = 0
+    private val queue = TransferQueue(connections({ connection }, scope), documents, scope) { serviceStarts++ }
 
     private fun uri(name: String) = Uri.parse("content://docs/$name")
 
@@ -45,6 +47,7 @@ class TransferQueueTest {
         documents.names[uri("a.txt").toString()] = DocumentInfo("a/b.txt", 4)
         val transfer = queue.upload(1, uri("a.txt"), HOME)
         transfer.name shouldBe "a_b.txt"
+        serviceStarts shouldBe 1 // each transfer keeps the foreground service up
         transfer.remotePath shouldBe "$HOME/a_b.txt"
         sftp.text("$HOME/a_b.txt") shouldBe "abcd"
         val done = queue.transfers.value.single()
@@ -76,6 +79,31 @@ class TransferQueueTest {
         queue.transfers.value
             .single()
             .error shouldBe "IllegalStateException"
+    }
+
+    @Test
+    fun `a transfer cancelled before it starts is not left queued`() {
+        val dispatcher = StandardTestDispatcher()
+        val lazy = TransferQueue(connections({ connection }, scope), documents, CoroutineScope(dispatcher)) {}
+        documents.inputs[uri("c").toString()] = ByteArray(1)
+        val transfer = lazy.upload(1, uri("c"), HOME)
+        lazy.hasActiveWork shouldBe true
+        lazy.cancel(transfer.id)
+        dispatcher.scheduler.runCurrent()
+        lazy.transfers.value
+            .single()
+            .status shouldBe TransferStatus.CANCELLED
+        lazy.hasActiveWork shouldBe false
+        sftp.exists("$HOME/c") shouldBe false
+
+        // A download cancelled that early removes the document the user created for it.
+        val download = lazy.download(1, "$HOME/d", uri("d"))
+        lazy.cancel(download.id)
+        dispatcher.scheduler.runCurrent()
+        lazy.transfers.value
+            .last()
+            .status shouldBe TransferStatus.CANCELLED
+        documents.deleted shouldBe listOf(uri("d").toString())
     }
 
     @Test

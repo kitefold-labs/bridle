@@ -94,6 +94,7 @@ class ModelsTest {
         field(p.copy(name = "")) shouldBe "label"
         field(p.copy(sessionName = "a b")) shouldBe "sessionName"
         field(p.copy(workingDir = " ")) shouldBe "workingDir"
+        field(p.copy(workingDir = "~/a\\b")) shouldBe "workingDir" // could launch, but never attach
         field(p.copy(command = "")) shouldBe "command"
         field(p.copy(env = mapOf("bad-name" to "1"))) shouldBe "env"
     }

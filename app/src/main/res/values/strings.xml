@@ -10,6 +10,10 @@
         <item quantity="one">%d session open</item>
         <item quantity="other">%d sessions open</item>
     </plurals>
+    <plurals name="sessions_notification_transfers">
+        <item quantity="one">%d transfer</item>
+        <item quantity="other">%d transfers</item>
+    </plurals>
     <string name="action_disconnect_all">Disconnect all</string>
     <string name="action_approve">Approve</string>
     <string name="action_deny">Deny</string>

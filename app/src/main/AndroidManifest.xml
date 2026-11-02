@@ -41,7 +41,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Maintains user-initiated interactive SSH terminal sessions to the user's own servers while the app is in the background." />
+                android:value="Maintains user-initiated interactive SSH terminal sessions and file transfers to the user's own servers while the app is in the background." />
         </service>
 
         <receiver

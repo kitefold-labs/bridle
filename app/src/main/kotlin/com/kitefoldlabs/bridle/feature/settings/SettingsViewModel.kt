@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kitefoldlabs.bridle.core.data.ComposeHistoryRepository
 import com.kitefoldlabs.bridle.core.data.settings.NotificationEvent
 import com.kitefoldlabs.bridle.core.data.settings.Settings
 import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 /** Which built-in key-bar layout is in use, or a custom one. */
@@ -62,6 +64,7 @@ class SettingsViewModel
     constructor(
         private val repository: SettingsRepository,
         private val availability: LockAvailability,
+        private val history: ComposeHistoryRepository,
     ) : ViewModel() {
         /** Null until the stored settings have been read. */
         val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -81,6 +84,13 @@ class SettingsViewModel
         fun setBackspaceMode(mode: BackspaceMode) = write { setBackspaceMode(mode) }
 
         fun setKeepScreenOn(enabled: Boolean) = write { setKeepScreenOn(enabled) }
+
+        /** Turning it off also deletes the history already saved, for every host. */
+        fun setRememberComposeHistory(enabled: Boolean) =
+            write {
+                setRememberComposeHistory(enabled)
+                if (!enabled) history.clearAll()
+            }
 
         fun setAppLock(enabled: Boolean) = write { setAppLockEnabled(enabled && availability.isAvailable()) }
 
@@ -131,7 +141,18 @@ class SettingsViewModel
             }
         }
 
+        /**
+         * A store that can't be written (the same I/O error that gave [SettingsRepository.UNREADABLE],
+         * say) leaves the setting as it was: the screen keeps showing the old value, and the app
+         * doesn't crash.
+         */
         private fun write(change: suspend SettingsRepository.() -> Unit) {
-            viewModelScope.launch { repository.change() }
+            viewModelScope.launch {
+                try {
+                    repository.change()
+                } catch (ignored: IOException) {
+                    // Nothing changed; the screen still shows the stored value.
+                }
+            }
         }
     }

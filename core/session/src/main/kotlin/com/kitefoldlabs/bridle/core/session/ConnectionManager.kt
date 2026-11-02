@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
@@ -70,11 +72,15 @@ public class ConnectionManager(
     private val scope: CoroutineScope,
     private val policy: ReconnectPolicy = ReconnectPolicy(),
     private val idleGrace: Duration = 60.seconds,
+    private val probeTimeout: Duration = 5.seconds,
 ) {
     private val mutex = Mutex()
 
     // Concurrent: [state] reads it without the mutex.
     private val entries = ConcurrentHashMap<EntityId, Entry>()
+
+    /** Connections with a probe in flight: a burst of network callbacks probes each only once. */
+    private val probing: MutableSet<SshConnection> = ConcurrentHashMap.newKeySet()
 
     /** Acquires a lease on [hostId], connecting if needed. */
     public suspend fun acquire(hostId: EntityId): ConnectionLease =
@@ -98,21 +104,66 @@ public class ConnectionManager(
 
     /**
      * The phone switched networks (or came back online): retry immediately instead of waiting
-     * out the backoff, since the old TCP connection is almost certainly dead.
+     * out the backoff, since the old TCP connection is almost certainly dead. A host that still
+     * looks connected is probed with a no-op command and reconnected if it doesn't answer within
+     * [probeTimeout], instead of waiting for keep-alives to notice. Terminal tabs reattach to
+     * their tmux sessions by themselves once the new connection is up.
      */
     public suspend fun onNetworkChanged() {
+        val probes = mutableListOf<Pair<Entry, SshConnection>>()
         mutex.withLock {
             for (entry in entries.values) {
                 if (entry.leases == 0) continue
-                when (entry.state.value) {
+                when (val state = entry.state.value) {
                     is HostConnectionState.Reconnecting -> entry.start()
-                    is HostConnectionState.Failed ->
-                        if ((entry.state.value as HostConnectionState.Failed).retryable) entry.start()
+                    is HostConnectionState.Failed -> if (state.retryable) entry.start()
+                    is HostConnectionState.Connected ->
+                        if (probing.add(state.connection)) probes += entry to state.connection
                     else -> Unit
                 }
             }
         }
+        for ((entry, connection) in probes) {
+            scope.launch {
+                try {
+                    probe(entry, connection)
+                } finally {
+                    probing.remove(connection)
+                }
+            }
+        }
     }
+
+    /** Reconnects [entry] if [connection], still its current one, doesn't answer a no-op in time. */
+    private suspend fun probe(
+        entry: Entry,
+        connection: SshConnection,
+    ) {
+        // Awaited with a timeout rather than wrapped in one: a blocked socket read may not notice
+        // cancellation until the reconnect below closes the connection.
+        val reply = scope.async { answers(connection) }
+        val alive = withTimeoutOrNull(probeTimeout) { reply.await() } ?: false
+        if (alive) return
+        reply.cancel()
+        mutex.withLock {
+            val current = entry.state.value
+            if (entry.leases > 0 && current is HostConnectionState.Connected && current.connection === connection) {
+                entry.start()
+            }
+        }
+    }
+
+    // Any failure means the same thing: the link is unusable, so reconnect.
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun answers(connection: SshConnection): Boolean =
+        try {
+            connection.exec(PROBE_COMMAND, probeTimeout)
+            true // any exit status: the link carried a round trip
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
 
     /** Explicit "Reconnect" button. */
     public suspend fun reconnect(hostId: EntityId) {
@@ -263,6 +314,11 @@ public class ConnectionManager(
 
     private fun HostConnectionState.isSettled(): Boolean =
         this is HostConnectionState.Connected || this is HostConnectionState.Failed || this is HostConnectionState.Idle
+
+    private companion object {
+        /** Means the same to sh, bash, zsh and fish, and prints nothing. */
+        const val PROBE_COMMAND = "true"
+    }
 }
 
 /** Every reconnect attempt failed. */

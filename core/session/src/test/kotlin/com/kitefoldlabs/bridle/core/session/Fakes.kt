@@ -101,11 +101,18 @@ class FakeConnection : SshConnection {
     val commands = mutableListOf<String?>()
     var failOpen = false
     var closed = false
+    val execs = mutableListOf<String>()
+
+    /** What [exec] does: returns a result, throws, or (a dead link) never answers. */
+    var onExec: suspend () -> ExecResult = { ExecResult(0, "", "") }
 
     override suspend fun exec(
         command: String,
         timeout: Duration,
-    ) = ExecResult(0, "", "")
+    ): ExecResult {
+        execs += command
+        return onExec()
+    }
 
     override suspend fun runScript(
         script: String,

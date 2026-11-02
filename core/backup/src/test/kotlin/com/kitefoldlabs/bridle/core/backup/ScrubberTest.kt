@@ -191,5 +191,23 @@ class ScrubberTest {
     fun `placeholders are documented constants`() {
         Scrubber.scrub("a 1.2.3.4") shouldContain Scrubber.IP
         Scrubber.MIN_SENSITIVE_LENGTH shouldBe 3
+        Scrubber.MIN_SENSITIVE_WORD_LENGTH shouldBe 2
+    }
+
+    @Test
+    fun `sensitive values are matched ignoring case, short ones only as whole words`() {
+        // Two characters: whole words only, so "pi" doesn't eat "pipe" or "api".
+        scrub("user pi: broken pipe in api, PI again", "pi") shouldBe
+            "user <redacted>: broken pipe in api, <redacted> again"
+        // A single character is never matched.
+        scrub("a connection to a", "a") shouldBe "a connection to a"
+        // Longer values match anywhere, in any case.
+        scrub("DevBox refused; mydevbox too", "devbox") shouldBe "<redacted> refused; my<redacted> too"
+        // One pass: a value can't match inside the placeholder another left ("red" in "<redacted>").
+        scrub("nate red", "nate", "red", "act") shouldBe "<redacted> <redacted>"
+        scrub("ÄRGER-box", "ärger-box") shouldBe "<redacted>"
+        // Regex metacharacters are literal.
+        scrub("box (1) vs box 1", "box (1)") shouldBe "<redacted> vs box 1"
+        scrub("nothing here", "  ", "") shouldBe "nothing here"
     }
 }

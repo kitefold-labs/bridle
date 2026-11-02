@@ -1,12 +1,16 @@
 package com.kitefoldlabs.bridle
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.view.WindowManager
+import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.feature.sftp.TransferQueue
 import com.kitefoldlabs.bridle.service.Notifications
 import com.kitefoldlabs.bridle.service.SessionActionReceiver
 import com.kitefoldlabs.bridle.service.SessionCoordinator
@@ -38,6 +42,8 @@ class HiltWiringTest {
     @Inject lateinit var coordinator: SessionCoordinator
 
     @Inject lateinit var settings: SettingsRepository
+
+    @Inject lateinit var transfers: TransferQueue
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -104,6 +110,27 @@ class HiltWiringTest {
             shadow.stopSelfId shouldBe 3
             controller.destroy()
         }
+
+    @Test
+    fun `service stays in the foreground while a transfer runs`() {
+        // An unknown host keeps the transfer connecting (and so active) until it is cancelled.
+        val transfer = transfers.download(404, "/srv/log.txt", Uri.parse("content://nowhere/log.txt"))
+        shadowOf(context as Application).nextStartedService.component!!.className shouldBe
+            SessionService::class.java.name
+        val controller = Robolectric.buildService(SessionService::class.java).create().startCommand(0, 1)
+        ShadowLooper.idleMainLooper()
+        val shadow = shadowOf(controller.get())
+        NotificationCompat.getContentText(shadow.lastForegroundNotification).toString() shouldBe "1 transfer"
+        shadow.isStoppedBySelf shouldBe false
+        transfers.cancel(transfer.id)
+        repeat(200) {
+            ShadowLooper.idleMainLooper()
+            if (shadow.isStoppedBySelf) return@repeat
+            Thread.sleep(10)
+        }
+        shadow.isStoppedBySelf shouldBe true
+        controller.destroy()
+    }
 
     @Test
     fun `main activity follows the secure screen setting`() =

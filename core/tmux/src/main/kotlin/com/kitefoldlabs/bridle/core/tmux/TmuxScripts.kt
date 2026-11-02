@@ -29,6 +29,18 @@ public object TmuxScripts {
     private const val REQUIRE_TMUX: String =
         "command -v tmux >/dev/null 2>&1 || { echo 'tmux is not installed' >&2; exit $NO_TMUX_EXIT; }"
 
+    /** What a session runs until its pane is respawned with the environment in place. */
+    private const val PLACEHOLDER: String = "cat"
+
+    /**
+     * The user's login shell, as tmux would start it. tmux sets `SHELL` for every pane, and the
+     * line means the same in sh, bash, zsh and fish (tmux runs it with its `default-shell`).
+     */
+    private const val LOGIN_SHELL: String = "exec \"\$SHELL\" -l"
+
+    /** Session option holding the names of the variables Bridle last set, so restart can drop removed ones. */
+    private const val ENV_OPTION: String = "@bridle-env"
+
     private val keyName = Regex("^(?:[CMS]-)*[A-Za-z0-9]+$|^[!-~]$")
     private val captureMarker = Regex("^@@[A-Za-z0-9_]+@@$")
 
@@ -102,18 +114,26 @@ public object TmuxScripts {
     /**
      * Creates the session if it does not exist and starts the profile's command in it.
      * Prints `created` or `exists`.
+     *
+     * The profile's environment variables are put in the tmux *session environment*, never typed
+     * into the pane, so their values (API keys, say) stay off the screen, out of scrollback and out
+     * of the shell's history: with `new-session -e` on [tmuxVersion] 3.2 and newer, otherwise by
+     * starting the session on a placeholder, setting them with `set-environment` and respawning the
+     * pane, whose new process then inherits them. Pass `null` when the version isn't known to get
+     * the second way, which works everywhere.
      */
     public fun launch(
         profile: LaunchProfile,
         columns: Int? = null,
         rows: Int? = null,
+        tmuxVersion: TmuxVersion? = null,
     ): String {
         requireValid(profile.validate())
         require((columns == null) == (rows == null)) { "Give both columns and rows, or neither" }
         val exists = tmux("has-session", "-t", "=${profile.sessionName}")
         return script(
             listOf(REQUIRE_TMUX, "if $exists 2>/dev/null; then echo exists; exit 0; fi") +
-                launchLines(profile, columns, rows) +
+                launchLines(profile, columns, rows, tmuxVersion) +
                 "echo created",
         )
     }
@@ -121,11 +141,19 @@ public object TmuxScripts {
     /**
      * Restarts the profile's command in place (keeping the session name and window layout), or
      * launches it if the session is gone. Prints `restarted` or `created`.
+     *
+     * The environment variables are (re)set in the session environment first, and those the
+     * profile no longer has are unset, so a respawned pane gets the profile's current values.
+     * [RestartMode.SEND_KEYS] types into the shell that is already running, which keeps the
+     * environment it started with.
      */
-    public fun restart(profile: LaunchProfile): String {
+    public fun restart(
+        profile: LaunchProfile,
+        tmuxVersion: TmuxVersion? = null,
+    ): String {
         requireValid(profile.validate())
         val name = profile.sessionName
-        val command = envPrefix(profile) + profile.effectiveRestartCommand
+        val command = profile.effectiveRestartCommand
         val body =
             when {
                 profile.restartMode == RestartMode.SEND_KEYS ->
@@ -143,8 +171,11 @@ public object TmuxScripts {
             }
         return script(
             listOf(REQUIRE_TMUX, "if ! ${tmux("has-session", "-t", "=$name")} 2>/dev/null; then") +
-                launchLines(profile, null, null).map { "  $it" } +
+                launchLines(profile, null, null, tmuxVersion).map { "  $it" } +
                 listOf("  echo created", "  exit 0", "fi") +
+                forgetEnvironment(name) +
+                setEnvironment(profile) +
+                recordEnvironment(profile) +
                 body +
                 "echo restarted",
         )
@@ -181,15 +212,15 @@ public object TmuxScripts {
     /**
      * The command for an interactive PTY that attaches to [session], creating it in [workingDir]
      * if needed. It is run as the SSH exec command, so it must parse the same in bash, zsh and
-     * fish: the fixed program contains no `'` or `\`, and arguments may not contain `\`.
+     * fish: the fixed program contains no `'` or `\`, and [Validators.workingDirectory] keeps `\`
+     * out of the arguments.
      */
     public fun attachCommand(
         session: String,
         workingDir: String = "~",
     ): String {
         requireValid(Validators.sessionName(session))
-        require('\\' !in workingDir) { "Working directory may not contain backslashes" }
-        require(workingDir.none { it.isISOControl() }) { "Working directory may not contain control characters" }
+        requireValid(Validators.workingDirectory(workingDir))
         val program =
             "$PATH_PRELUDE; " +
                 "case \"\$2\" in \"~\" | \"~/\"*) d=\"\$HOME\${2#?}\" ;; *) d=\"\$2\" ;; esac; " +
@@ -202,23 +233,50 @@ public object TmuxScripts {
         profile: LaunchProfile,
         columns: Int?,
         rows: Int?,
+        tmuxVersion: TmuxVersion?,
     ): List<String> {
         val name = profile.sessionName
         val size: List<Any> =
             if (columns != null && rows != null) listOf("-x", "$columns", "-y", "$rows") else emptyList()
         val create = listOf("new-session", "-d", "-s", name, "-c", PathArg(profile.workingDir)) + size
-        val window = "=$name:"
+        // DIRECT runs the command as the pane's program; SHELL_HOSTED starts the shell and types it.
+        val program = if (profile.mode == LaunchMode.DIRECT) listOf(profile.command) else emptyList()
+        // A failed new-session (a session of that name started meanwhile, an option this tmux
+        // lacks) must stop here, or the command would be typed into someone else's pane.
         val start =
-            when (profile.mode) {
-                LaunchMode.SHELL_HOSTED ->
-                    listOf(tmux(create)) + typeCommand(name, envPrefix(profile) + profile.command)
-                LaunchMode.DIRECT ->
+            when {
+                profile.env.isEmpty() -> listOf("${tmux(create + program)} || exit 1")
+                tmuxVersion != null && tmuxVersion >= TmuxVersion.SESSION_ENV_FLAG -> {
+                    val flags = profile.env.flatMap { (key, value) -> listOf("-e", "$key=$value") }
+                    listOf("${tmux(create + flags + program)} || exit 1")
+                }
+                else -> {
+                    // The placeholder waits until the respawn replaces it with a process that
+                    // inherits the session environment set in between. Respawning with no command
+                    // would rerun the placeholder, so a shell-hosted pane names the login shell.
+                    // If that fails, the session goes rather than being left on the placeholder.
+                    val respawn =
+                        tmux(
+                            listOf("respawn-pane", "-k", "-t", pane(name), "-c", PathArg(profile.workingDir)) +
+                                program.ifEmpty { listOf(LOGIN_SHELL) },
+                        )
                     listOf(
-                        tmux(create + (envPrefix(profile) + profile.command)),
-                        tmux("set-option", "-w", "-t", window, "remain-on-exit", "on"),
+                        "${tmux(create + PLACEHOLDER)} || exit 1",
+                        "if ! { ${(setEnvironment(profile) + respawn).joinToString(" && ")}; }; then",
+                        "  ${tmux("kill-session", "-t", "=$name")} 2>/dev/null",
+                        "  exit 1",
+                        "fi",
                     )
+                }
             }
-        return start + "${tmux("set-option", "-t", "=$name", "window-size", "latest")} 2>/dev/null || true"
+        val run =
+            when (profile.mode) {
+                LaunchMode.SHELL_HOSTED -> typeCommand(name, profile.command)
+                LaunchMode.DIRECT -> listOf(tmux("set-option", "-w", "-t", "=$name:", "remain-on-exit", "on"))
+            }
+        val record = if (profile.env.isEmpty()) emptyList() else listOf(recordEnvironment(profile))
+        return start + record + run +
+            "${tmux("set-option", "-w", "-t", "=$name:", "window-size", "latest")} 2>/dev/null || true"
     }
 
     private fun typeCommand(
@@ -230,8 +288,21 @@ public object TmuxScripts {
             tmux("send-keys", "-t", pane(session), "Enter"),
         )
 
-    private fun envPrefix(profile: LaunchProfile): String =
-        profile.env.entries.joinToString("") { (key, value) -> "export $key=${ShellQuote.quote(value)}; " }
+    /**
+     * Sets the profile's variables in the session environment (`set-environment`, any tmux).
+     * Values only ever travel as quoted arguments of the script Bridle runs through `sh -s`, never
+     * through the pane, so nothing echoes them.
+     */
+    private fun setEnvironment(profile: LaunchProfile): List<String> =
+        profile.env.map { (key, value) -> tmux("set-environment", "-t", "=${profile.sessionName}", key, value) }
+
+    /** Unsets the variables recorded by [recordEnvironment] (names only, checked by [Validators.envName]). */
+    private fun forgetEnvironment(session: String): String =
+        "for n in \$(${tmux("show-options", "-qv", "-t", pane(session), ENV_OPTION)}); do " +
+            "${tmux("set-environment", "-u", "-t", "=$session")} \"\$n\"; done"
+
+    private fun recordEnvironment(profile: LaunchProfile): String =
+        tmux("set-option", "-t", pane(profile.sessionName), ENV_OPTION, profile.env.keys.joinToString(" "))
 
     private fun pane(session: String) = "=$session:"
 

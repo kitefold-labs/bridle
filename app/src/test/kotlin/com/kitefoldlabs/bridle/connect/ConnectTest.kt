@@ -8,6 +8,7 @@ import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.model.Identity
 import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
 import com.kitefoldlabs.bridle.core.model.KeySource
+import com.kitefoldlabs.bridle.core.ssh.AuthenticationFailedException
 import com.kitefoldlabs.bridle.core.ssh.ConnectOptions
 import com.kitefoldlabs.bridle.core.ssh.ConnectTarget
 import com.kitefoldlabs.bridle.core.ssh.Credential
@@ -20,13 +21,17 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -131,6 +136,86 @@ class ConnectTest {
             val again = "twice".toCharArray()
             broker.answer(Interaction.Password("Dev", "nate"), again)
             again.all { it == '\u0000' } shouldBe true
+        }
+
+    @Test
+    fun `withdrawing an attempt's questions closes them at once`() =
+        runBlocking<Unit> {
+            val broker = InteractionBroker(timeout = 10.seconds)
+            val prompt = HostKeyPrompt("h", 22, "ssh-ed25519", "SHA256:x")
+            val attempt = broker.questions()
+            val other = broker.questions()
+            val trust = async(Dispatchers.IO) { attempt.confirmNewHost(prompt) }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            other.withdraw() // another attempt's: this question stays
+            delay(50.milliseconds)
+            broker.pending.value shouldBe Interaction.TrustHost(prompt)
+            val started = System.nanoTime()
+            attempt.withdraw()
+            trust.await() shouldBe false
+            (System.nanoTime() - started < 5_000_000_000L) shouldBe true // not the 10 s timeout
+            broker.pending.value shouldBe null
+            attempt.withdraw() // nothing showing: no-op
+            // Asked after the attempt ended: answered at once, never shown.
+            attempt.requestPassword("Dev", "nate") shouldBe null
+            broker.pending.value shouldBe null
+        }
+
+    @Test
+    fun `a password typed into a withdrawn question is zeroed`() =
+        runBlocking<Unit> {
+            val broker = InteractionBroker(timeout = 10.seconds)
+            val attempt = broker.questions()
+            val asked = async(Dispatchers.IO) { attempt.requestPassword("Dev", "nate") }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            val shown = broker.pending.value!!
+            attempt.withdraw()
+            asked.await() shouldBe null
+            val late = "hunter2".toCharArray()
+            broker.answer(shown, late) // the dialog's OK, tapped as it closed
+            late.all { it == '\u0000' } shouldBe true
+        }
+
+    @Test
+    fun `cancelling a connection attempt closes its password question`() =
+        runBlocking<Unit> {
+            val hostId = data.hosts.upsert(Host(label = "Dev", hostname = "dev.example.com", username = "nate"))
+            val broker = InteractionBroker(timeout = 10.seconds)
+            // Like sshj: the password is asked for on a blocked I/O thread that cancellation can't reach.
+            val engine =
+                object : SshEngine {
+                    override suspend fun connect(
+                        target: ConnectTarget,
+                        hostKeys: HostKeyVerifier,
+                        options: ConnectOptions,
+                    ): SshConnection =
+                        withContext(Dispatchers.IO) {
+                            val typed =
+                                target.credentials
+                                    .single()
+                                    .shouldBeInstanceOf<Credential.Password>()
+                                    .supply()
+                            // No cancellation check: the I/O thread may see the withdrawn (empty)
+                            // password before the cancellation reaches it.
+                            throw AuthenticationFailedException("rejected ${typed.size}")
+                        }
+                }
+            val connector =
+                DefaultHostConnector(
+                    data.hosts,
+                    data.knownHosts,
+                    HostCredentials(data.identities, { null }, broker),
+                    broker,
+                    engine,
+                ) { 1L }
+            val attempt = scope.async { connector.connect(hostId) }
+            while (broker.pending.value == null) delay(5.milliseconds)
+            broker.pending.value shouldBe Interaction.Password("Dev", "nate")
+            withTimeout(5.seconds) { attempt.cancelAndJoin() }
+            broker.pending.value shouldBe null
+            // Reported as cancelled, not as the rejected empty password (which would go uncaught).
+            shouldThrow<CancellationException> { attempt.await() }
+            data.hosts.get(hostId)!!.lastConnectedAtEpochMs shouldBe null
         }
 
     @Test

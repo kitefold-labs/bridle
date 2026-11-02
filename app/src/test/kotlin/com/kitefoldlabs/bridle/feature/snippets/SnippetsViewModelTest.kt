@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.core.model.Snippet
 import com.kitefoldlabs.bridle.core.model.SnippetRunMode
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.feature.FakeConnection
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.connections
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
@@ -18,8 +19,6 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -39,14 +38,14 @@ class SnippetsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(ApplicationProvider.getApplicationContext())
     }
 
     @After
     fun tearDown() {
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
     private fun viewModel(target: SnippetTarget? = null) =

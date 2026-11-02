@@ -4,13 +4,18 @@ import android.app.Application
 import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.data.DataModule
 import com.kitefoldlabs.bridle.core.data.settings.NotificationEvent
 import com.kitefoldlabs.bridle.core.data.settings.Settings
+import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.core.data.settings.ThemeMode
+import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
 import com.kitefoldlabs.bridle.core.terminal.KeyBarLayout
+import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
 import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.matchers.nulls.shouldBeNull
@@ -18,14 +23,16 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -36,19 +43,45 @@ class SettingsViewModelTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
+        TestMain.set(Dispatchers.Unconfined)
         data = testData(ApplicationProvider.getApplicationContext())
     }
 
     @After
     fun tearDown() {
         data.close()
-        Dispatchers.resetMain()
+        TestMain.reset()
     }
 
-    private fun viewModel() = SettingsViewModel(data.settings, { available })
+    private fun viewModel() = SettingsViewModel(data.settings, { available }, data.composeHistory)
 
     private fun SettingsViewModel.current(): Settings = settings.value!!
+
+    @Test
+    fun `a store that can't be written leaves the settings alone instead of crashing`() {
+        val broken =
+            object : DataStore<Preferences> {
+                override val data: Flow<Preferences> = flow { throw IOException("disk on fire") }
+
+                override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                    throw IOException("disk on fire")
+            }
+        val vm = SettingsViewModel(SettingsRepository(broken), { available }, data.composeHistory)
+        eventually { vm.settings.value == SettingsRepository.UNREADABLE }
+        val thread = Thread.currentThread()
+        val previous = thread.uncaughtExceptionHandler
+        val uncaught = mutableListOf<Throwable>()
+        thread.setUncaughtExceptionHandler { _, e -> uncaught += e }
+        try {
+            vm.setTheme(ThemeMode.DARK)
+            vm.setAppLock(false)
+            vm.setRememberComposeHistory(false)
+        } finally {
+            thread.uncaughtExceptionHandler = previous
+        }
+        uncaught shouldBe emptyList()
+        vm.settings.value shouldBe SettingsRepository.UNREADABLE
+    }
 
     @Test
     fun `writes every preference`() {
@@ -80,6 +113,19 @@ class SettingsViewModelTest {
         s.useHelperByDefault shouldBe false
         vm.setAppLock(false)
         eventually { !vm.current().appLockEnabled }
+    }
+
+    @Test
+    fun `turning compose history off deletes what was saved`() {
+        val vm = viewModel()
+        val host = runBlocking { data.hosts.upsert(Host(label = "devbox", hostname = "devbox", username = "me")) }
+        runBlocking { data.composeHistory.save(host, listOf("hunter2")) }
+        vm.setRememberComposeHistory(true)
+        eventually { vm.settings.value?.rememberComposeHistory == true }
+        runBlocking { data.composeHistory.get(host) } shouldBe listOf("hunter2")
+        vm.setRememberComposeHistory(false)
+        eventually { vm.settings.value?.rememberComposeHistory == false }
+        eventually { runBlocking { data.composeHistory.get(host) }.isEmpty() }
     }
 
     @Test

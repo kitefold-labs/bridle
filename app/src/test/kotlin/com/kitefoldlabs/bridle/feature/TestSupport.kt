@@ -1,6 +1,8 @@
 package com.kitefoldlabs.bridle.feature
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import com.google.crypto.tink.Aead
@@ -28,15 +30,22 @@ import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.service.SessionCoordinator
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.rules.TestWatcher
@@ -51,18 +60,95 @@ import java.security.PublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.MGF1ParameterSpec
 import java.util.Base64
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.crypto.Cipher
 import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /** Runs view-model coroutines eagerly on the calling thread (Room resumes them on its own threads). */
-@OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule : TestWatcher() {
-    override fun starting(description: Description) = Dispatchers.setMain(Dispatchers.Unconfined)
+    override fun starting(description: Description) = TestMain.set(Dispatchers.Unconfined)
 
-    override fun finished(description: Description) = Dispatchers.resetMain()
+    override fun finished(description: Description) = TestMain.reset()
+}
+
+/**
+ * `Dispatchers.Main` for tests: use [set] and [reset], never `Dispatchers.setMain`/`resetMain`.
+ *
+ * kotlinx-coroutines-test's `setMain` and `resetMain` throw "Dispatchers.Main is used concurrently
+ * with setting it" if another thread reads `Dispatchers.Main` while they run, as a view model's
+ * collector does when Room resumes it on its own thread just as a test ends. A reader that only
+ * overlaps the write is remembered and thrown by the next `setMain`/`resetMain` instead, so the
+ * failure can surface in a later test, or another test class sharing the Robolectric sandbox.
+ *
+ * So `Dispatchers.Main` is set once per sandbox, before any view model exists, to a dispatcher
+ * whose target is a volatile field: switching it is safe from any thread, and a stray coroutine
+ * just goes to the old or the new target.
+ */
+@OptIn(ExperimentalCoroutinesApi::class, InternalCoroutinesApi::class)
+object TestMain {
+    @Volatile private var target: CoroutineDispatcher? = null
+
+    /** What `Dispatchers.Main` is outside [set]: the main looper, as in the app. */
+    private val looper: MainCoroutineDispatcher by lazy {
+        Handler.createAsync(Looper.getMainLooper()).asCoroutineDispatcher("Main")
+    }
+
+    /** For a target that can't delay (`Dispatchers.Unconfined`), as kotlinx-coroutines-test does. */
+    private val timer: Delay by lazy {
+        Executors
+            .newSingleThreadScheduledExecutor { Thread(it, "TestMain timer").apply { isDaemon = true } }
+            .asCoroutineDispatcher() as Delay
+    }
+
+    private val installed = AtomicBoolean(false)
+
+    /** Makes `Dispatchers.Main` run on [dispatcher] until [reset]. */
+    fun set(dispatcher: CoroutineDispatcher) {
+        if (installed.compareAndSet(false, true)) Dispatchers.setMain(Switch(isImmediate = false))
+        target = dispatcher
+    }
+
+    /** Back to the main looper. */
+    fun reset() {
+        target = null
+    }
+
+    private class Switch(
+        private val isImmediate: Boolean,
+    ) : MainCoroutineDispatcher(),
+        Delay {
+        override val immediate: MainCoroutineDispatcher
+            get() = if (isImmediate) this else IMMEDIATE
+
+        private fun current(): CoroutineDispatcher = target ?: if (isImmediate) looper.immediate else looper
+
+        private fun delay(): Delay = current() as? Delay ?: timer
+
+        override fun isDispatchNeeded(context: CoroutineContext): Boolean = current().isDispatchNeeded(context)
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) = current().dispatch(context, block)
+
+        override fun scheduleResumeAfterDelay(
+            timeMillis: Long,
+            continuation: CancellableContinuation<Unit>,
+        ) = delay().scheduleResumeAfterDelay(timeMillis, continuation)
+
+        override fun invokeOnTimeout(
+            timeMillis: Long,
+            block: Runnable,
+            context: CoroutineContext,
+        ): DisposableHandle = delay().invokeOnTimeout(timeMillis, block, context)
+    }
+
+    private val IMMEDIATE: MainCoroutineDispatcher = Switch(isImmediate = true)
 }
 
 /** An in-memory database plus the session plumbing view models need. */

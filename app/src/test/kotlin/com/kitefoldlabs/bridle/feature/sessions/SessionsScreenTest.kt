@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
@@ -20,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.data.settings.Settings
@@ -422,6 +426,23 @@ class SessionsScreenTest {
         rule.onNodeWithText("Restarted api").assertExists()
         rule.waitUntil(timeoutMillis = 10_000) { "shown" in actions.calls }
         actions.calls shouldContain "shown"
+    }
+
+    @Test
+    fun `environment values are masked until shown`() {
+        val form = ProfileForm.claudePreset(1, emptySet()).copy(env = listOf(EnvVar("ANTHROPIC_API_KEY", "sk-1")))
+        show(full.copy(editor = form))
+        // A password field either way (no IME learning); only what is drawn changes.
+        val password = SemanticsMatcher.keyIsDefined(SemanticsProperties.Password)
+
+        fun displayed(text: String) =
+            SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(text))
+        val value = rule.onNode(hasSetTextAction() and hasText("Value"))
+        value.assert(password).assert(displayed("••••"))
+        rule.onNodeWithContentDescription("Show value").performClick()
+        value.assert(password).assert(displayed("sk-1"))
+        rule.onNodeWithContentDescription("Hide value").performClick()
+        value.assert(displayed("••••"))
     }
 
     @Test

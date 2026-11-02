@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -23,15 +24,18 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Foreground service that keeps open SSH sessions alive while Bridle is in the background. It
- * runs only while tabs are open and reconnects immediately when the network changes. If Android
- * stops it anyway, nothing is lost: the work lives in tmux on the host.
+ * Foreground service that keeps open SSH sessions and file transfers alive while Bridle is in the
+ * background. It runs only while tabs are open or transfers are queued or running ([ForegroundWork])
+ * and reconnects immediately when the network changes. If Android stops it anyway, nothing is
+ * lost: the work lives in tmux on the host.
  */
 @AndroidEntryPoint
 class SessionService : LifecycleService() {
     @Inject lateinit var coordinator: SessionCoordinator
 
     @Inject lateinit var statusHub: ClaudeStatusHub
+
+    @Inject lateinit var work: ForegroundWork
 
     private val networkCallback =
         object : ConnectivityManager.NetworkCallback() {
@@ -40,7 +44,7 @@ class SessionService : LifecycleService() {
             }
         }
 
-    private var watchingTabs = false
+    private var watching = false
 
     /** The newest start request delivered; see [onStartCommand]. */
     private var lastStartId = 0
@@ -60,31 +64,29 @@ class SessionService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         lastStartId = startId
         // startForegroundService() requires startForeground() before the service may stop, even if
-        // the last tab closed in the meantime; so go foreground first, then follow the tabs.
-        goForeground(
-            coordinator.tabs.value.size
-                .coerceAtLeast(1),
-        )
-        if (!watchingTabs) {
-            watchingTabs = true
-            lifecycleScope.launch { coordinator.tabs.collect(::follow) }
+        // the last tab closed (or transfer ended) in the meantime; so go foreground first, then
+        // follow the work.
+        goForeground(work.current)
+        if (!watching) {
+            watching = true
+            lifecycleScope.launch { work.changes.collect(::follow) }
         } else {
-            // The tabs may all have closed before this start arrived, and the collector has
+            // The work may all have ended before this start arrived, and the collector has
             // nothing new to report then: check here, or the service would stay in the foreground.
-            follow(coordinator.tabs.value)
+            follow(work.current)
         }
         return START_NOT_STICKY
     }
 
-    private fun follow(tabs: List<TerminalTab>) {
-        if (tabs.isEmpty()) {
+    private fun follow(active: ActiveWork) {
+        if (active.isIdle) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             // Only if no start arrived since: a tab opened right after the last one closed has
             // already called startForegroundService(), and stopping before that start is handled
             // would crash the app ("did not then call startForeground"). It stops on that start.
             stopSelf(lastStartId)
         } else {
-            goForeground(tabs.size)
+            goForeground(active)
         }
     }
 
@@ -93,20 +95,36 @@ class SessionService : LifecycleService() {
         super.onDestroy()
     }
 
-    private fun goForeground(count: Int) {
+    private fun goForeground(active: ActiveWork) {
         ServiceCompat.startForeground(
             this,
             Notifications.ID_SESSIONS,
-            notification(this, count),
+            notification(this, active),
             foregroundType(),
         )
     }
 
     companion object {
-        /** Starts (or refreshes) the service; call after opening a tab. */
-        fun ensureRunning(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, SessionService::class.java))
-        }
+        /**
+         * Starts (or refreshes) the service; call after opening a tab or queueing a transfer.
+         * Returns false when Android won't start a foreground service right now: from the
+         * background on Android 12+ (say, a reconnect or a notification action) it throws
+         * `ForegroundServiceStartNotAllowedException`, an [IllegalStateException]. That is not
+         * worth failing for: the tab still works while Bridle runs, the work itself lives in tmux
+         * on the host, and the next start (opening a tab with the app in front) brings the service
+         * back. Only a fixed line is logged.
+         */
+        @Suppress("SwallowedException")
+        fun ensureRunning(context: Context): Boolean =
+            try {
+                ContextCompat.startForegroundService(context, Intent(context, SessionService::class.java))
+                true
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "Foreground service start not allowed now; continuing without it")
+                false
+            }
+
+        private const val TAG = "SessionService"
 
         /**
          * `specialUse` exists from Android 14; earlier versions take no type for this service. The
@@ -116,10 +134,26 @@ class SessionService : LifecycleService() {
         internal fun foregroundType(sdk: Int = Build.VERSION.SDK_INT): Int =
             if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
 
+        /** The ongoing notification; [active] says what is open (idle: a start that is about to stop). */
         internal fun notification(
             context: Context,
-            count: Int,
+            active: ActiveWork,
         ): Notification {
+            val res = context.resources
+            val sessions = active.tabs.coerceAtLeast(if (active.transfers == 0) 1 else 0)
+            val parts =
+                listOfNotNull(
+                    sessions.takeIf { it > 0 }?.let {
+                        res.getQuantityString(
+                            R.plurals.sessions_notification_text,
+                            it,
+                            it,
+                        )
+                    },
+                    active.transfers.takeIf { it > 0 }?.let {
+                        res.getQuantityString(R.plurals.sessions_notification_transfers, it, it)
+                    },
+                )
             val open =
                 PendingIntent.getActivity(
                     context,
@@ -131,7 +165,7 @@ class SessionService : LifecycleService() {
                 .Builder(context, Notifications.CHANNEL_SESSIONS)
                 .setSmallIcon(R.drawable.ic_stat_bridle)
                 .setContentTitle(context.getString(R.string.sessions_notification_title))
-                .setContentText(context.resources.getQuantityString(R.plurals.sessions_notification_text, count, count))
+                .setContentText(parts.joinToString(" · "))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(open)

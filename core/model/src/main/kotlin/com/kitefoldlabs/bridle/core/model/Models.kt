@@ -163,14 +163,7 @@ public data class LaunchProfile(
             listOf(
                 Validators.label(name),
                 Validators.sessionName(sessionName),
-                if (workingDir.isBlank()) {
-                    Validation.Invalid(
-                        "workingDir",
-                        Validation.Reason.BLANK,
-                    )
-                } else {
-                    Validation.Valid
-                },
+                Validators.workingDirectory(workingDir),
                 if (command.isBlank()) Validation.Invalid("command", Validation.Reason.BLANK) else Validation.Valid,
             ) + env.keys.map(Validators::envName),
         )

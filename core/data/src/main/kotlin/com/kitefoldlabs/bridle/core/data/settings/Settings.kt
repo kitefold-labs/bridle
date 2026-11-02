@@ -43,6 +43,11 @@ public data class Settings(
     val secureScreenEnabled: Boolean = false,
     /** Keep the screen on while a terminal is visible. */
     val keepScreenOn: Boolean = false,
+    /**
+     * Save what is sent from the compose box (per host, for ↑/↓) to the database. Off, history
+     * lasts only while Bridle runs.
+     */
+    val rememberComposeHistory: Boolean = true,
     /** Master switch for local notifications; see [notifies]. */
     val notificationsEnabled: Boolean = true,
     val notificationEvents: Set<NotificationEvent> = NotificationEvent.entries.toSet(),

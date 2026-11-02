@@ -12,15 +12,45 @@ public data class TmuxVersion(
     public companion object {
         /** Oldest tmux Bridle supports (respawn-pane -c, window-size, `=name` targets). */
         public val MINIMUM: TmuxVersion = TmuxVersion(3, 0)
+
+        /** First tmux whose `new-session` takes `-e NAME=value`. */
+        public val SESSION_ENV_FLAG: TmuxVersion = TmuxVersion(3, 2)
         private val DEVELOPMENT = TmuxVersion(99, 0)
         private val pattern = Regex("""(\d+)\.(\d+)""")
 
+        /**
+         * OpenBSD's base tmux reports the OS release (`tmux openbsd-7.4`), not its own version:
+         * the oldest OpenBSD release that shipped each tmux version Bridle checks for. Older
+         * releases count as too old.
+         */
+        private val openBsd =
+            listOf(
+                TmuxVersion(6, 9) to SESSION_ENV_FLAG,
+                TmuxVersion(6, 7) to TmuxVersion(3, 1),
+                TmuxVersion(6, 6) to MINIMUM,
+            )
+        private val TOO_OLD = TmuxVersion(2, 9)
+        private val openBsdPattern = Regex("""^tmux openbsd-(\d+)\.(\d+)""")
+
         public fun parse(output: String): TmuxVersion? {
             val text = output.trim()
-            if (!text.startsWith("tmux ")) return null
-            if (text == "tmux master") return DEVELOPMENT
-            val match = pattern.find(text) ?: return null
-            return TmuxVersion(match.groupValues[1].toInt(), match.groupValues[2].toInt())
+            val openBsdRelease = openBsdPattern.find(text)
+            return when {
+                !text.startsWith("tmux ") -> null
+                text == "tmux master" -> DEVELOPMENT
+                openBsdRelease != null ->
+                    of(openBsdRelease)?.let { os ->
+                        openBsd.firstOrNull { (since, _) -> os >= since }?.second ?: TOO_OLD
+                    }
+                else -> pattern.find(text)?.let(::of)
+            }
+        }
+
+        /** A version from a match's two groups; `null` if a number doesn't fit an Int. */
+        private fun of(match: MatchResult): TmuxVersion? {
+            val major = match.groupValues[1].toIntOrNull() ?: return null
+            val minor = match.groupValues[2].toIntOrNull() ?: return null
+            return TmuxVersion(major, minor)
         }
     }
 }

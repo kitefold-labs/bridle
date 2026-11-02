@@ -26,7 +26,9 @@ import java.util.Locale
 /**
  * App preferences on Jetpack DataStore. Reading never fails: missing, out-of-range or unreadable
  * values (including a key-bar layout that no longer parses) fall back to the [Settings] defaults.
- * Writers validate, so bad values are rejected when they are set rather than silently dropped.
+ * A store that can't be read at all gives [UNREADABLE]: the defaults, but with every privacy
+ * setting at its safe value, so an I/O error can't switch the lock off. Writers validate, so bad
+ * values are rejected when they are set rather than silently dropped.
  */
 public class SettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -34,8 +36,8 @@ public class SettingsRepository(
     /** The current settings; emits again whenever one changes. */
     public val settings: Flow<Settings> =
         dataStore.data
-            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
             .map(::read)
+            .catch { e -> if (e is IOException) emit(UNREADABLE) else throw e }
             .distinctUntilChanged()
 
     public suspend fun setTheme(theme: ThemeMode): Unit = update { it[THEME] = theme.name }
@@ -70,6 +72,8 @@ public class SettingsRepository(
     public suspend fun setSecureScreenEnabled(enabled: Boolean): Unit = update { it[SECURE_SCREEN] = enabled }
 
     public suspend fun setKeepScreenOn(enabled: Boolean): Unit = update { it[KEEP_SCREEN_ON] = enabled }
+
+    public suspend fun setRememberComposeHistory(enabled: Boolean): Unit = update { it[COMPOSE_HISTORY] = enabled }
 
     public suspend fun setNotificationsEnabled(enabled: Boolean): Unit = update { it[NOTIFICATIONS] = enabled }
 
@@ -116,6 +120,7 @@ public class SettingsRepository(
         internal val APP_LOCK = booleanPreferencesKey("app_lock_enabled")
         internal val SECURE_SCREEN = booleanPreferencesKey("secure_screen_enabled")
         internal val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        internal val COMPOSE_HISTORY = booleanPreferencesKey("remember_compose_history")
         internal val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         internal val CRASH_REPORTING = booleanPreferencesKey("crash_reporting_opt_in")
         internal val USE_HELPER = booleanPreferencesKey("use_helper_by_default")
@@ -125,6 +130,17 @@ public class SettingsRepository(
             }
 
         private val defaults = Settings()
+
+        /**
+         * What [settings] gives when the store can't be read (an [IOException]): the defaults,
+         * except that the privacy settings fail closed: app lock and FLAG_SECURE on, compose
+         * history kept in memory only. Failing closed costs one unlock (which still works, as long
+         * as the device has a screen lock); failing open would hand the app to whoever holds the
+         * phone, or write a password sent from the compose box to disk for a user who had turned
+         * that off.
+         */
+        public val UNREADABLE: Settings =
+            Settings(appLockEnabled = true, secureScreenEnabled = true, rememberComposeHistory = false)
 
         private fun isValidFontFamilyId(id: String): Boolean =
             id.isNotBlank() && id.length <= Settings.MAX_FONT_FAMILY_ID_LENGTH
@@ -155,6 +171,7 @@ public class SettingsRepository(
                 appLockEnabled = prefs[APP_LOCK] ?: defaults.appLockEnabled,
                 secureScreenEnabled = prefs[SECURE_SCREEN] ?: defaults.secureScreenEnabled,
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+                rememberComposeHistory = prefs[COMPOSE_HISTORY] ?: defaults.rememberComposeHistory,
                 notificationsEnabled = prefs[NOTIFICATIONS] ?: defaults.notificationsEnabled,
                 notificationEvents =
                     NotificationEvent.entries.filterTo(mutableSetOf()) { event ->

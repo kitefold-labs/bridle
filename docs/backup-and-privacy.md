@@ -111,7 +111,11 @@ Bridle replaces:
 | URLs | `<url>` |
 | `SHA256:` and MD5 key fingerprints | `<fingerprint>` |
 | Long hex or base64 strings (possible keys or tokens), also as `key=value` | `<redacted>` |
-| The names, hostnames and usernames from your own configuration | `<redacted>` |
+| From your own configuration: host labels, hostnames and IP addresses, usernames, tmux session names (a host's default session and each Launch Profile's), Launch Profile names and working directories | `<redacted>` |
+
+Bridle keeps the list of your configured values up to date in memory as you edit hosts and
+profiles, so the crash handler never has to read the database. tmux sessions you started
+elsewhere, and never saved in Bridle, aren't on the list.
 
 Terminal content is never part of a report. Scrubbing errs on the side of removing too much: a
 file name may show up as `<host>`. It works on the *shape* of text, so some things can't be
