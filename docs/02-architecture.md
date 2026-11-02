@@ -173,7 +173,10 @@ interface SshConnection : Closeable {
   grace period after the last channel closes.
 - **Reconnect policy:** the app listens for network changes
   (`ConnectivityManager.NetworkCallback`) and reconnects immediately when the
-  network changes. Otherwise it uses exponential backoff (1s → 30s) while a
+  network changes. A connection that still looks up is probed with a no-op
+  `exec` (`true`, 5-second timeout) and reconnected if it doesn't answer, so a
+  Wi-Fi/LTE switch doesn't wait for the keepalive to notice the dead link.
+  Otherwise it uses exponential backoff (1s → 30s) while a
   terminal tab is visible. After reconnecting, each TerminalSession reopens its
   shell and re-runs its attach command. tmux redraws the full screen, so no
   state needs to be replayed.

@@ -107,7 +107,8 @@ where they were:
 
 - When the connection drops, the terminal shows **Connection lost. Reattaching…**. Bridle
   reconnects with backoff, and immediately when the phone gets a network again, then reattaches
-  to the same tmux session. Claude kept running on the host the whole time.
+  to the same tmux session. When you move between Wi-Fi and mobile data, Bridle checks each
+  connection within a few seconds and replaces the ones that no longer answer. Claude kept running on the host the whole time.
 - A tab that ended (say, after you detached tmux) shows **Session ended** with a **Reconnect**
   button, which opens the same session again.
 - Plain shell tabs (not tmux) can't survive a drop. To make every connection to a host land in

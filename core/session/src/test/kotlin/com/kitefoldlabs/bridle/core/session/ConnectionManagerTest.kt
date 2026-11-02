@@ -4,6 +4,7 @@ import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.ssh.AuthenticationFailedException
 import com.kitefoldlabs.bridle.core.ssh.ConnectionFailedException
 import com.kitefoldlabs.bridle.core.ssh.Credential
+import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.HostKeyChangedException
 import com.kitefoldlabs.bridle.core.ssh.ReconnectPolicy
 import io.kotest.assertions.throwables.shouldThrow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -137,6 +139,71 @@ class ConnectionManagerTest {
             m.closeAll()
             m.state(1).value shouldBe HostConnectionState.Idle
             m.reconnect(1) // unknown host: no-op
+        }
+
+    @Test
+    fun `network change probes a connected host and reconnects it if the link is dead`() =
+        runTest {
+            val connector = ScriptedConnector()
+            val m = manager(connector)
+            val lease = m.acquire(1)
+            val old = lease.awaitConnection() as FakeConnection
+            old.onExec = { awaitCancellation() } // the TCP link died without a FIN
+
+            m.onNetworkChanged()
+            runCurrent()
+            old.execs shouldBe listOf("true")
+            lease.state.value.shouldBeInstanceOf<HostConnectionState.Connected>() // still probing
+            advanceTimeBy(6.seconds)
+            runCurrent()
+            old.closed shouldBe true
+            lease.state.value
+                .shouldBeInstanceOf<HostConnectionState.Connected>()
+                .connection shouldBe connector.made[1]
+
+            // A probe that fails outright reconnects at once.
+            connector.made[1].onExec = { throw IOException("broken pipe") }
+            m.onNetworkChanged()
+            runCurrent()
+            lease.state.value
+                .shouldBeInstanceOf<HostConnectionState.Connected>()
+                .connection shouldBe connector.made[2]
+
+            // One that answers, whatever the exit status, keeps the connection.
+            connector.made[2].onExec = { ExecResult(1, "", "") }
+            m.onNetworkChanged()
+            settle()
+            connector.attempts.size shouldBe 3
+            lease.close()
+        }
+
+    @Test
+    fun `a probe that times out leaves alone a host that reconnected or was released meanwhile`() =
+        runTest {
+            val connector = ScriptedConnector()
+            val m = manager(connector)
+            val lease = m.acquire(1)
+            val first = lease.awaitConnection() as FakeConnection
+            first.onExec = { awaitCancellation() }
+            m.onNetworkChanged()
+            runCurrent()
+            first.drop() // noticed by the transport first: the manager reconnects on its own
+            advanceTimeBy(2.seconds)
+            runCurrent()
+            val second = lease.awaitConnection() as FakeConnection
+            second shouldBe connector.made[1]
+            advanceTimeBy(10.seconds)
+            runCurrent()
+            connector.attempts.size shouldBe 2 // the stale probe didn't restart the new connection
+
+            second.onExec = { awaitCancellation() }
+            m.onNetworkChanged()
+            runCurrent()
+            lease.close()
+            advanceTimeBy(10.seconds) // the probe times out within the idle grace period
+            runCurrent()
+            connector.attempts.size shouldBe 2
+            second.closed shouldBe false
         }
 
     @Test
