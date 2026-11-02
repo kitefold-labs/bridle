@@ -48,7 +48,7 @@ class RoutesTest {
     private val world = TestWorld(context, scope)
     private val navigator = TerminalNavigator()
     private val launcher =
-        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator, {}, scope)
+        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine() }, {}, navigator, { _, _ -> }, scope)
     private val store = ViewModelStore()
 
     @After

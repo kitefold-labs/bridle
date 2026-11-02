@@ -121,10 +121,9 @@ class FeatureWiringTest {
             forwards.statuses.await { forward in it }
             // Nothing listens on port 1, so the paste has no open terminal to go to.
             snippetTarget.get().paste(id, "uptime") shouldBe false
-            // Stopped here, not by tearDown's "Disconnect all": the forward may not hold its lease
-            // yet (TerminalLauncherTest checks that "Disconnect all" stops running forwards).
-            forwards.stop(forward)
-            forwards.statuses.value shouldBe emptyMap()
+            // "Disconnect all" stops it, also if it does not hold its lease yet (no tab is left).
+            coordinator.disconnectAll()
+            forwards.statuses.await { it.isEmpty() }
         }
 
     /** Screens fill in as their data loads from the database. */

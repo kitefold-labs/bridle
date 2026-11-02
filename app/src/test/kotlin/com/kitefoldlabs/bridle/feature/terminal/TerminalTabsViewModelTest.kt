@@ -62,7 +62,7 @@ class TerminalTabsViewModelTest {
             { FakeEngine().also { engines += it } },
             {},
             navigator,
-            {},
+            { _, _ -> },
             scope,
         )
     private val store = ViewModelStore()

@@ -139,7 +139,7 @@ class TerminalLauncher
         private fun startWithHost(hostId: EntityId) {
             scope.launch {
                 try {
-                    autoStart.start(hostId)
+                    autoStart.start(hostId) { coordinator.tabs.value.any { it.hostId == hostId } }
                 } catch (
                     @Suppress("TooGenericExceptionCaught") _: Exception,
                 ) {

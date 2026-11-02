@@ -42,7 +42,7 @@ class TerminalSnippetTargetTest {
             { FakeEngine().also { engines += it } },
             {},
             navigator,
-            {},
+            { _, _ -> },
             scope,
         )
     private val target = TerminalSnippetTarget(world.coordinator, navigator)

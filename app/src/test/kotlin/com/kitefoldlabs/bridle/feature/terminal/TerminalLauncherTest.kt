@@ -57,7 +57,7 @@ class TerminalLauncherTest {
     private val engines = CopyOnWriteArrayList<FakeEngine>()
     private var serviceStarts = 0
     private val navigator = TerminalNavigator()
-    private var autoStart = HostAutoStart {}
+    private var autoStart = HostAutoStart { _, _ -> }
     private val launcher =
         TerminalLauncher(
             world.coordinator,
@@ -65,7 +65,7 @@ class TerminalLauncherTest {
             { FakeEngine().also { engines += it } },
             { serviceStarts++ },
             navigator,
-            { autoStart.start(it) },
+            { hostId, wanted -> autoStart.start(hostId, wanted) },
             scope,
         )
 
@@ -173,7 +173,7 @@ class TerminalLauncherTest {
                     { refusing },
                     { serviceStarts++ },
                     navigator,
-                    { error("not started for a tab that failed to open") },
+                    { _, _ -> error("not started for a tab that failed to open") },
                     scope,
                 )
             shouldThrow<IllegalStateException> { failing.openTerminal(id) }
@@ -187,7 +187,7 @@ class TerminalLauncherTest {
     fun `opening a tab starts the host's auto-start forwards, and disconnect all stops them`() =
         runBlocking<Unit> {
             val forwards = ForwardManager(world.connections, world.data.portForwards, scope)
-            autoStart = HostAutoStart { forwards.startAutoForwards(it) }
+            autoStart = HostAutoStart { hostId, wanted -> forwards.startAutoForwards(hostId, wanted) }
             val id = world.addHost()
             val other = world.addHost("other")
             val auto =
@@ -212,13 +212,42 @@ class TerminalLauncherTest {
         }
 
     @Test
+    fun `an auto start still reading its forwards when disconnect all comes starts nothing`() =
+        runBlocking<Unit> {
+            val forwards = ForwardManager(world.connections, world.data.portForwards, scope)
+            val reading = CompletableDeferred<Unit>()
+            val done = CompletableDeferred<Unit>()
+            val wantedWhileOpen = CompletableDeferred<Boolean>()
+            autoStart =
+                HostAutoStart { hostId, wanted ->
+                    wantedWhileOpen.complete(wanted())
+                    reading.await()
+                    forwards.startAutoForwards(hostId, wanted)
+                    done.complete(Unit)
+                }
+            val id = world.addHost()
+            world.data.portForwards.upsert(
+                PortForward(hostId = id, type = PortForwardType.DYNAMIC, bindPort = freePort(), autoStart = true),
+            )
+            launcher.openTerminal(id)
+            withTimeout(5_000) { wantedWhileOpen.await() } shouldBe true
+
+            world.coordinator.disconnectAll()
+            reading.complete(Unit)
+            withTimeout(5_000) { done.await() }
+            // No forward, and nothing connected the host again.
+            forwards.statuses.value shouldBe emptyMap()
+            world.connections.activeHosts() shouldBe emptySet()
+        }
+
+    @Test
     fun `auto start runs in the background for every tab and its failures stay there`() =
         runBlocking<Unit> {
             val id = world.addHost()
             val started = CopyOnWriteArrayList<Long>()
             val never = CompletableDeferred<Unit>()
             autoStart =
-                HostAutoStart { host ->
+                HostAutoStart { host, _ ->
                     started += host
                     never.await() // a slow start never holds up the terminal
                 }
@@ -227,7 +256,7 @@ class TerminalLauncherTest {
             awaitUntil { started == listOf(id) }
 
             autoStart =
-                HostAutoStart { host ->
+                HostAutoStart { host, _ ->
                     started += host
                     throw IOException("database gone")
                 }

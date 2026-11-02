@@ -59,12 +59,24 @@ class ForwardManager
         /** Status of every started forward, by forward id. Stopped forwards are absent. */
         val statuses: StateFlow<Map<EntityId, ForwardStatus>> = mutable.asStateFlow()
 
-        /** Starts [forward] (no-op if it is already running). */
-        fun start(forward: PortForward) {
-            if (jobs.containsKey(forward.id)) return
+        /**
+         * Starts [forward] (no-op if it is already running), unless [wanted] says no: it is asked
+         * before and again once the forward holds its host's lease. From then on "Disconnect all"
+         * stops the forward (its connection goes [HostConnectionState.Idle]), so an auto-start
+         * racing "Disconnect all" can't bring the host back up.
+         */
+        fun start(
+            forward: PortForward,
+            wanted: () -> Boolean = { true },
+        ) {
+            if (jobs.containsKey(forward.id) || !wanted()) return
             val job =
                 scope.launch(start = CoroutineStart.LAZY) {
                     connections.acquire(forward.hostId).use { lease ->
+                        if (!wanted()) {
+                            stop(forward.id)
+                            return@launch
+                        }
                         lease.state.collectLatest { state ->
                             when (state) {
                                 is HostConnectionState.Connected -> serve(forward, state.connection)
@@ -89,14 +101,18 @@ class ForwardManager
 
         /**
          * Starts the forwards of [hostId] marked "start automatically" (those already running are
-         * left alone). Runs whenever a terminal opens on the host ([ForwardsModule]).
+         * left alone) while [wanted] holds (see [start]). Runs whenever a terminal opens on the
+         * host ([ForwardsModule]), wanted while the host still has a terminal tab.
          */
-        suspend fun startAutoForwards(hostId: EntityId) {
+        suspend fun startAutoForwards(
+            hostId: EntityId,
+            wanted: () -> Boolean = { true },
+        ) {
             repository
                 .observeForHost(hostId)
                 .first()
                 .filter { it.autoStart }
-                .forEach(::start)
+                .forEach { start(it, wanted) }
         }
 
         private suspend fun serve(
@@ -150,5 +166,6 @@ class ForwardManager
 @InstallIn(SingletonComponent::class)
 object ForwardsModule {
     @Provides
-    fun hostAutoStart(forwards: ForwardManager): HostAutoStart = HostAutoStart { forwards.startAutoForwards(it) }
+    fun hostAutoStart(forwards: ForwardManager): HostAutoStart =
+        HostAutoStart { hostId, wanted -> forwards.startAutoForwards(hostId, wanted) }
 }

@@ -26,7 +26,15 @@ fun interface TerminalEngineFactory {
  * port forwards ([com.kitefoldlabs.bridle.feature.forwards.ForwardManager.startAutoForwards]).
  */
 fun interface HostAutoStart {
-    suspend fun start(hostId: EntityId)
+    /**
+     * Starts [hostId]'s work while [wanted] is true: it turns false once the host has no tab
+     * left (closed, or "Disconnect all" while the work was still starting), and then nothing
+     * may start, since it would connect the host again.
+     */
+    suspend fun start(
+        hostId: EntityId,
+        wanted: () -> Boolean,
+    )
 }
 
 /** Starts (or refreshes) the foreground service that keeps open tabs alive in the background. */
