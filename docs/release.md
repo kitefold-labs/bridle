@@ -276,10 +276,11 @@ The repository moved from `nkoenig/terminal`; GitHub redirects the old URLs. The
 (`GitHubIssueUrl.DEFAULT_REPO`, the source and privacy links) and the docs point at the new
 home. On the repository itself, check that these are on:
 
-- Private vulnerability reporting (Settings → Code security), which `SECURITY.md` and the
-  issue template's security link rely on.
+- Private vulnerability reporting (repository Settings → *Advanced Security*, called *Code
+  security* on some plans), which `SECURITY.md` and the issue template's security link rely on.
 - Branch protection or a ruleset on `main` with the required checks *Pre-commit hooks*,
   *Build, test, coverage gate* and *Analyze (java-kotlin)*.
-- Dependabot version updates (from `.github/dependabot.yml`) and CodeQL (from its workflow).
+- Dependabot version updates (from `.github/dependabot.yml`) and CodeQL (from its workflow;
+  leave CodeQL *default setup* off, or GitHub rejects the workflow's uploads).
 - The `release` environment, limited to `v*` tags, with required reviewers and the
   `BRIDLE_SIGNING_*` secrets if CI signs; and a ruleset protecting `v*` tags.

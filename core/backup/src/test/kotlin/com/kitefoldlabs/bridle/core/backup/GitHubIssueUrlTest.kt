@@ -46,9 +46,9 @@ class GitHubIssueUrlTest {
     @Test
     fun `long traces are trimmed at a line break with a marker`() {
         val r = report(bigTrace(400))
-        val url = GitHubIssueUrl.build("kitefold-labs/bridle", r, "notes")
+        val url = GitHubIssueUrl.build("some-org/fork.of_bridle", r, "notes")
         url.length shouldBeLessThanOrEqual GitHubIssueUrl.MAX_URL_LENGTH
-        url shouldStartWith "https://github.com/kitefold-labs/bridle/issues/new?"
+        url shouldStartWith "https://github.com/some-org/fork.of_bridle/issues/new?"
         val body = params(url).getValue("report")
         body shouldStartWith header + "\n\n\tat com.kitefoldlabs.bridle.App.method1(App.kt:1)\n"
         body shouldEndWith ")\n[truncated]"
