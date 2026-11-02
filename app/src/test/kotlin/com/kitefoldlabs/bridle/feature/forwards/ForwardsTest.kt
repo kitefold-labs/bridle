@@ -24,7 +24,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -60,7 +61,8 @@ class ForwardsTest {
 
     @After
     fun tearDown() {
-        scope.cancel()
+        // Forwards' coroutines must stop before the database they read closes.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         data.close()
         Dispatchers.resetMain()
     }
