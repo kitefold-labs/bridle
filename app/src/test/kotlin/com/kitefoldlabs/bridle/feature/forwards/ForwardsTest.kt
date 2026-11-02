@@ -24,7 +24,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -37,6 +38,7 @@ import org.robolectric.annotation.Config
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.atomic.AtomicInteger
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -59,7 +61,8 @@ class ForwardsTest {
 
     @After
     fun tearDown() {
-        scope.cancel()
+        // Forwards' coroutines must stop before the database they read closes.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         data.close()
         Dispatchers.resetMain()
     }
@@ -226,6 +229,19 @@ class ForwardsTest {
         // "Disconnect all" stops every forward.
         runBlocking { manager.closeAll() }
         eventually { forwards.statuses.value.isEmpty() }
+    }
+
+    @Test
+    fun `a forward no longer wanted once it holds its lease stops and lets the connection go`() {
+        val asked = AtomicInteger()
+        // Wanted when started, not by the time the lease is held (the host's last tab closed).
+        forwards.start(local(freePort(), id = 6)) { asked.getAndIncrement() == 0 }
+        eventually { asked.get() == 2 && forwards.statuses.value.isEmpty() }
+        eventually { runBlocking { manager.activeHosts() }.isEmpty() }
+        // Not wanted at all: nothing starts.
+        forwards.start(local(freePort(), id = 7)) { false }
+        forwards.statuses.value shouldBe emptyMap()
+        asked.get() shouldBe 2
     }
 
     @Test

@@ -74,7 +74,6 @@
     <string name="snippets_no_output">(no output)</string>
     <string name="snippets_output_shortened">Long output: only its end is shown, without terminal colours and control codes.</string>
     <string name="snippets_run_failed">Couldn\'t run: %1$s</string>
-    <string name="snippets_pasted">Pasted into the terminal. Press Enter there to run it.</string>
     <string name="snippets_no_terminal">No terminal is open on this host. Open one first, or run the snippet and show its output.</string>
     <string name="snippets_saved">Snippet saved</string>
     <string name="snippets_deleted">Snippet deleted</string>

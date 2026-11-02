@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -41,10 +43,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
+import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.KeyBarLayout
 import com.kitefoldlabs.bridle.core.terminalui.TerminalScreen
 import com.kitefoldlabs.bridle.core.terminalui.TerminalScreenState
+import com.kitefoldlabs.bridle.ui.nav.HostTool
+import com.kitefoldlabs.bridle.ui.nav.HostTools
+import com.kitefoldlabs.bridle.ui.nav.LocalNavController
 
 /** The terminal destination: open tabs, wired to [TerminalTabsViewModel] and the user's settings. */
 @Composable
@@ -61,6 +67,7 @@ fun TerminalTabsRoute(
         viewModel.setVisibleTab(selected)
         onStopOrDispose { viewModel.setVisibleTab(null) }
     }
+    val tools = HostTools(LocalNavController.current)
     TerminalTabsScreen(
         tabs = tabs,
         selectedTabId = selected,
@@ -68,12 +75,14 @@ fun TerminalTabsRoute(
         keyBarLayout = settings?.keyBarLayout ?: KeyBarLayout.DEFAULT,
         actions = viewModel,
         onBack = onBack,
+        onOpenTool = @DontMemoize { hostId, tool -> tools.open(hostId, tool) },
     )
 }
 
 /**
  * Open terminal tabs in a scrollable tab row (each with a close button) above the selected tab's
- * [TerminalScreen]. A tab without a screen state yet (settings still loading) shows nothing.
+ * [TerminalScreen]. A tab without a screen state yet (settings still loading) shows nothing. The
+ * overflow menu opens [TERMINAL_TOOLS] on the selected tab's host through [onOpenTool].
  */
 @Composable
 fun TerminalTabsScreen(
@@ -83,6 +92,7 @@ fun TerminalTabsScreen(
     keyBarLayout: KeyBarLayout,
     actions: TerminalTabsActions,
     onBack: () -> Unit,
+    onOpenTool: (EntityId, HostTool) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectedIndex = tabs.indexOfFirst { it.id == selectedTabId }.coerceAtLeast(0)
@@ -106,7 +116,10 @@ fun TerminalTabsScreen(
                 ) {
                     tabs.forEach { tab -> TerminalTabTitle(tab, tab.id == current.id, actions) }
                 }
-                TabMenu(onClearHistory = { actions.clearHistory(current.hostId) })
+                TabMenu(
+                    onOpenTool = { tool -> onOpenTool(current.hostId, tool) },
+                    onClearHistory = { actions.clearHistory(current.hostId) },
+                )
             }
         }
         if (current == null) {
@@ -168,14 +181,30 @@ private fun TerminalTabTitle(
     }
 }
 
+/** The host tools the terminal's menu offers for the selected tab's host. */
+internal val TERMINAL_TOOLS = listOf(HostTool.FILES, HostTool.SNIPPETS)
+
 @Composable
-private fun TabMenu(onClearHistory: () -> Unit) {
+private fun TabMenu(
+    onOpenTool: (HostTool) -> Unit,
+    onClearHistory: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.terminal_more))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            TERMINAL_TOOLS.forEach { tool ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(tool.label)) },
+                    onClick = {
+                        expanded = false
+                        onOpenTool(tool)
+                    },
+                )
+            }
+            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.terminal_clear_history)) },
                 onClick = {

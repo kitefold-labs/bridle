@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.feature.terminal
 
 import android.content.Context
+import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.core.terminalui.EngineSink
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
@@ -17,6 +18,23 @@ import dagger.hilt.components.SingletonComponent
  */
 fun interface TerminalEngineFactory {
     fun create(): TerminalEngine
+}
+
+/**
+ * What starts with a host's terminal: [TerminalLauncher] calls it each time it opens a tab on a
+ * host, so it must do nothing for work that is already running. Bound to the host's auto-start
+ * port forwards ([com.kitefoldlabs.bridle.feature.forwards.ForwardManager.startAutoForwards]).
+ */
+fun interface HostAutoStart {
+    /**
+     * Starts [hostId]'s work while [wanted] is true: it turns false once the host has no tab
+     * left (closed, or "Disconnect all" while the work was still starting), and then nothing
+     * may start, since it would connect the host again.
+     */
+    suspend fun start(
+        hostId: EntityId,
+        wanted: () -> Boolean,
+    )
 }
 
 /**

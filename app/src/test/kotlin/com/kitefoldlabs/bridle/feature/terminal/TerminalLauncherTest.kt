@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.connect.UnknownHostException
+import com.kitefoldlabs.bridle.core.model.PortForward
+import com.kitefoldlabs.bridle.core.model.PortForwardType
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
@@ -11,7 +13,10 @@ import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.TestWorld
+import com.kitefoldlabs.bridle.feature.await
 import com.kitefoldlabs.bridle.feature.awaitUntil
+import com.kitefoldlabs.bridle.feature.forwards.ForwardManager
+import com.kitefoldlabs.bridle.feature.forwards.ForwardStatus
 import com.kitefoldlabs.bridle.service.SessionLink
 import com.kitefoldlabs.bridle.service.SessionLinks
 import com.kitefoldlabs.bridle.service.SessionService
@@ -20,13 +25,16 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -36,6 +44,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.IOException
+import java.net.ServerSocket
 import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
@@ -47,6 +57,7 @@ class TerminalLauncherTest {
     private val engines = CopyOnWriteArrayList<FakeEngine>()
     private var serviceStarts = 0
     private val navigator = TerminalNavigator()
+    private var autoStart = HostAutoStart { _, _ -> }
     private val launcher =
         TerminalLauncher(
             world.coordinator,
@@ -54,13 +65,16 @@ class TerminalLauncherTest {
             { FakeEngine().also { engines += it } },
             { serviceStarts++ },
             navigator,
+            { hostId, wanted -> autoStart.start(hostId, wanted) },
+            scope,
         )
 
     @After
     fun tearDown() {
         runBlocking { world.coordinator.disconnectAll() }
+        // Background work (auto-start forwards) must end before the database closes.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         world.data.close()
-        scope.cancel()
     }
 
     @Test
@@ -153,12 +167,106 @@ class TerminalLauncherTest {
                         set(_) = error("emulator gone")
                 }
             val failing =
-                TerminalLauncher(world.coordinator, world.data.hosts, { refusing }, { serviceStarts++ }, navigator)
+                TerminalLauncher(
+                    world.coordinator,
+                    world.data.hosts,
+                    { refusing },
+                    { serviceStarts++ },
+                    navigator,
+                    { _, _ -> error("not started for a tab that failed to open") },
+                    scope,
+                )
             shouldThrow<IllegalStateException> { failing.openTerminal(id) }
             engine.closed shouldBe true
             world.coordinator.tabs.value shouldBe emptyList()
             serviceStarts shouldBe 0
             awaitUntil { runBlocking { world.connections.activeHosts() }.isEmpty() }
+        }
+
+    @Test
+    fun `opening a tab starts the host's auto-start forwards, and disconnect all stops them`() =
+        runBlocking<Unit> {
+            val forwards = ForwardManager(world.connections, world.data.portForwards, scope)
+            autoStart = HostAutoStart { hostId, wanted -> forwards.startAutoForwards(hostId, wanted) }
+            val id = world.addHost()
+            val other = world.addHost("other")
+            val auto =
+                world.data.portForwards.upsert(
+                    PortForward(hostId = id, type = PortForwardType.DYNAMIC, bindPort = freePort(), autoStart = true),
+                )
+            world.data.portForwards.upsert(
+                PortForward(hostId = id, type = PortForwardType.DYNAMIC, bindPort = freePort()),
+            )
+            world.data.portForwards.upsert(
+                PortForward(hostId = other, type = PortForwardType.DYNAMIC, bindPort = freePort(), autoStart = true),
+            )
+
+            launcher.openTerminal(id)
+            forwards.statuses.await { it.keys == setOf(auto) }
+            launcher.openTerminal(id, AttachSpec.Tmux("api")) // already running: left alone
+            forwards.statuses.await { it.values.single().phase == ForwardStatus.Phase.RUNNING }
+            forwards.statuses.value.keys shouldBe setOf(auto)
+
+            world.coordinator.disconnectAll()
+            forwards.statuses.await { it.isEmpty() }
+        }
+
+    @Test
+    fun `an auto start still reading its forwards when disconnect all comes starts nothing`() =
+        runBlocking<Unit> {
+            val forwards = ForwardManager(world.connections, world.data.portForwards, scope)
+            val reading = CompletableDeferred<Unit>()
+            val done = CompletableDeferred<Unit>()
+            val wantedWhileOpen = CompletableDeferred<Boolean>()
+            autoStart =
+                HostAutoStart { hostId, wanted ->
+                    wantedWhileOpen.complete(wanted())
+                    reading.await()
+                    forwards.startAutoForwards(hostId, wanted)
+                    done.complete(Unit)
+                }
+            val id = world.addHost()
+            world.data.portForwards.upsert(
+                PortForward(hostId = id, type = PortForwardType.DYNAMIC, bindPort = freePort(), autoStart = true),
+            )
+            launcher.openTerminal(id)
+            withTimeout(5_000) { wantedWhileOpen.await() } shouldBe true
+
+            world.coordinator.disconnectAll()
+            reading.complete(Unit)
+            withTimeout(5_000) { done.await() }
+            // No forward, and nothing connected the host again.
+            forwards.statuses.value shouldBe emptyMap()
+            world.connections.activeHosts() shouldBe emptySet()
+        }
+
+    @Test
+    fun `auto start runs in the background for every tab and its failures stay there`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            val started = CopyOnWriteArrayList<Long>()
+            val never = CompletableDeferred<Unit>()
+            autoStart =
+                HostAutoStart { host, _ ->
+                    started += host
+                    never.await() // a slow start never holds up the terminal
+                }
+            val tab = withTimeout(5_000) { launcher.openTerminal(id) }
+            navigator.selectedTabId.value shouldBe tab.id
+            awaitUntil { started == listOf(id) }
+
+            autoStart =
+                HostAutoStart { host, _ ->
+                    started += host
+                    throw IOException("database gone")
+                }
+            val replaced = launcher.reconnect(tab.id)!!
+            awaitUntil { started == listOf(id, id) }
+            launcher.attachTmux(id, "api")
+            awaitUntil { started == listOf(id, id, id) }
+            world.coordinator.tabs.value
+                .map { it.id } shouldBe listOf(replaced.id, navigator.selectedTabId.value)
+            scope.isActive shouldBe true
         }
 
     @Test
@@ -234,6 +342,8 @@ class TerminalLauncherTest {
         TerminalModule.serviceStarter(context).ensureRunning()
         shadowOf(context).nextStartedService.component!!.className shouldContain SessionService::class.java.simpleName
     }
+
+    private fun freePort(): Int = ServerSocket(0).use { it.localPort }
 
     @Test
     fun `the navigator tracks the selected and visible tabs`() =

@@ -48,7 +48,8 @@ class FakeEngine(
 
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
-    override val isBracketedPasteEnabled = true
+
+    @Volatile override var isBracketedPasteEnabled = true
     override val isApplicationCursorKeys = false
 
     @Volatile override var onRemoteInput: ((ByteArray) -> Unit)? = null
