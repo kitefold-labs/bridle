@@ -25,7 +25,10 @@ class CrashReporter
     constructor(
         @param:ApplicationContext private val context: Context,
     ) {
-        /** Values the scrubber can't recognise by shape (single-word hostnames, usernames). */
+        /**
+         * Values the scrubber can't recognise by shape (single-word hostnames, usernames, session
+         * names), kept up to date by [CrashScrubList]. Read once per report, never blocking.
+         */
         @Volatile var sensitiveValues: Collection<String> = emptyList()
 
         private val file: File get() = File(context.noBackupFilesDir, FILE_NAME)

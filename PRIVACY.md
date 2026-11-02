@@ -57,8 +57,9 @@ Kitefold Labs never receives it.
 Bridle has no crash-reporting service, and nothing is ever sent automatically:
 
 1. If Bridle crashes, it saves a report on your phone, with hostnames, usernames, IP addresses,
-   file paths, key fingerprints and anything that looks like a secret removed. The report stays
-   in Bridle's private storage.
+   file paths, key fingerprints and anything that looks like a secret removed, as well as the
+   names of your saved hosts, Launch Profiles and tmux sessions. The report stays in Bridle's
+   private storage.
 2. On the next launch, Bridle asks whether you want to look at it. If you have turned on
    **Offer to report crashes** in Settings, it shows you the full text straight away instead.
    If you decline or discard it, the report is deleted.
