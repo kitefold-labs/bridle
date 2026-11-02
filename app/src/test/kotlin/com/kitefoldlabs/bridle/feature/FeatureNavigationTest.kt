@@ -72,6 +72,9 @@ class FeatureNavigationTest {
     val hilt = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
+    val onboarded = OnboardedRule()
+
+    @get:Rule(order = 2)
     val rule = createAndroidComposeRule<MainActivity>()
 
     @BindValue

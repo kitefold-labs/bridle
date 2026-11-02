@@ -43,6 +43,9 @@ class FeatureWiringTest {
     val hilt = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
+    val onboarded = OnboardedRule()
+
+    @get:Rule(order = 2)
     val compose = createEmptyComposeRule()
 
     @BindValue

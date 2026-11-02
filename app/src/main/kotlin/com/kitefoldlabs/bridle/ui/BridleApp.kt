@@ -47,12 +47,18 @@ fun BridleApp(
                 onAddHost = { nav.navigate(TopLevel.HOSTS.route) },
                 viewModel = hiltViewModel(),
             ) {
-                BridleNavHost(screens, nav, terminal = terminal, showTerminal = showTerminal) {
-                    sftpDestination(onBack = nav::popBackStack)
-                    snippetsDestination(onBack = nav::popBackStack)
-                    forwardsDestination(onBack = nav::popBackStack)
-                    routes(nav)
-                }
+                BridleNavHost(
+                    screens = screens,
+                    nav = nav,
+                    routes = {
+                        sftpDestination(onBack = nav::popBackStack)
+                        snippetsDestination(onBack = nav::popBackStack)
+                        forwardsDestination(onBack = nav::popBackStack)
+                        routes(nav)
+                    },
+                    terminal = terminal,
+                    showTerminal = showTerminal,
+                )
                 overlay()
                 CrashReportPrompt(hiltViewModel())
             }
