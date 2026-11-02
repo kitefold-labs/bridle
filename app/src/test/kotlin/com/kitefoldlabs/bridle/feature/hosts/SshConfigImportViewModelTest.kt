@@ -117,7 +117,10 @@ class SshConfigImportViewModelTest {
             vm.setText(config)
             vm.parse()
             vm.state.await { it.plan != null }
+            // "nouser" is selectable too (the default username "x" fills it in): deselect both.
+            vm.state.value.selected shouldBe setOf("dev", "nouser")
             vm.toggle("dev")
+            vm.toggle("nouser")
             vm.import() // nothing selected: ignored
             vm.state.value.imported shouldBe null
             vm.edit()

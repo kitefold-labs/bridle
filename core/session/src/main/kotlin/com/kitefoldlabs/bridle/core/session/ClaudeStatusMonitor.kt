@@ -97,9 +97,14 @@ public class ClaudeStatusMonitor(
     /** One refresh; exposed for pull-to-refresh and tests. */
     public suspend fun pollOnce() {
         val helper = useHelper()
+        val listed = tmux.listSessions(useHelper = helper, claudeHint = claudeHint)
+        val unreported = listed.filter { it.claude == null && it.claudeRunning }.map { it.session.name }
+        // All the screens to guess from in one round trip, however many sessions there are.
+        val screens = if (unreported.isEmpty()) emptyMap() else screens(unreported)
         val rows =
-            tmux.listSessions(useHelper = helper, claudeHint = claudeHint).map { row ->
-                if (row.claude == null && row.claudeRunning) row.copy(claude = guess(row.session.name)) else row
+            listed.map { row ->
+                val name = row.session.name
+                if (name in unreported) row.copy(claude = guess(screens[name])) else row
             }
         mutableSessions.value = rows
         val current = rows.mapNotNull { row -> row.claude?.let { row.session.name to it } }.toMap()
@@ -119,16 +124,19 @@ public class ClaudeStatusMonitor(
         }
     }
 
-    private suspend fun guess(session: String): ClaudeStatus =
+    private suspend fun screens(sessions: List<String>): Map<String, String> =
         try {
-            ClaudeScreen.classify(tmux.preview(session))
+            tmux.previews(sessions)
         } catch (e: CancellationException) {
             throw e
         } catch (
             @Suppress("TooGenericExceptionCaught") ignored: Exception,
         ) {
-            ClaudeStatus(ClaudeState.UNKNOWN, StatusSource.SCREEN)
+            emptyMap() // every guess is UNKNOWN this round
         }
+
+    private fun guess(screen: String?): ClaudeStatus =
+        screen?.let(ClaudeScreen::classify) ?: ClaudeStatus(ClaudeState.UNKNOWN, StatusSource.SCREEN)
 
     private companion object {
         const val EVENT_BUFFER = 64

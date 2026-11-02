@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature
 
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,14 +16,22 @@ import com.kitefoldlabs.bridle.core.security.KeyStoreBackend
 import com.kitefoldlabs.bridle.core.security.KeyWrappingStore
 import com.kitefoldlabs.bridle.core.ssh.HostKeyPrompt
 import com.kitefoldlabs.bridle.di.KeystoreModule
+import com.kitefoldlabs.bridle.feature.terminal.SessionServiceStarter
+import com.kitefoldlabs.bridle.feature.terminal.TerminalEngineFactory
+import com.kitefoldlabs.bridle.feature.terminal.TerminalModule
+import com.kitefoldlabs.bridle.service.SessionCoordinator
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
+import dagger.hilt.android.testing.UninstallModules
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -50,8 +59,12 @@ object TestKeystoreModule {
     fun keyWrappingStore(): KeyWrappingStore = SoftwareWrapping()
 }
 
-/** Walks the Hosts and Keys tabs of the real app, with the real Hilt graph and database. */
+/**
+ * Walks the Hosts and Keys tabs of the real app, with the real Hilt graph and database (and a fake
+ * emulator: termlib's native library does not load on the host JVM).
+ */
 @HiltAndroidTest
+@UninstallModules(TerminalModule::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = HiltTestApplication::class, qualifiers = "w411dp-h2400dp")
 class FeatureNavigationTest {
@@ -61,10 +74,23 @@ class FeatureNavigationTest {
     @get:Rule(order = 1)
     val rule = createAndroidComposeRule<MainActivity>()
 
+    @BindValue
+    @JvmField
+    val engines: TerminalEngineFactory = TerminalEngineFactory { FakeEngine() }
+
+    @BindValue
+    @JvmField
+    val service: SessionServiceStarter = SessionServiceStarter {}
+
     @Inject lateinit var broker: InteractionBroker
+
+    @Inject lateinit var coordinator: SessionCoordinator
 
     @Before
     fun setUp() = hilt.inject()
+
+    @After
+    fun tearDown() = runBlocking { coordinator.disconnectAll() }
 
     private fun waitFor(
         text: String,
@@ -85,7 +111,13 @@ class FeatureNavigationTest {
         rule.onNodeWithText("Username").performTextInput("nate")
         rule.onNodeWithText("Save").performClick()
         waitFor("nate@dev.example")
-        rule.onNodeWithText("Dev").performClick() // opens a terminal (wired by the terminal feature)
+        rule.onNodeWithText("Dev").performClick() // opens a terminal on the host
+        rule.waitUntil(10_000) { rule.onAllNodesWithTag(FakeEngine.TAG).fetchSemanticsNodes().isNotEmpty() }
+        coordinator.tabs.value
+            .single()
+            .title shouldBe "Dev"
+        rule.onNodeWithContentDescription("Back").performClick()
+        waitFor("Dev")
         rule.onNodeWithContentDescription("More actions for Dev").performClick()
         waitFor("Edit")
         rule.onNodeWithText("Edit").performClick()

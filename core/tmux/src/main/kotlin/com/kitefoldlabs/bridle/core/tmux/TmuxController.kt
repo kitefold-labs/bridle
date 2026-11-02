@@ -1,9 +1,12 @@
 package com.kitefoldlabs.bridle.core.tmux
 
 import com.kitefoldlabs.bridle.core.model.LaunchProfile
+import com.kitefoldlabs.bridle.core.model.Validation
+import com.kitefoldlabs.bridle.core.model.Validators
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.RemoteCommandException
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import java.security.SecureRandom
 
 public enum class LaunchResult { CREATED, ALREADY_RUNNING }
 
@@ -19,6 +22,8 @@ public class TmuxNotInstalledException : Exception("tmux is not installed on thi
 public class TmuxController(
     private val connection: SshConnection,
 ) {
+    private val random = SecureRandom()
+
     public suspend fun probe(): HostProbe =
         TmuxParsers.parseProbe(run(TmuxScripts.probe(HostHelper.INSTALL_PATH)).stdout)
 
@@ -44,6 +49,22 @@ public class TmuxController(
         session: String,
         lines: Int = TmuxScripts.DEFAULT_PREVIEW_LINES,
     ): String = run(TmuxScripts.capturePane(session, lines)).stdout
+
+    /**
+     * The last [lines] lines of each of [sessions]' active panes, in one round trip. Sessions whose
+     * names Bridle can't target (created outside Bridle with spaces or the like) are left out.
+     */
+    public suspend fun previews(
+        sessions: List<String>,
+        lines: Int = TmuxScripts.DEFAULT_PREVIEW_LINES,
+    ): Map<String, String> {
+        val targetable = sessions.filter { Validators.sessionName(it) == Validation.Valid }
+        if (targetable.isEmpty()) return emptyMap()
+        // Fresh per call: what a pane prints can't predict it to fake another session's capture.
+        val marker = "@@BRIDLE_CAPTURE_" + ByteArray(MARKER_BYTES).also(random::nextBytes).toHex() + "@@"
+        val output = run(TmuxScripts.capturePanes(targetable, lines, marker)).stdout
+        return TmuxParsers.parseCaptures(output, marker)
+    }
 
     public suspend fun launch(
         profile: LaunchProfile,
@@ -95,6 +116,8 @@ public class TmuxController(
         if (!result.isSuccess) throw RemoteCommandException("Removing bridle-helper failed", result)
     }
 
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
     private suspend fun run(script: String): ExecResult {
         val result = connection.runScript(script)
         return when {
@@ -102,5 +125,9 @@ public class TmuxController(
             !result.isSuccess -> throw RemoteCommandException("tmux command failed", result)
             else -> result
         }
+    }
+
+    private companion object {
+        const val MARKER_BYTES = 8
     }
 }

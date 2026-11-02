@@ -17,6 +17,7 @@
     <string name="claude_waiting_input">%1$s is waiting for you</string>
     <string name="claude_idle">%1$s finished</string>
     <string name="claude_exited">%1$s exited</string>
+    <string name="claude_notification_public">Claude Code status changed</string>
     <string name="nav_hosts">Hosts</string>
     <string name="nav_sessions">Sessions</string>
     <string name="nav_keys">Keys</string>

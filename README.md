@@ -36,6 +36,14 @@ Start at the [documentation index](docs/README.md), which also lists the tutoria
 | [docs/release.md](docs/release.md) | Signing, the release workflow, Play Console (foreground service, Data Safety), F-Droid |
 | [docs/adr/](docs/adr/) | Architecture decision records |
 
+## Tutorials
+
+- [Run Claude Code in tmux from your phone](docs/tutorials/02-claude-in-tmux.md): a Launch
+  Profile for Claude, restarting with `--continue`, quick replies, reattaching after network drops
+- [Claude status and notifications](docs/tutorials/03-claude-status-notifications.md): installing
+  bridle-helper, what the badges mean, Approve/Deny from notifications, and the limits (only while
+  connected)
+
 ## Decisions
 
 - **Platform:** Android, native Kotlin + Jetpack Compose. Phones come first;

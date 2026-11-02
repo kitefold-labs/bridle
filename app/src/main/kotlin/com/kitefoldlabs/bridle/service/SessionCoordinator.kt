@@ -55,7 +55,14 @@ class SessionCoordinator
         /** True while any tab is open (drives the foreground service). */
         val hasActiveWork: Boolean get() = mutableTabs.value.isNotEmpty()
 
-        /** Opens a tab on [hostId]. The [sink] (emulator) is owned by the tab from now on. */
+        /**
+         * Opens a tab on [hostId]. The [sink] (emulator) is owned by the tab from now on.
+         * [onCreated] runs before the session starts, so the emulator's replies to the remote
+         * side's first queries (tmux and Claude Code ask for terminal attributes) can be wired to
+         * it without losing any.
+         *
+         * @throws IllegalArgumentException if [attach] names an invalid tmux session.
+         */
         suspend fun openTab(
             hostId: EntityId,
             title: String,
@@ -63,9 +70,24 @@ class SessionCoordinator
             sink: TerminalSink,
             size: PtySpec = PtySpec(),
             attachment: Any? = null,
+            onCreated: (TerminalSession) -> Unit = {},
         ): TerminalTab {
             val lease = connections.acquire(hostId)
-            val session = TerminalSession(lease, attach, sink, scope, size)
+            val session =
+                try {
+                    TerminalSession(lease, attach, sink, scope, size)
+                } catch (e: IllegalArgumentException) {
+                    lease.close()
+                    throw e
+                }
+            try {
+                onCreated(session)
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
+                session.close() // releases the lease too
+                throw e
+            }
             val tab = TerminalTab(UUID.randomUUID().toString(), hostId, title, session, attachment, sink)
             mutableTabs.update { it + tab }
             session.start()

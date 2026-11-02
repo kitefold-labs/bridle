@@ -27,6 +27,24 @@ public object TmuxParsers {
         return sessionLines.mapNotNull(::parseSession) to paneLines.mapNotNull(::parsePane)
     }
 
+    /** Splits [TmuxScripts.capturePanes] output into each session's pane text. */
+    public fun parseCaptures(
+        output: String,
+        marker: String,
+    ): Map<String, String> {
+        val prefix = "$marker "
+        val captures = linkedMapOf<String, StringBuilder>()
+        var current: StringBuilder? = null
+        for (line in output.lines()) {
+            if (line.startsWith(prefix)) {
+                current = StringBuilder().also { captures[line.removePrefix(prefix)] = it }
+            } else {
+                current?.append(line)?.append('\n')
+            }
+        }
+        return captures.mapValues { it.value.toString() }
+    }
+
     internal fun parseSession(line: String): TmuxSession? {
         val f = line.split(TmuxScripts.FIELD_SEPARATOR)
         if (f.size != SESSION_FIELDS || f[0].isEmpty()) return null

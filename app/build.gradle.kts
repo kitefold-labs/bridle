@@ -90,6 +90,7 @@ android {
 
 dependencies {
     implementation(project(":core:session"))
+    implementation(project(":core:terminal-ui"))
     implementation(project(":core:backup"))
     implementation(project(":core:security"))
     implementation(project(":core:data"))
