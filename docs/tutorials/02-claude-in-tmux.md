@@ -35,8 +35,15 @@ Under **Launch profiles**, tap **+** (New profile). The form starts from the Cla
 | Restart command | `claude --continue` | What **Restart (continue)** runs, so Claude picks up the last conversation. |
 | Restart | Respawn and continue | How **Restart** works (see below). |
 | Launch | Type the command into a login shell | The pane runs your shell and Bridle types the command, so the pane stays at a prompt when Claude exits. *Run the command directly* starts Claude as the pane's program instead. |
-| Environment variables | none | Set for the command, e.g. `ANTHROPIC_MODEL`. Names use letters, digits and `_`. |
+| Environment variables | none | Set for the command, e.g. `ANTHROPIC_MODEL`. Names use letters, digits and `_`. Values are masked; tap the eye to show one. |
 | Pin to the top | off | Pinned profiles are listed first. |
+
+Environment variables are set in the tmux session's environment, not typed into the pane, so a
+value such as an `ANTHROPIC_API_KEY` never appears on screen, in the Sessions preview or in your
+shell history on the host. Two limits: it is passed to `tmux` as a command-line argument for an
+instant, which other users on a shared host could see in a process list, and programs running in
+that tmux session can read it. *Press Ctrl+C twice, then type the command* restarts keep the
+values the shell started with; the respawn restarts pick up edited values.
 
 Set the working directory to your project and give the session a name you'll recognise, such as
 `claude-api`. Fields with a problem are marked and explain what to fix; **Save** is enabled once

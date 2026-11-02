@@ -322,6 +322,7 @@ All agentless. Every operation is one `exec` on the shared connection.
 | Attach (interactive) | shell channel running `tmux new-session -A -s S -c DIR` |
 | Restart (respawn) | `tmux respawn-pane -k -t =S: -c DIR` → send `claude --continue` (or a fresh `claude`) |
 | Restart (gentle) | send `C-c` twice, wait for the prompt, send the command |
+| Profile environment | tmux ≥ 3.2: `new-session … -e K=V`; older: `new-session … cat` → `set-environment -t =S K V` → `respawn-pane -k -t =S: -c DIR 'exec "$SHELL" -l'` (or `CMD`). Restarts run `set-environment` before respawning |
 | Stop | `tmux kill-session -t =S` |
 | Send keys | `tmux send-keys -t =S: …` (used by notification actions and quick replies) |
 
@@ -329,6 +330,17 @@ All agentless. Every operation is one `exec` on the shared connection.
   shell, and the app types the command into it. The user's normal `PATH`,
   nvm and similar setup apply, and when Claude exits the pane stays at a shell
   prompt instead of disappearing.
+- **Profile environment variables never go through the pane.** Values such as
+  `ANTHROPIC_API_KEY` are put in the tmux *session environment* and inherited
+  by the pane's process, so they never show on screen, in scrollback, in the
+  Sessions preview, in `pane_start_command` or in the host's shell history.
+  The tmux version comes from the probe. Limits: the values travel as
+  arguments of a short-lived `tmux` client process, so another account on
+  the host that can list processes could see them for that instant (as with
+  any command line), and anything running as you in that tmux session can
+  read them (`tmux show-environment`). The gentle restart types into the
+  running shell, which keeps the variables it started with; a respawn picks
+  up changed values.
 - **Phone and desktop attached together:** per session the app sets
   `window-size latest`, so the window follows whichever client was used most
   recently and the phone's small size doesn't shrink the desktop view

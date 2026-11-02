@@ -1,9 +1,12 @@
 package com.kitefoldlabs.bridle.core.tmux
 
+import com.kitefoldlabs.bridle.core.model.LaunchMode
 import com.kitefoldlabs.bridle.core.model.LaunchProfile
+import com.kitefoldlabs.bridle.core.model.RestartMode
 import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
+import com.kitefoldlabs.bridle.core.ssh.RemoteCommandException
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -171,6 +174,48 @@ class TmuxUnitTest {
         run(TmuxScripts.attachCommand("w", "~bob/x")) shouldBe "new-session|-A|-s|w|-c|~bob/x|"
         TmuxScripts.attachCommand("main") shouldStartWith "sh -c '"
     }
+
+    @Test
+    fun `environment values are passed to tmux, never typed`() {
+        val secret = "sk-ant-123"
+        val p = LaunchProfile.claude(1, "~/src", "s").copy(env = mapOf("ANTHROPIC_API_KEY" to secret))
+
+        fun typed(script: String) = script.lines().filter { "send-keys" in it }
+
+        val modern = TmuxScripts.launch(p, tmuxVersion = TmuxVersion(3, 2))
+        modern shouldContain "new-session -d -s s -c ~/src -e ANTHROPIC_API_KEY=sk-ant-123"
+        modern shouldNotContain "set-environment"
+        for (old in listOf(TmuxVersion(3, 1), null)) {
+            val script = TmuxScripts.launch(p, tmuxVersion = old)
+            script shouldContain "new-session -d -s s -c ~/src cat"
+            script shouldContain "set-environment -t '=s' ANTHROPIC_API_KEY sk-ant-123"
+            script shouldContain "respawn-pane -k -t '=s:' -c ~/src 'exec \"\$SHELL\" -l'"
+        }
+        val restarts = RestartMode.entries.map { TmuxScripts.restart(p.copy(restartMode = it)) }
+        restarts.forEach { it shouldContain "set-environment -t '=s' ANTHROPIC_API_KEY sk-ant-123" }
+        (listOf(modern, TmuxScripts.launch(p)) + restarts).flatMap(::typed).forEach {
+            it shouldNotContain secret
+            it shouldNotContain "export"
+        }
+        // Without variables nothing changes: no placeholder, no probe needed.
+        TmuxScripts.launch(p.copy(env = emptyMap())) shouldNotContain "cat"
+        TmuxScripts.launch(p.copy(mode = LaunchMode.DIRECT)) shouldContain
+            "respawn-pane -k -t '=s:' -c ~/src claude"
+    }
+
+    @Test
+    fun `the controller probes the tmux version only for profiles with variables`() =
+        runBlocking<Unit> {
+            val connection = FixedResult(ExecResult(0, "tmux=tmux 3.1\ncreated\n", ""))
+            val tmux = TmuxController(connection)
+            val p = LaunchProfile.claude(1, "~", "s")
+            shouldThrow<RemoteCommandException> { tmux.launch(p) } // output isn't just "created"
+            connection.scripts.size shouldBe 1
+            shouldThrow<RemoteCommandException> { tmux.launch(p.copy(env = mapOf("A" to "1"))) }
+            shouldThrow<RemoteCommandException> { tmux.restart(p.copy(env = mapOf("A" to "1"))) }
+            connection.scripts.size shouldBe 4 // probed once, then remembered
+            connection.scripts[2] shouldContain "set-environment"
+        }
 
     @Test
     fun `a trailing semicolon can never end a tmux command`() {

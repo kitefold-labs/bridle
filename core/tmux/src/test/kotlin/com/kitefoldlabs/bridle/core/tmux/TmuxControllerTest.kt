@@ -23,6 +23,8 @@ import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 import kotlin.time.Duration.Companion.seconds
 
+private const val SECRET = "sk-'s3cr3t\"\nvalue;"
+
 class TmuxControllerTest {
     @TempDir
     lateinit var home: Path
@@ -166,6 +168,64 @@ class TmuxControllerTest {
             screenOf("semi", "pwd=$dir")
             tmux.restart(p) shouldBe RestartResult.RESTARTED
             screenOf("semi", "args=[--continue]")
+        }
+
+    /** Everything the session could show: the whole scrollback and how each pane was started. */
+    private suspend fun everythingVisible(session: String): String =
+        tmux.preview(session, lines = TmuxScripts.MAX_PREVIEW_LINES) +
+            shell.exec("tmux list-panes -a -F '#{pane_start_command}'").stdout
+
+    private fun secretProfile(mode: LaunchMode) =
+        profile(name = "secret", mode = mode).copy(
+            // Ends in ';' (a tmux separator) and holds quotes and a newline.
+            env = mapOf("BRIDLE_SECRET" to SECRET, "ANTHROPIC_MODEL" to "it's-fine"),
+        )
+
+    @Test
+    fun `environment values never reach the pane, with new-session -e`() =
+        runBlocking<Unit> {
+            for (mode in LaunchMode.entries) {
+                val p = secretProfile(mode)
+                tmux.launch(p) shouldBe LaunchResult.CREATED // tmux 3.4: -e
+                shell.scripts.last() shouldContain " -e "
+                screenOf("secret", "secret=[${SECRET.length}]") shouldContain "model=[it's-fine]"
+                tmux.restart(p) shouldBe RestartResult.RESTARTED
+                screenOf("secret", "args=[--continue] model=[it's-fine] secret=[${SECRET.length}]")
+                val seen = everythingVisible("secret")
+                seen shouldNotContain "export"
+                seen shouldNotContain "s3cr3t"
+                tmux.kill("secret")
+            }
+        }
+
+    @Test
+    fun `environment values never reach the pane, on tmux older than 3_2`() =
+        runBlocking<Unit> {
+            for (mode in LaunchMode.entries) {
+                val p = secretProfile(mode)
+                val launch = TmuxScripts.launch(p, tmuxVersion = TmuxVersion(3, 1))
+                launch shouldNotContain " -e "
+                shell.runScript(launch).stdout.trim() shouldBe "created"
+                screenOf("secret", "secret=[${SECRET.length}]") shouldContain "model=[it's-fine]"
+                // A restart that finds the session gone launches it the same way.
+                tmux.kill("secret")
+                shell.runScript(TmuxScripts.restart(p, TmuxVersion(3, 1))).stdout.trim() shouldBe "created"
+                screenOf("secret", "secret=[${SECRET.length}]")
+                val seen = everythingVisible("secret")
+                seen shouldNotContain "export"
+                seen shouldNotContain "s3cr3t"
+                tmux.kill("secret")
+            }
+        }
+
+    @Test
+    fun `a respawn restart picks up changed environment values`() =
+        runBlocking<Unit> {
+            val p = secretProfile(LaunchMode.SHELL_HOSTED)
+            tmux.launch(p)
+            screenOf("secret", "secret=[${SECRET.length}]")
+            tmux.restart(p.copy(env = mapOf("BRIDLE_SECRET" to "xy"))) shouldBe RestartResult.RESTARTED
+            screenOf("secret", "secret=[2]")
         }
 
     @Test

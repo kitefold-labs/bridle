@@ -24,8 +24,11 @@ public class TmuxController(
 ) {
     private val random = SecureRandom()
 
+    @Volatile
+    private var lastProbe: HostProbe? = null
+
     public suspend fun probe(): HostProbe =
-        TmuxParsers.parseProbe(run(TmuxScripts.probe(HostHelper.INSTALL_PATH)).stdout)
+        TmuxParsers.parseProbe(run(TmuxScripts.probe(HostHelper.INSTALL_PATH)).stdout).also { lastProbe = it }
 
     /**
      * All sessions, newest activity first. With [useHelper], Claude status from bridle-helper
@@ -71,14 +74,14 @@ public class TmuxController(
         columns: Int? = null,
         rows: Int? = null,
     ): LaunchResult =
-        when (val out = run(TmuxScripts.launch(profile, columns, rows)).stdout.trim()) {
+        when (val out = run(TmuxScripts.launch(profile, columns, rows, envVersion(profile))).stdout.trim()) {
             "created" -> LaunchResult.CREATED
             "exists" -> LaunchResult.ALREADY_RUNNING
             else -> throw RemoteCommandException("Unexpected launch output: $out", ExecResult(0, out, ""))
         }
 
     public suspend fun restart(profile: LaunchProfile): RestartResult =
-        when (val out = run(TmuxScripts.restart(profile)).stdout.trim()) {
+        when (val out = run(TmuxScripts.restart(profile, envVersion(profile))).stdout.trim()) {
             "restarted" -> RestartResult.RESTARTED
             "created" -> RestartResult.CREATED
             else -> throw RemoteCommandException("Unexpected restart output: $out", ExecResult(0, out, ""))
@@ -115,6 +118,13 @@ public class TmuxController(
         val result = connection.runScript(HostHelper.uninstallScript())
         if (!result.isSuccess) throw RemoteCommandException("Removing bridle-helper failed", result)
     }
+
+    /**
+     * The host's tmux version, which decides how [TmuxScripts.launch] sets environment variables.
+     * Probed (once per controller) only when [profile] has any.
+     */
+    private suspend fun envVersion(profile: LaunchProfile): TmuxVersion? =
+        if (profile.env.isEmpty()) null else (lastProbe ?: probe()).tmuxVersion
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 

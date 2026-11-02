@@ -12,6 +12,9 @@ public data class TmuxVersion(
     public companion object {
         /** Oldest tmux Bridle supports (respawn-pane -c, window-size, `=name` targets). */
         public val MINIMUM: TmuxVersion = TmuxVersion(3, 0)
+
+        /** First tmux whose `new-session` takes `-e NAME=value`. */
+        public val SESSION_ENV_FLAG: TmuxVersion = TmuxVersion(3, 2)
         private val DEVELOPMENT = TmuxVersion(99, 0)
         private val pattern = Regex("""(\d+)\.(\d+)""")
 
