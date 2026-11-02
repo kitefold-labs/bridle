@@ -168,6 +168,12 @@ class TerminalTabsViewModel
             tabs: List<TerminalTab>,
             current: Settings,
         ) {
+            if (current.rememberComposeHistory && !rememberHistory) {
+                // Lines sent while history was off were never to be saved: the next submission
+                // after turning it back on would otherwise write them all to disk.
+                histories.values.forEach { it.clear() }
+                savedHistories.replaceAll { _, _ -> emptyList() }
+            }
             rememberHistory = current.rememberComposeHistory
             val open = tabs.map { it.id }.toSet()
             // Closed tabs go, and so does every screen when the backspace mode changed (fixed per screen).

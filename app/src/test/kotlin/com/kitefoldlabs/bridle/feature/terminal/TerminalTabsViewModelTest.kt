@@ -213,6 +213,17 @@ class TerminalTabsViewModelTest {
             Thread.sleep(200)
             state.history.entries shouldBe listOf("hunter2") // ↑ still works until Bridle closes
             world.data.composeHistory.get(id) shouldBe listOf("older")
+
+            // Turned back on, the next line is saved, but never what was sent while it was off.
+            world.data.settings.setRememberComposeHistory(true)
+            awaitUntil { vm.settings.value?.rememberComposeHistory == true }
+            awaitUntil { state.history.entries.isEmpty() }
+            withContext(main) { state.updateComposeText("ls") }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } } == "ls" }
+            withContext(main) { state.submitCompose() }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { world.data.composeHistory.get(id) } == listOf("ls") }
         }
 
     @Test
