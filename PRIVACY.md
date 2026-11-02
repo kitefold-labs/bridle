@@ -94,5 +94,5 @@ features that you choose to use.
 ## Contact
 
 Bridle is open source under the Apache License 2.0:
-<https://github.com/nkoenig/terminal>. Questions about privacy can be asked in the repository's
+<https://github.com/kitefold-labs/bridle>. Questions about privacy can be asked in the repository's
 issues. Report security problems privately as described in [SECURITY.md](SECURITY.md).

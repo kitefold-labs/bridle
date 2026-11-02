@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets
  * enough are the user's notes trimmed too.
  */
 public object GitHubIssueUrl {
-    public const val DEFAULT_REPO: String = "nkoenig/terminal"
+    public const val DEFAULT_REPO: String = "kitefold-labs/bridle"
     public const val TEMPLATE: String = "crash_report.yml"
     public const val MAX_URL_LENGTH: Int = 7_500
     public const val MAX_NOTES_CHARS: Int = 2_000
