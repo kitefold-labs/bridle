@@ -18,6 +18,7 @@ import com.kitefoldlabs.bridle.core.ssh.TofuHostKeyVerifier
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -78,6 +79,7 @@ class DefaultHostConnector
         private val engine: SshEngine,
         private val clock: () -> Long,
     ) : HostConnector {
+        @Suppress("TooGenericExceptionCaught") // rethrown unless the attempt was cancelled
         override suspend fun connect(hostId: EntityId): SshConnection {
             val host = hosts.get(hostId) ?: throw UnknownHostException(hostId)
             val questions = broker.questions()
@@ -102,6 +104,12 @@ class DefaultHostConnector
                         )
                     hosts.markConnected(hostId, clock())
                     connection
+                } catch (e: Exception) {
+                    // Withdrawing answers the question (no password, host not trusted), and the SSH
+                    // thread can act on that before the cancellation reaches it: report the
+                    // cancellation, not the authentication failure it caused.
+                    ensureActive()
+                    throw e
                 } finally {
                     withdrawOnCancel.cancel() // the attempt is over either way: nothing more to ask
                 }

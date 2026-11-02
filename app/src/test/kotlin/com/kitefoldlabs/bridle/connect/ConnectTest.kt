@@ -21,6 +21,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,8 +29,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -196,7 +195,8 @@ class ConnectTest {
                                     .single()
                                     .shouldBeInstanceOf<Credential.Password>()
                                     .supply()
-                            ensureActive() // like SshjEngine: report the cancellation, not its side effect
+                            // No cancellation check: the I/O thread may see the withdrawn (empty)
+                            // password before the cancellation reaches it.
                             throw AuthenticationFailedException("rejected ${typed.size}")
                         }
                 }
@@ -208,11 +208,13 @@ class ConnectTest {
                     broker,
                     engine,
                 ) { 1L }
-            val attempt = scope.launch { connector.connect(hostId) }
+            val attempt = scope.async { connector.connect(hostId) }
             while (broker.pending.value == null) delay(5.milliseconds)
             broker.pending.value shouldBe Interaction.Password("Dev", "nate")
             withTimeout(5.seconds) { attempt.cancelAndJoin() }
             broker.pending.value shouldBe null
+            // Reported as cancelled, not as the rejected empty password (which would go uncaught).
+            shouldThrow<CancellationException> { attempt.await() }
             data.hosts.get(hostId)!!.lastConnectedAtEpochMs shouldBe null
         }
 
