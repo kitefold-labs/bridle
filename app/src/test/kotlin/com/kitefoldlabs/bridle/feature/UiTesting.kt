@@ -39,7 +39,7 @@ class FakeUris : UriHandler {
     var noBrowser = false
 
     override fun openUri(uri: String) {
-        if (noBrowser) throw IllegalArgumentException("Can't open $uri.")
+        require(!noBrowser) { "Can't open $uri." }
         opened += uri
     }
 }

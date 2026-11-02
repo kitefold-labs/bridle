@@ -318,10 +318,8 @@ class SftpViewModelTest {
         vm.downloadTo(Uri.parse("content://docs/ignored"))
         vm.transfers.value shouldBe emptyList()
         vm.requestDownload(notes)
-        vm.state.value.pendingDownload shouldBe notes
         vm.downloadTo(null)
-        vm.state.value.pendingDownload
-            .shouldBeNull()
+        vm.downloadTo(Uri.parse("content://docs/late")) // the cancelled request is gone
         vm.transfers.value shouldBe emptyList()
         vm.requestDownload(notes)
         vm.downloadTo(Uri.parse("content://docs/notes.md"))
@@ -343,9 +341,6 @@ class SftpViewModelTest {
         val saved = SavedStateHandle(mapOf(SftpDestination.ARG_HOST to 7L))
         val before = viewModel(saved)
         before.requestDownload(before.entry("notes.md"))
-        before.downloadPickerShown()
-        before.state.value.pendingDownload
-            .shouldBeNull()
         clear(before)
         // The process may be gone by now; only the saved state comes back with the result.
         val after = viewModel(saved)

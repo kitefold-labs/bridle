@@ -78,8 +78,6 @@ data class SftpUiState(
     val loading: Boolean = false,
     val notice: SftpNotice? = null,
     val editor: EditorState? = null,
-    /** A file waiting for the user to pick where to save it. */
-    val pendingDownload: RemoteFile? = null,
 ) {
     val visible: List<RemoteFile> get() = SftpListing.arrange(entries, sort, showHidden)
 }
@@ -215,21 +213,17 @@ class SftpViewModel(
     }
 
     /**
-     * Asks the UI to open the "save as" picker for [file]. Its path is kept in the saved state,
-     * so the download still starts if Android recreates the app while the picker is open.
+     * Remembers [file] as the one to download while the UI shows the "save as" picker. The path
+     * is kept in the saved state, so the download still starts if Android recreates the app
+     * (or its process) while the picker is open.
      */
     fun requestDownload(file: RemoteFile) {
         savedState[KEY_DOWNLOAD] = file.path
-        mutable.update { it.copy(pendingDownload = file) }
     }
-
-    /** The UI has opened the picker; it must not open it again (say, after a rotation). */
-    fun downloadPickerShown() = mutable.update { it.copy(pendingDownload = null) }
 
     /** The user picked [uri] for the pending download, or cancelled the picker (null). */
     fun downloadTo(uri: Uri?) {
         val path = savedState.remove<String>(KEY_DOWNLOAD) ?: return
-        mutable.update { it.copy(pendingDownload = null) }
         if (uri != null) queue.download(hostId, path, uri)
     }
 
@@ -353,7 +347,7 @@ class SftpViewModel(
 
     /** Opens SFTP on a (re-established) connection and shows the current directory, or the home directory. */
     private suspend fun attach(connection: SshConnection) {
-        closeInBackground(sftp)
+        background.closeLater(sftp, io)
         sftp = null
         try {
             val session = connection.openSftp()
@@ -376,14 +370,10 @@ class SftpViewModel(
 
     private fun disconnect() {
         connectJob?.cancel()
-        closeInBackground(sftp)
+        background.closeLater(sftp, io)
         lease?.close()
         sftp = null
         lease = null
-    }
-
-    private fun closeInBackground(session: SftpSession?) {
-        if (session != null) background.launch(io) { session.close() }
     }
 
     private fun refreshAfterUploads(list: List<Transfer>) {
@@ -400,9 +390,17 @@ class SftpViewModel(
 
     private fun failure(e: Exception): SftpNotice = SftpNotice.Failed(describe(e))
 
-    private fun describe(e: Throwable): String = e.message ?: e.javaClass.simpleName
-
     private companion object {
         const val KEY_DOWNLOAD = "pendingDownload"
     }
+}
+
+private fun describe(e: Throwable): String = e.message ?: e.javaClass.simpleName
+
+/** Closes [session] (if any) in this scope on [io]: closing waits for the server's reply. */
+private fun CoroutineScope.closeLater(
+    session: SftpSession?,
+    io: CoroutineDispatcher,
+) {
+    if (session != null) launch(io) { session.close() }
 }

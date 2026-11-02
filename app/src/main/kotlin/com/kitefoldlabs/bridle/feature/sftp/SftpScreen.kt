@@ -90,12 +90,11 @@ fun SftpScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(MIME_BINARY)) @DontMemoize { uri ->
             viewModel.downloadTo(uri)
         }
-    LaunchedEffect(state.pendingDownload) @DontMemoize {
-        state.pendingDownload?.let {
-            viewModel.downloadPickerShown()
-            // The name comes from the server: never let it be a path or carry control characters.
-            download.launch(SftpListing.safeName(it.name, fallback = "download", forDocument = true))
-        }
+    // Launched straight from the click, once: not from state, which would relaunch it on recreation.
+    val startDownload: (RemoteFile) -> Unit = @DontMemoize { file ->
+        viewModel.requestDownload(file)
+        // The name comes from the server: never let it be a path or carry control characters.
+        download.launch(SftpListing.safeName(file.name, fallback = "download", forDocument = true))
     }
     val editor = state.editor
     if (editor != null) {
@@ -122,7 +121,7 @@ fun SftpScreen(
                 else -> {
                     Breadcrumbs(state.path.orEmpty(), viewModel::open)
                     HorizontalDivider()
-                    FileList(state, viewModel, onDialog = { dialog = it })
+                    FileList(state, viewModel, onDialog = { dialog = it }, onDownload = startDownload)
                 }
             }
         }
@@ -235,6 +234,7 @@ private fun FileList(
     state: SftpUiState,
     viewModel: SftpViewModel,
     onDialog: (SftpDialog) -> Unit,
+    onDownload: (RemoteFile) -> Unit,
 ) {
     PullToRefreshBox(
         isRefreshing = state.loading,
@@ -269,7 +269,7 @@ private fun FileList(
                 }
             }
             items(files, key = { it.path }) { file ->
-                FileRow(file, viewModel, onDialog)
+                FileRow(file, viewModel, onDialog, onDownload)
             }
         }
     }
@@ -280,6 +280,7 @@ private fun FileRow(
     file: RemoteFile,
     viewModel: SftpViewModel,
     onDialog: (SftpDialog) -> Unit,
+    onDownload: (RemoteFile) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     val icon =
@@ -300,7 +301,7 @@ private fun FileRow(
                         contentDescription = stringResource(R.string.sftp_file_actions, file.name),
                     )
                 }
-                FileMenu(file, menu, onDismiss = { menu = false }, viewModel = viewModel, onDialog = onDialog)
+                FileMenu(file, menu, { menu = false }, viewModel, onDialog, onDownload)
             }
         },
         modifier = Modifier.clickable(role = Role.Button) @DontMemoize { viewModel.activate(file) },
@@ -314,6 +315,7 @@ private fun FileMenu(
     onDismiss: () -> Unit,
     viewModel: SftpViewModel,
     onDialog: (SftpDialog) -> Unit,
+    onDownload: (RemoteFile) -> Unit,
 ) {
     @Composable
     fun entry(
@@ -329,7 +331,7 @@ private fun FileMenu(
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (!file.isDirectory) {
             entry(R.string.sftp_edit) { viewModel.openEditor(file) }
-            entry(R.string.sftp_download) { viewModel.requestDownload(file) }
+            entry(R.string.sftp_download) { onDownload(file) }
         }
         entry(R.string.sftp_rename) { onDialog(SftpDialog.Rename(file)) }
         entry(R.string.sftp_permissions) { onDialog(SftpDialog.Permissions(file)) }

@@ -322,7 +322,7 @@ private fun ExecResultView(run: SnippetRun) {
     )
     if (output.omitted > 0) {
         Text(
-            stringResource(R.string.snippets_output_shortened, ExecOutput.MAX_CHARS),
+            stringResource(R.string.snippets_output_shortened),
             style = MaterialTheme.typography.labelSmall,
         )
     }

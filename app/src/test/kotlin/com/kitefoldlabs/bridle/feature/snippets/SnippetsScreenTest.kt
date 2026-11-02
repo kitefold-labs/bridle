@@ -93,7 +93,7 @@ class SnippetsScreenTest {
 
         connection.execResult = ExecResult(0, "x".repeat(ExecOutput.MAX_CHARS) + "\u001B[1mlast line", "")
         rule.onAllNodesWithText("Run and show output")[0].performClick()
-        waitForText("Showing the last")
+        waitForText("only its end is shown")
         rule.onNodeWithText("last line", substring = true).assertExists()
 
         connection.execResult = ExecResult(null, "", "")
