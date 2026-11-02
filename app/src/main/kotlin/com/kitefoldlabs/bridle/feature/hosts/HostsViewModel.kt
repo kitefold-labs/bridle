@@ -10,6 +10,7 @@ import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.session.ConnectionManager
 import com.kitefoldlabs.bridle.core.session.HostConnectionState
 import com.kitefoldlabs.bridle.service.SessionCoordinator
+import com.kitefoldlabs.bridle.ui.nav.HostTool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -68,12 +69,13 @@ data class HostsUiState(
     val pendingDelete: Host? = null,
 )
 
-/** Callbacks the hosts list needs from its navigation. */
+/** Callbacks the hosts list needs from its navigation. [onOpenTool] opens a host's files, snippets or forwards. */
 data class HostsNavigation(
     val onOpenTerminal: (EntityId) -> Unit,
     val onAdd: () -> Unit,
     val onEdit: (EntityId) -> Unit,
     val onImport: () -> Unit,
+    val onOpenTool: (EntityId, HostTool) -> Unit,
 )
 
 /** What the hosts list can ask its view model to do. */

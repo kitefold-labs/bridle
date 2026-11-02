@@ -38,7 +38,8 @@ val LocalNavController = staticCompositionLocalOf<NavHostController?> { null }
  * plugged in from one place and the scaffold can be tested on its own. [routes] registers the
  * other destinations (full-screen, without the bottom bar), such as a host's files or snippets.
  * [terminal] is the full-screen terminal destination (given a callback that goes back); it is
- * brought up each time [showTerminal] emits.
+ * brought up each time [showTerminal] emits, returning to the one on the back stack if there is
+ * one (closing the screens opened above it).
  */
 @Composable
 fun BridleNavHost(
@@ -52,7 +53,13 @@ fun BridleNavHost(
     val current = entry?.destination?.route
     val topLevel = current == null || TopLevel.entries.any { it.route == current }
     LaunchedEffect(nav, showTerminal) {
-        showTerminal.collect { nav.navigate(TERMINAL_ROUTE) { launchSingleTop = true } }
+        // Back to the terminal already on the stack, if any (e.g. under a host's snippets), not a second one.
+        showTerminal.collect {
+            nav.navigate(TERMINAL_ROUTE) {
+                popUpTo(TERMINAL_ROUTE)
+                launchSingleTop = true
+            }
+        }
     }
     Scaffold(
         bottomBar = {

@@ -25,6 +25,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.Host
+import com.kitefoldlabs.bridle.ui.nav.HostTool
 
 @Composable
 internal fun HostsRoute(
@@ -235,6 +237,16 @@ private fun HostMenu(
     navigation: HostsNavigation,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        HostTool.entries.forEach { tool ->
+            DropdownMenuItem(
+                text = { Text(stringResource(tool.label)) },
+                onClick = {
+                    onDismiss()
+                    navigation.onOpenTool(host.id, tool)
+                },
+            )
+        }
+        HorizontalDivider()
         DropdownMenuItem(
             text = { Text(stringResource(R.string.action_edit)) },
             onClick = {

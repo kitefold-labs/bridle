@@ -50,6 +50,30 @@ class FeatureWiringTest {
     }
 
     @Test
+    fun `onboarding's generate a key opens key generation in the keys tab`() {
+        waitForText("Next")
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("Next").performClick()
+        waitForText("Generate a key")
+        rule.onNodeWithText("Generate a key").performClick()
+        waitForText("Key name")
+        rule.onNodeWithContentDescription("Back").performClick()
+        waitForText("No keys yet")
+    }
+
+    @Test
+    fun `onboarding's add a host opens the host editor in the hosts tab`() {
+        waitForText("Next")
+        rule.onNodeWithText("Next").performClick()
+        rule.onNodeWithText("Next").performClick()
+        waitForText("Add a host")
+        rule.onNodeWithText("Add a host").performClick()
+        waitForText("Host name or IP address")
+        rule.onNodeWithContentDescription("Back").performClick()
+        waitForText("No hosts yet")
+    }
+
+    @Test
     fun `host tools open from a route builder and go back`() {
         var extra = false
         rule.runOnUiThread {
