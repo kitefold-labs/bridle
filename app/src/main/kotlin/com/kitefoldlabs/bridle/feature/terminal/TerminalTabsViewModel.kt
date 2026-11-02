@@ -123,12 +123,16 @@ class TerminalTabsViewModel
                     syncScreens(tabs, current)
                 }
             }
-            // A paste that must be confirmed (a snippet): its screen asks once it exists.
+            // A paste that must be confirmed (a snippet): its screen asks once it exists. If the tab
+            // closes first, the paste is dropped, not kept for later.
             viewModelScope.launch {
                 navigator.pendingPaste.filterNotNull().collectLatest { paste ->
-                    val screen = mutableScreens.first { paste.tabId in it }.getValue(paste.tabId)
+                    val (open, screen) =
+                        combine(coordinator.tabs, mutableScreens) { tabs, screens ->
+                            tabs.any { it.id == paste.tabId } to screens[paste.tabId]
+                        }.first { (open, screen) -> !open || screen != null }
                     navigator.pasteTaken(paste)
-                    screen.paste(paste.text)
+                    if (open) screen?.paste(paste.text)
                 }
             }
         }
