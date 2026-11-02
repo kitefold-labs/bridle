@@ -61,7 +61,8 @@ data class TerminalTabItem(
  * Sessions and emulators live in [SessionCoordinator] (they outlive this ViewModel); the screen
  * states live here so the compose box and zoom survive rotation. Settings apply live: the font
  * size when it changes, the backspace mode by rebuilding the screen states. Compose-box history
- * is shared by the tabs of a host and saved after every submission.
+ * is shared by the tabs of a host and saved after every submission, unless "Remember compose
+ * history" is off: then it is neither read from nor written to the database.
  */
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,6 +87,7 @@ class TerminalTabsViewModel
         private val histories = mutableMapOf<EntityId, ComposeHistory>()
         private val savedHistories = mutableMapOf<EntityId, List<String>>()
         private var appliedFontSize: Int? = null
+        private var rememberHistory = true
         private val mutableScreens = MutableStateFlow<Map<String, TerminalScreenState>>(emptyMap())
 
         /** Null until the settings are first read. */
@@ -152,6 +154,7 @@ class TerminalTabsViewModel
             tabs: List<TerminalTab>,
             current: Settings,
         ) {
+            rememberHistory = current.rememberComposeHistory
             val open = tabs.map { it.id }.toSet()
             // Closed tabs go, and so does every screen when the backspace mode changed (fixed per screen).
             tabScreens.entries.removeAll { (id, screen) ->
@@ -201,12 +204,13 @@ class TerminalTabsViewModel
         }
 
         private suspend fun loadHistory(hostId: EntityId): ComposeHistory {
-            val entries = historyRepository.get(hostId)
+            val entries = if (rememberHistory) historyRepository.get(hostId) else emptyList()
             savedHistories[hostId] = entries
             return ComposeHistory(entries).also { histories[hostId] = it }
         }
 
         private fun persistHistory(hostId: EntityId) {
+            if (!rememberHistory) return
             val entries = histories.getValue(hostId).entries
             if (savedHistories[hostId] == entries) return
             savedHistories[hostId] = entries

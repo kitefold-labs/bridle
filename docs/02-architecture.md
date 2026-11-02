@@ -148,7 +148,7 @@ with a key that never leaves the Keystore. Passwords are typed once, used only
 to install a key, and never stored. The one exception is user-typed text: compose-box history
 records what the user submitted, which may include something secret. It is kept per host,
 deleted with the host, never exported in backups, and can be cleared per entry, per host or
-entirely.
+entirely; with "Remember compose history" off it stays in memory only.
 The DB is excluded from Android cloud backup (`dataExtractionRules`). Users
 back up with an explicit, passphrase-encrypted export instead.
 

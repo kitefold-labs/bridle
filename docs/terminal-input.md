@@ -137,3 +137,8 @@ Each host keeps its last 200 compose-box submissions, most recent first and with
 ↑ and ↓ in the compose box move through them; going back down past the newest entry restores
 what you were typing. Very long submissions (over 16 KiB) are sent but not remembered, and
 entries can be deleted individually or cleared.
+
+History is saved on the phone, so anything typed into the compose box at a password prompt ends
+up on disk too: type passwords on the terminal keyboard instead. **Settings → Remember compose
+history** (on by default) controls this. Off, history is kept only while Bridle runs, and
+turning it off deletes the history already saved for every host.

@@ -182,6 +182,29 @@ class TerminalTabsViewModelTest {
         }
 
     @Test
+    fun `with compose history off nothing is read from or written to disk`() =
+        runBlocking<Unit> {
+            val id = world.addHost()
+            world.data.composeHistory.save(id, listOf("older"))
+            world.data.settings.setRememberComposeHistory(false)
+            val vm = viewModel()
+            val tab = launcher.openTerminal(id)
+            awaitUntil { vm.screens.value[tab.id] != null }
+            val state = vm.screens.value.getValue(tab.id)
+            state.history.entries shouldBe emptyList()
+
+            withContext(main) { state.updateComposeText("hunter2") }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } } == "hunter2" }
+            withContext(main) { state.submitCompose() }
+            Snapshot.sendApplyNotifications()
+            awaitUntil { runBlocking { withContext(main) { state.composeText } }.isEmpty() }
+            Thread.sleep(200)
+            state.history.entries shouldBe listOf("hunter2") // ↑ still works until Bridle closes
+            world.data.composeHistory.get(id) shouldBe listOf("older")
+        }
+
+    @Test
     fun `reconnect replaces the tab`() =
         runBlocking<Unit> {
             val vm = viewModel()

@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.core.data.DataModule
 import com.kitefoldlabs.bridle.core.data.settings.NotificationEvent
 import com.kitefoldlabs.bridle.core.data.settings.Settings
 import com.kitefoldlabs.bridle.core.data.settings.ThemeMode
+import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
 import com.kitefoldlabs.bridle.core.terminal.KeyBarLayout
 import com.kitefoldlabs.bridle.feature.eventually
@@ -18,6 +19,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -46,7 +48,7 @@ class SettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = SettingsViewModel(data.settings, { available })
+    private fun viewModel() = SettingsViewModel(data.settings, { available }, data.composeHistory)
 
     private fun SettingsViewModel.current(): Settings = settings.value!!
 
@@ -80,6 +82,19 @@ class SettingsViewModelTest {
         s.useHelperByDefault shouldBe false
         vm.setAppLock(false)
         eventually { !vm.current().appLockEnabled }
+    }
+
+    @Test
+    fun `turning compose history off deletes what was saved`() {
+        val vm = viewModel()
+        val host = runBlocking { data.hosts.upsert(Host(label = "devbox", hostname = "devbox", username = "me")) }
+        runBlocking { data.composeHistory.save(host, listOf("hunter2")) }
+        vm.setRememberComposeHistory(true)
+        eventually { vm.settings.value?.rememberComposeHistory == true }
+        runBlocking { data.composeHistory.get(host) } shouldBe listOf("hunter2")
+        vm.setRememberComposeHistory(false)
+        eventually { vm.settings.value?.rememberComposeHistory == false }
+        eventually { runBlocking { data.composeHistory.get(host) }.isEmpty() }
     }
 
     @Test

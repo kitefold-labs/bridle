@@ -60,6 +60,8 @@ In the terminal:
 - the **key bar** has the keys Claude Code needs (Esc, ⇧Tab, Ctrl+C, arrows);
 - the **compose box** (pencil button) is the easiest way to write a long prompt. **Send** pastes
   it as one block and presses Enter, and ↑/↓ go through what you sent before on this host.
+  That history is saved on the phone, so type passwords on the terminal keyboard, not in the
+  compose box (or turn off **Settings → Remember compose history**).
 
 The tmux session also appears under **tmux sessions** with a **Claude** badge. You can attach to
 any session there with **Attach**, including ones you started on your desktop. If your desktop is

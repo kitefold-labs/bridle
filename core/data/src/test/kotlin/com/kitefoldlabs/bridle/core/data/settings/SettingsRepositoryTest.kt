@@ -64,6 +64,7 @@ class SettingsRepositoryTest {
             repository.setAppLockEnabled(true)
             repository.setSecureScreenEnabled(true)
             repository.setKeepScreenOn(true)
+            repository.setRememberComposeHistory(false)
             repository.setNotificationsEnabled(false)
             repository.setNotificationEventEnabled(NotificationEvent.SESSION_EXITED, false)
             repository.setCrashReportingOptIn(true)
@@ -80,6 +81,7 @@ class SettingsRepositoryTest {
                     appLockEnabled = true,
                     secureScreenEnabled = true,
                     keepScreenOn = true,
+                    rememberComposeHistory = false,
                     notificationsEnabled = false,
                     notificationEvents = NotificationEvent.entries.toSet() - NotificationEvent.SESSION_EXITED,
                     crashReportingOptIn = true,

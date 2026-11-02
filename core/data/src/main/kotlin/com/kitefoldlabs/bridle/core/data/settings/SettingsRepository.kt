@@ -73,6 +73,8 @@ public class SettingsRepository(
 
     public suspend fun setKeepScreenOn(enabled: Boolean): Unit = update { it[KEEP_SCREEN_ON] = enabled }
 
+    public suspend fun setRememberComposeHistory(enabled: Boolean): Unit = update { it[COMPOSE_HISTORY] = enabled }
+
     public suspend fun setNotificationsEnabled(enabled: Boolean): Unit = update { it[NOTIFICATIONS] = enabled }
 
     public suspend fun setNotificationEventEnabled(
@@ -118,6 +120,7 @@ public class SettingsRepository(
         internal val APP_LOCK = booleanPreferencesKey("app_lock_enabled")
         internal val SECURE_SCREEN = booleanPreferencesKey("secure_screen_enabled")
         internal val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        internal val COMPOSE_HISTORY = booleanPreferencesKey("remember_compose_history")
         internal val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         internal val CRASH_REPORTING = booleanPreferencesKey("crash_reporting_opt_in")
         internal val USE_HELPER = booleanPreferencesKey("use_helper_by_default")
@@ -165,6 +168,7 @@ public class SettingsRepository(
                 appLockEnabled = prefs[APP_LOCK] ?: defaults.appLockEnabled,
                 secureScreenEnabled = prefs[SECURE_SCREEN] ?: defaults.secureScreenEnabled,
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+                rememberComposeHistory = prefs[COMPOSE_HISTORY] ?: defaults.rememberComposeHistory,
                 notificationsEnabled = prefs[NOTIFICATIONS] ?: defaults.notificationsEnabled,
                 notificationEvents =
                     NotificationEvent.entries.filterTo(mutableSetOf()) { event ->

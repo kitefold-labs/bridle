@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kitefoldlabs.bridle.core.data.ComposeHistoryRepository
 import com.kitefoldlabs.bridle.core.data.settings.NotificationEvent
 import com.kitefoldlabs.bridle.core.data.settings.Settings
 import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
@@ -62,6 +63,7 @@ class SettingsViewModel
     constructor(
         private val repository: SettingsRepository,
         private val availability: LockAvailability,
+        private val history: ComposeHistoryRepository,
     ) : ViewModel() {
         /** Null until the stored settings have been read. */
         val settings: StateFlow<Settings?> = repository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -81,6 +83,13 @@ class SettingsViewModel
         fun setBackspaceMode(mode: BackspaceMode) = write { setBackspaceMode(mode) }
 
         fun setKeepScreenOn(enabled: Boolean) = write { setKeepScreenOn(enabled) }
+
+        /** Turning it off also deletes the history already saved, for every host. */
+        fun setRememberComposeHistory(enabled: Boolean) =
+            write {
+                setRememberComposeHistory(enabled)
+                if (!enabled) history.clearAll()
+            }
 
         fun setAppLock(enabled: Boolean) = write { setAppLockEnabled(enabled && availability.isAvailable()) }
 

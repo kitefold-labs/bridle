@@ -70,7 +70,7 @@ class SettingsScreenTest {
     fun tearDown() = data.close()
 
     private fun show(memory: () -> Long = { Long.MAX_VALUE }): SettingsViewModel {
-        val vm = SettingsViewModel(data.settings) { available }
+        val vm = SettingsViewModel(data.settings, { available }, data.composeHistory)
         backup =
             BackupViewModel(
                 data.backup,
@@ -124,6 +124,8 @@ class SettingsScreenTest {
         rule.onNodeWithText("Terminal font size: 20 sp").assertExists()
         click("Keep the screen on in terminals")
         eventually { settings().keepScreenOn }
+        click("Remember compose history")
+        eventually { !settings().rememberComposeHistory }
         click("Extra keys bar")
         clickInDialog("Claude Code")
         waitForText("Claude Code")

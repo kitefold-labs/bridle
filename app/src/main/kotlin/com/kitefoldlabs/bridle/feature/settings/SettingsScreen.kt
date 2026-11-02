@@ -143,6 +143,12 @@ private fun LazyListScope.appearance(
             },
         )
         SwitchRow(stringResource(R.string.settings_keep_screen_on), settings.keepScreenOn, viewModel::setKeepScreenOn)
+        SwitchRow(
+            title = stringResource(R.string.settings_compose_history),
+            summary = stringResource(R.string.settings_compose_history_summary),
+            checked = settings.rememberComposeHistory,
+            onChange = viewModel::setRememberComposeHistory,
+        )
     }
 }
 
