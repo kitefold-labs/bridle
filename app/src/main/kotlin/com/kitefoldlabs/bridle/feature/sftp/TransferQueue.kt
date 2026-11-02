@@ -161,8 +161,13 @@ class TransferQueue
             job.invokeOnCompletion { cause ->
                 jobs.remove(transfer.id)
                 // Cancelled before its body ever ran, so nothing above recorded it; left QUEUED, it
-                // would keep the foreground service up for good.
-                if (cause != null) update(transfer.id) { if (it.isActive) it.copy(status = CANCELLED) else it }
+                // would keep the foreground service up for good, and a download would leave its
+                // empty document behind.
+                val neverRan = cause != null && state.value.any { it.id == transfer.id && it.isActive }
+                if (neverRan) {
+                    update(transfer.id) { if (it.isActive) it.copy(status = CANCELLED) else it }
+                    onFailure()
+                }
             }
             job.start()
         }

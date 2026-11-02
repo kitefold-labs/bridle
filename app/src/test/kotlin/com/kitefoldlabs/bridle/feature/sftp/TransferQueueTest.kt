@@ -95,6 +95,15 @@ class TransferQueueTest {
             .status shouldBe TransferStatus.CANCELLED
         lazy.hasActiveWork shouldBe false
         sftp.exists("$HOME/c") shouldBe false
+
+        // A download cancelled that early removes the document the user created for it.
+        val download = lazy.download(1, "$HOME/d", uri("d"))
+        lazy.cancel(download.id)
+        dispatcher.scheduler.runCurrent()
+        lazy.transfers.value
+            .last()
+            .status shouldBe TransferStatus.CANCELLED
+        documents.deleted shouldBe listOf(uri("d").toString())
     }
 
     @Test
