@@ -31,6 +31,7 @@ Start at the [documentation index](docs/README.md), which also lists the tutoria
 | [docs/host-helper.md](docs/host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
 | [docs/terminal-input.md](docs/terminal-input.md) | Key encodings, safe bracketed paste, and customising the extra-keys bar (JSON format) |
 | [docs/backup-and-privacy.md](docs/backup-and-privacy.md) | What encrypted backups contain (and never contain), how they are encrypted, how crash reports are scrubbed and filed |
+| [docs/tutorials/01-first-connection.md](docs/tutorials/01-first-connection.md) | Tutorial: generate a key, add a host (with Tailscale tips), install the key, connect and verify the fingerprint |
 | [docs/development.md](docs/development.md) | Building, quality gates (≥95% coverage, lint, licenses), pre-commit hooks |
 | [docs/release.md](docs/release.md) | Signing, the release workflow, Play Console (foreground service, Data Safety), F-Droid |
 | [docs/adr/](docs/adr/) | Architecture decision records |

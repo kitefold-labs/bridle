@@ -195,6 +195,11 @@ class AndroidKeyStoreBackendTest {
         shouldThrow<KeyGenerationException> {
             backend.generateKeyPair("y", KeyGenSpec(KeyAlgorithm.RSA))
         }.cause.shouldBeInstanceOf<InvalidAlgorithmParameterException>()
+        // A per-use key on a device without an enrolled biometric.
+        FakeAndroidKeyStore.failure = IllegalStateException("At least one biometric must be enrolled")
+        shouldThrow<KeyGenerationException> {
+            backend.generateKeyPair("z", KeyGenSpec(KeyAlgorithm.ECDSA_P256, UserAuthPolicy.PerUse))
+        }.cause.shouldBeInstanceOf<IllegalStateException>()
     }
 
     @Test

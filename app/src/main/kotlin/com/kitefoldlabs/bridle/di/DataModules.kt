@@ -7,6 +7,7 @@ import com.kitefoldlabs.bridle.core.data.DataModule
 import com.kitefoldlabs.bridle.core.session.HostConnector
 import com.kitefoldlabs.bridle.core.ssh.SshEngine
 import com.kitefoldlabs.bridle.core.ssh.SshjEngine
+import com.kitefoldlabs.bridle.feature.keys.KeyStoreSignerSource
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -59,11 +60,7 @@ object ConnectModules {
     @Provides
     fun hostConnector(connector: DefaultHostConnector): HostConnector = connector
 
-    /**
-     * Until key storage is wired in, hosts authenticate with passwords only. Replaced by the
-     * Keystore/imported-key signer source when core:security lands.
-     */
+    /** Keystore keys and vault-encrypted imported keys, with biometric prompts where required. */
     @Provides
-    @Singleton
-    fun signerSource(): SignerSource = SignerSource { null }
+    fun signerSource(source: KeyStoreSignerSource): SignerSource = source
 }

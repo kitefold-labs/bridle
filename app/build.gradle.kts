@@ -106,4 +106,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.compose.material.icons)
     implementation(libs.kotlinx.serialization.json)
+
+    // Tests build an in-memory AEAD for the imported-key vault (Robolectric has no Keystore).
+    testImplementation(libs.tink.android)
 }

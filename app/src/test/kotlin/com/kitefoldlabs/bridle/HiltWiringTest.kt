@@ -110,7 +110,14 @@ class HiltWiringTest {
     fun `receiver injects and handles disconnect all`() =
         runBlocking<Unit> {
             coordinator.openTab(42, "x", AttachSpec.Shell, { _, _ -> })
-            SessionActionReceiver().onReceive(context, Intent(SessionActionReceiver.ACTION_DISCONNECT_ALL))
+            // A real broadcast, so goAsync() has a pending result to finish (a direct onReceive()
+            // call leaks a NullPointerException into whichever coroutine test runs next).
+            context.sendBroadcast(
+                Intent(
+                    SessionActionReceiver.ACTION_DISCONNECT_ALL,
+                ).setClass(context, SessionActionReceiver::class.java),
+            )
+            ShadowLooper.idleMainLooper()
             repeat(100) {
                 if (coordinator.tabs.value.isNotEmpty()) Thread.sleep(10)
             }
