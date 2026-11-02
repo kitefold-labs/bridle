@@ -229,14 +229,12 @@ internal fun fieldError(
     when (reason) {
         Validation.Reason.BLANK -> R.string.profile_error_required
         Validation.Reason.TOO_LONG -> R.string.profile_error_too_long
-        // Only names and session names are checked for characters (and nothing for range).
+        // Names, session names and working directories are checked for characters (nothing for range).
         else ->
-            if (field ==
-                ProfileField.SESSION_NAME
-            ) {
-                R.string.profile_error_session_chars
-            } else {
-                R.string.profile_error_control_chars
+            when (field) {
+                ProfileField.SESSION_NAME -> R.string.profile_error_session_chars
+                ProfileField.WORKING_DIR -> R.string.profile_error_dir_chars
+                else -> R.string.profile_error_control_chars
             }
     }
 

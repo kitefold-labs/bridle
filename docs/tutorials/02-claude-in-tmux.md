@@ -30,7 +30,7 @@ Under **Launch profiles**, tap **+** (New profile). The form starts from the Cla
 |-------|--------|--------------|
 | Name | `Claude · ~` | Shown on the card. |
 | tmux session name | `claude` | The tmux session the profile runs in. Letters, digits, `-` and `_` only. |
-| Working directory | `~` | Where Claude starts, e.g. `~/src/api`. |
+| Working directory | `~` | Where Claude starts, e.g. `~/src/api`. Backslashes and control characters aren't allowed. |
 | Command | `claude` | What **Start** and **Restart fresh** run. |
 | Restart command | `claude --continue` | What **Restart (continue)** runs, so Claude picks up the last conversation. |
 | Restart | Respawn and continue | How **Restart** works (see below). |

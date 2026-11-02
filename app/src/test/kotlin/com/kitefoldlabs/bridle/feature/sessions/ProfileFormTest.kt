@@ -37,6 +37,12 @@ class ProfileFormTest {
                 ProfileField.COMMAND to Validation.Reason.BLANK,
             )
         bad.isValid shouldBe false
+        // Start would launch these but couldn't attach (TmuxScripts.attachCommand refuses them).
+        for (dir in listOf("C:\\src", "~/a\\b", "~/a\nb", "~/\u0007")) {
+            preset.copy(workingDir = dir).errors shouldBe
+                mapOf(ProfileField.WORKING_DIR to Validation.Reason.ILLEGAL_CHARACTERS)
+        }
+        preset.copy(workingDir = " ~/src/my app ").isValid shouldBe true
     }
 
     @Test
@@ -109,6 +115,8 @@ class ProfileFormTest {
             R.string.profile_error_control_chars
         fieldError(ProfileField.SESSION_NAME, Validation.Reason.ILLEGAL_CHARACTERS) shouldBe
             R.string.profile_error_session_chars
+        fieldError(ProfileField.WORKING_DIR, Validation.Reason.ILLEGAL_CHARACTERS) shouldBe
+            R.string.profile_error_dir_chars
         envError(EnvError.BLANK) shouldBe R.string.profile_error_required
         envError(EnvError.ILLEGAL_CHARACTERS) shouldBe R.string.profile_error_env_chars
         envError(EnvError.DUPLICATE) shouldBe R.string.profile_error_env_duplicate

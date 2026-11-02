@@ -81,6 +81,16 @@ class ValidatorsTest {
     }
 
     @Test
+    fun `working directories`() {
+        Validators.workingDirectory("~/src/it's \$(here)") shouldBe Validation.Valid
+        Validators.workingDirectory("/srv/a b;") shouldBe Validation.Valid
+        reason(Validators.workingDirectory(" ")) shouldBe Validation.Reason.BLANK
+        reason(Validators.workingDirectory("C:\\src")) shouldBe Validation.Reason.ILLEGAL_CHARACTERS
+        reason(Validators.workingDirectory("~/a\nb")) shouldBe Validation.Reason.ILLEGAL_CHARACTERS
+        reason(Validators.workingDirectory("~/a\tb")) shouldBe Validation.Reason.ILLEGAL_CHARACTERS
+    }
+
+    @Test
     fun `all returns first failure`() {
         Validators.all() shouldBe Validation.Valid
         Validators

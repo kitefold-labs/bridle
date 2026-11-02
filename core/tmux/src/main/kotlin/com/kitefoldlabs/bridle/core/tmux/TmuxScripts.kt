@@ -206,15 +206,15 @@ public object TmuxScripts {
     /**
      * The command for an interactive PTY that attaches to [session], creating it in [workingDir]
      * if needed. It is run as the SSH exec command, so it must parse the same in bash, zsh and
-     * fish: the fixed program contains no `'` or `\`, and arguments may not contain `\`.
+     * fish: the fixed program contains no `'` or `\`, and [Validators.workingDirectory] keeps `\`
+     * out of the arguments.
      */
     public fun attachCommand(
         session: String,
         workingDir: String = "~",
     ): String {
         requireValid(Validators.sessionName(session))
-        require('\\' !in workingDir) { "Working directory may not contain backslashes" }
-        require(workingDir.none { it.isISOControl() }) { "Working directory may not contain control characters" }
+        requireValid(Validators.workingDirectory(workingDir))
         val program =
             "$PATH_PRELUDE; " +
                 "case \"\$2\" in \"~\" | \"~/\"*) d=\"\$HOME\${2#?}\" ;; *) d=\"\$2\" ;; esac; " +

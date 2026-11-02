@@ -86,6 +86,19 @@ public object Validators {
             else -> Validation.Valid
         }
 
+    /**
+     * A remote working directory (`~/src/api`, `/srv/app`). Bridle attaches to tmux with a command
+     * that must parse the same in sh, bash, zsh and fish, so backslashes and control characters
+     * are refused; anything else is shell-quoted where it is used.
+     */
+    public fun workingDirectory(value: String): Validation =
+        when {
+            value.isBlank() -> invalid("workingDir", Validation.Reason.BLANK)
+            '\\' in value || value.any { it.isISOControl() } ->
+                invalid("workingDir", Validation.Reason.ILLEGAL_CHARACTERS)
+            else -> Validation.Valid
+        }
+
     /** Returns the first failure among [checks], or [Validation.Valid]. */
     public fun all(vararg checks: Validation): Validation = all(checks.asList())
 

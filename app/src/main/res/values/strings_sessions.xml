@@ -141,6 +141,7 @@
     <string name="profile_error_too_long">Too long</string>
     <string name="profile_error_session_chars">Use letters, digits, - and _ only</string>
     <string name="profile_error_control_chars">Remove control characters</string>
+    <string name="profile_error_dir_chars">Remove backslashes and control characters</string>
     <string name="profile_error_env_chars">Use letters, digits and _, not starting with a digit</string>
     <string name="profile_error_env_duplicate">Duplicate name</string>
 
