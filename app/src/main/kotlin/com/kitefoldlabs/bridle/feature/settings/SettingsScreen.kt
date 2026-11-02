@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DontMemoize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,6 +33,7 @@ import com.kitefoldlabs.bridle.core.data.settings.NotificationEvent
 import com.kitefoldlabs.bridle.core.data.settings.Settings
 import com.kitefoldlabs.bridle.core.data.settings.ThemeMode
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
+import kotlin.math.roundToInt
 
 /** Sub-pages of the settings screen. */
 enum class SettingsPage { MAIN, LICENCES, PRIVACY }
@@ -120,13 +123,19 @@ private fun LazyListScope.appearance(
             { onChoice(SettingsChoice.FONT) },
             stringResource(fontLabel(TerminalFont.of(settings.fontFamilyId))),
         )
-        val sizeLabel = stringResource(R.string.settings_font_size, settings.terminalFontSizeSp)
+        // The slider moves locally and the size is stored once, when the drag ends: storing every
+        // step meant a disk write per frame. Rounded, as a step's float may be 13.999...
+        var position by remember(settings.terminalFontSizeSp) {
+            mutableFloatStateOf(settings.terminalFontSizeSp.toFloat())
+        }
+        val sizeLabel = stringResource(R.string.settings_font_size, position.roundToInt())
         ListItem(
             headlineContent = { Text(sizeLabel) },
             supportingContent = {
                 Slider(
-                    value = settings.terminalFontSizeSp.toFloat(),
-                    onValueChange = { viewModel.setFontSize(it.toInt()) },
+                    value = position,
+                    onValueChange = { position = it },
+                    onValueChangeFinished = { viewModel.setFontSize(position.roundToInt()) },
                     valueRange = Settings.MIN_FONT_SIZE_SP.toFloat()..Settings.MAX_FONT_SIZE_SP.toFloat(),
                     steps = Settings.MAX_FONT_SIZE_SP - Settings.MIN_FONT_SIZE_SP - 1,
                     modifier = Modifier.semantics { contentDescription = sizeLabel },

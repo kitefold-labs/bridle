@@ -118,9 +118,10 @@ class SettingsScreenTest {
             .onNodeWithContentDescription(
                 "Terminal font size: 14 sp",
             ).performSemanticsAction(SemanticsActions.SetProgress) {
-                it(20f)
+                it(19.999f)
             }
         eventually { settings().terminalFontSizeSp == 20 }
+        rule.onNodeWithText("Terminal font size: 20 sp").assertExists()
         click("Keep the screen on in terminals")
         eventually { settings().keepScreenOn }
         click("Extra keys bar")
