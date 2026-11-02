@@ -159,7 +159,9 @@ dynamic), terminal font size and font id, the key-bar layout (Termux-style JSON,
 with `KeyBarLayout.parse`, falling back to the default), Backspace mode, app lock, FLAG_SECURE,
 keep-screen-on, notifications (master switch plus one toggle per event), crash-report opt-in,
 and whether to use bridle-helper. If the file can't be read (an I/O error), the defaults
-apply, except that app lock is treated as on: the lock fails closed and can still be unlocked.
+apply, except that the privacy settings fail closed: app lock and FLAG_SECURE are treated as on
+(the lock can still be unlocked) and compose history is kept in memory only. Changing a setting
+then does nothing, rather than crashing the app.
 
 **The database holds no plaintext secrets.** Generated private keys live
 only in the Keystore. Imported keys are stored only as ciphertext, encrypted

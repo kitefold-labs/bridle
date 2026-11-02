@@ -26,9 +26,9 @@ import java.util.Locale
 /**
  * App preferences on Jetpack DataStore. Reading never fails: missing, out-of-range or unreadable
  * values (including a key-bar layout that no longer parses) fall back to the [Settings] defaults.
- * A store that can't be read at all gives [UNREADABLE]: the defaults, but with app lock on, so an
- * I/O error can't switch the lock off. Writers validate, so bad values are rejected when they are
- * set rather than silently dropped.
+ * A store that can't be read at all gives [UNREADABLE]: the defaults, but with every privacy
+ * setting at its safe value, so an I/O error can't switch the lock off. Writers validate, so bad
+ * values are rejected when they are set rather than silently dropped.
  */
 public class SettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -133,11 +133,14 @@ public class SettingsRepository(
 
         /**
          * What [settings] gives when the store can't be read (an [IOException]): the defaults,
-         * except that app lock is on. Failing closed costs one unlock (which still works, as long
+         * except that the privacy settings fail closed: app lock and FLAG_SECURE on, compose
+         * history kept in memory only. Failing closed costs one unlock (which still works, as long
          * as the device has a screen lock); failing open would hand the app to whoever holds the
-         * phone.
+         * phone, or write a password sent from the compose box to disk for a user who had turned
+         * that off.
          */
-        public val UNREADABLE: Settings = Settings(appLockEnabled = true)
+        public val UNREADABLE: Settings =
+            Settings(appLockEnabled = true, secureScreenEnabled = true, rememberComposeHistory = false)
 
         private fun isValidFontFamilyId(id: String): Boolean =
             id.isNotBlank() && id.length <= Settings.MAX_FONT_FAMILY_ID_LENGTH

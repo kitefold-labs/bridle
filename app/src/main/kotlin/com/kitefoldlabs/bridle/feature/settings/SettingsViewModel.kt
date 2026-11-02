@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 /** Which built-in key-bar layout is in use, or a custom one. */
@@ -140,7 +141,18 @@ class SettingsViewModel
             }
         }
 
+        /**
+         * A store that can't be written (the same I/O error that gave [SettingsRepository.UNREADABLE],
+         * say) leaves the setting as it was: the screen keeps showing the old value, and the app
+         * doesn't crash.
+         */
         private fun write(change: suspend SettingsRepository.() -> Unit) {
-            viewModelScope.launch { repository.change() }
+            viewModelScope.launch {
+                try {
+                    repository.change()
+                } catch (ignored: IOException) {
+                    // Nothing changed; the screen still shows the stored value.
+                }
+            }
         }
     }

@@ -182,12 +182,13 @@ class SettingsRepositoryTest {
         }
 
     @Test
-    fun `read errors give the defaults, but with app lock on`() =
+    fun `read errors give the defaults, but with the privacy settings closed`() =
         runTest {
             val failing = FailingStore(IOException("disk on fire"))
 
             SettingsRepository(failing).settings.toList() shouldBe listOf(SettingsRepository.UNREADABLE)
-            SettingsRepository.UNREADABLE shouldBe Settings().copy(appLockEnabled = true)
+            SettingsRepository.UNREADABLE shouldBe
+                Settings().copy(appLockEnabled = true, secureScreenEnabled = true, rememberComposeHistory = false)
         }
 
     @Test
