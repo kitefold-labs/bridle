@@ -32,7 +32,7 @@ class GitHubIssueUrlTest {
         val r = report("java.lang.IllegalStateException: boom\n\tat a.B.c(B.kt:1)")
         val url = GitHubIssueUrl.build(report = r, userNotes = "Tapped connect & waited + more")
         url shouldStartWith
-            "https://github.com/nkoenig/terminal/issues/new?template=crash_report.yml" +
+            "https://github.com/kitefold-labs/bridle/issues/new?template=crash_report.yml" +
             "&title=Crash%3A%20IllegalStateException&context="
         params(url) shouldBe
             mapOf(
@@ -46,9 +46,9 @@ class GitHubIssueUrlTest {
     @Test
     fun `long traces are trimmed at a line break with a marker`() {
         val r = report(bigTrace(400))
-        val url = GitHubIssueUrl.build("kitefoldlabs/bridle", r, "notes")
+        val url = GitHubIssueUrl.build("some-org/fork.of_bridle", r, "notes")
         url.length shouldBeLessThanOrEqual GitHubIssueUrl.MAX_URL_LENGTH
-        url shouldStartWith "https://github.com/kitefoldlabs/bridle/issues/new?"
+        url shouldStartWith "https://github.com/some-org/fork.of_bridle/issues/new?"
         val body = params(url).getValue("report")
         body shouldStartWith header + "\n\n\tat com.kitefoldlabs.bridle.App.method1(App.kt:1)\n"
         body shouldEndWith ")\n[truncated]"
@@ -75,7 +75,7 @@ class GitHubIssueUrlTest {
     @Test
     fun `notes may be dropped entirely when only the minimal report fits`() {
         val minimal =
-            "https://github.com/nkoenig/terminal/issues/new?template=crash_report.yml" +
+            "https://github.com/kitefold-labs/bridle/issues/new?template=crash_report.yml" +
                 "&title=Crash%3A%20IllegalStateException&context=&report=" +
                 GitHubIssueUrl.encode(header + "\n\n" + CrashReport.TRUNCATED)
         GitHubIssueUrl.build(report = report("y".repeat(5_000)), userNotes = "abc", maxLength = minimal.length) shouldBe

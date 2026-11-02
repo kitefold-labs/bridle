@@ -4,8 +4,9 @@ Bridle holds the keys to your servers, so we take security reports seriously.
 
 ## Reporting a vulnerability
 
-Please use **GitHub private vulnerability reporting** ("Report a vulnerability" under the
-repository's *Security* tab). Don't open public issues for security problems.
+Please use **GitHub private vulnerability reporting**:
+<https://github.com/kitefold-labs/bridle/security/advisories/new> ("Report a vulnerability"
+under the repository's *Security* tab). Don't open public issues for security problems.
 
 Include affected version(s), reproduction steps and impact. We aim to acknowledge reports within
 3 business days and to ship a fix for confirmed high-severity issues within 30 days. We credit

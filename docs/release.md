@@ -211,13 +211,13 @@ Categories:
   - Internet
 License: Apache-2.0
 AuthorName: Kitefold Labs
-SourceCode: https://github.com/kitefoldlabs/bridle
-IssueTracker: https://github.com/kitefoldlabs/bridle/issues
+SourceCode: https://github.com/kitefold-labs/bridle
+IssueTracker: https://github.com/kitefold-labs/bridle/issues
 
 AutoName: Bridle
 
 RepoType: git
-Repo: https://github.com/kitefoldlabs/bridle.git
+Repo: https://github.com/kitefold-labs/bridle.git
 
 Builds:
   - versionName: 0.1.0
@@ -227,7 +227,7 @@ Builds:
     gradle:
       - yes
 
-Binaries: https://github.com/kitefoldlabs/bridle/releases/download/v%v/Bridle-v%v.apk
+Binaries: https://github.com/kitefold-labs/bridle/releases/download/v%v/Bridle-v%v.apk
 AllowedAPKSigningKeys: <sha256 of the GitHub release certificate, lowercase, no colons>
 
 AutoUpdateMode: Version
@@ -270,13 +270,17 @@ string). Last checked on 1 November 2026: two builds in different directories
 gave byte-identical unsigned APKs, and both a CI-style (Gradle-signed) APK and
 one signed with the `apksigner` command above passed `apksigcopier compare`.
 
-## When the repository moves to `kitefoldlabs/bridle`
+## Repository settings (`kitefold-labs/bridle`)
 
-- Update `GitHubIssueUrl.DEFAULT_REPO` in `core/backup` (crash reports open
-  issues there) and its test.
-- Update links in `README.md`, `SECURITY.md`, `PRIVACY.md`, `CONTRIBUTING.md`
-  and the issue templates.
-- Re-enable private vulnerability reporting, branch protection (required
-  checks: *Pre-commit hooks*, *Build, test, coverage gate*, *Analyze*),
-  Dependabot and CodeQL on the new repository.
-- Move the signing secrets if CI signs.
+The repository moved from `nkoenig/terminal`; GitHub redirects the old URLs. The code
+(`GitHubIssueUrl.DEFAULT_REPO`, the source and privacy links) and the docs point at the new
+home. On the repository itself, check that these are on:
+
+- Private vulnerability reporting (repository Settings → *Advanced Security*, called *Code
+  security* on some plans), which `SECURITY.md` and the issue template's security link rely on.
+- Branch protection or a ruleset on `main` with the required checks *Pre-commit hooks*,
+  *Build, test, coverage gate* and *Analyze (java-kotlin)*.
+- Dependabot version updates (from `.github/dependabot.yml`) and CodeQL (from its workflow;
+  leave CodeQL *default setup* off, or GitHub rejects the workflow's uploads).
+- The `release` environment, limited to `v*` tags, with required reviewers and the
+  `BRIDLE_SIGNING_*` secrets if CI signs; and a ruleset protecting `v*` tags.

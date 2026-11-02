@@ -115,7 +115,7 @@ back to the same session.
       trace, app/OS version, device model; no hostnames, usernames, paths or
       terminal content). On the next launch the app offers to report it,
       shows the exact text, and opens a pre-filled
-      `github.com/kitefoldlabs/bridle/issues/new` URL in the browser. The URL
+      `github.com/kitefold-labs/bridle/issues/new` URL in the browser. The URL
       is size-capped and the stack trace is trimmed. Issue templates live in
       `.github/ISSUE_TEMPLATE/` (bug, crash, feature).
 - [ ] Open-source release: public repo, CONTRIBUTING, CODE_OF_CONDUCT,
@@ -167,7 +167,7 @@ Launch Profiles, multi-host snippet broadcast.
 | Push when disconnected | No; notifications only while connected |
 | Other agent presets | No; Claude-first (profiles still accept any command) |
 | Device focus | Phone first; tablet/foldable later |
-| Repository | Moves to the Kitefold Labs GitHub org (proposed `kitefoldlabs/bridle`) |
+| Repository | Kitefold Labs GitHub org: `kitefold-labs/bridle` |
 | Store signing | Kitefold Labs holds the Play upload key (Play App Signing) |
 | Crash reporting | Opt-in, user-reviewed GitHub Issues; no crash SDK or server |
 

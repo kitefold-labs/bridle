@@ -14,7 +14,7 @@ data class ThirdPartyLicence(
  * list when a runtime dependency is added.
  */
 object Licences {
-    const val SOURCE_URL: String = "https://github.com/nkoenig/terminal"
+    const val SOURCE_URL: String = "https://github.com/kitefold-labs/bridle"
     const val PRIVACY_URL: String = "$SOURCE_URL/blob/main/PRIVACY.md"
 
     private const val APACHE = "Apache License 2.0"
