@@ -79,6 +79,9 @@ public class ConnectionManager(
     // Concurrent: [state] reads it without the mutex.
     private val entries = ConcurrentHashMap<EntityId, Entry>()
 
+    /** Connections with a probe in flight: a burst of network callbacks probes each only once. */
+    private val probing: MutableSet<SshConnection> = ConcurrentHashMap.newKeySet()
+
     /** Acquires a lease on [hostId], connecting if needed. */
     public suspend fun acquire(hostId: EntityId): ConnectionLease =
         mutex.withLock {
@@ -114,12 +117,21 @@ public class ConnectionManager(
                 when (val state = entry.state.value) {
                     is HostConnectionState.Reconnecting -> entry.start()
                     is HostConnectionState.Failed -> if (state.retryable) entry.start()
-                    is HostConnectionState.Connected -> probes += entry to state.connection
+                    is HostConnectionState.Connected ->
+                        if (probing.add(state.connection)) probes += entry to state.connection
                     else -> Unit
                 }
             }
         }
-        for ((entry, connection) in probes) scope.launch { probe(entry, connection) }
+        for ((entry, connection) in probes) {
+            scope.launch {
+                try {
+                    probe(entry, connection)
+                } finally {
+                    probing.remove(connection)
+                }
+            }
+        }
     }
 
     /** Reconnects [entry] if [connection], still its current one, doesn't answer a no-op in time. */

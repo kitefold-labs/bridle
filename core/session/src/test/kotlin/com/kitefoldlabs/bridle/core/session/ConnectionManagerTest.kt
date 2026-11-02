@@ -178,6 +178,28 @@ class ConnectionManagerTest {
         }
 
     @Test
+    fun `a burst of network changes probes each connection once`() =
+        runTest {
+            val connector = ScriptedConnector()
+            val m = manager(connector)
+            val lease = m.acquire(1)
+            val connection = lease.awaitConnection() as FakeConnection
+            val answer = CompletableDeferred<ExecResult>()
+            connection.onExec = { answer.await() }
+            repeat(3) { m.onNetworkChanged() }
+            runCurrent()
+            connection.execs shouldBe listOf("true")
+            answer.complete(ExecResult(0, "", ""))
+            runCurrent()
+            // Once it has answered, the next change probes again.
+            m.onNetworkChanged()
+            runCurrent()
+            connection.execs shouldBe listOf("true", "true")
+            connector.attempts.size shouldBe 1
+            lease.close()
+        }
+
+    @Test
     fun `a probe that times out leaves alone a host that reconnected or was released meanwhile`() =
         runTest {
             val connector = ScriptedConnector()
