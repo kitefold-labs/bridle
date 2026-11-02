@@ -61,7 +61,7 @@ data class SnippetRun(
     val command: String get() = snippet.render(values)
 }
 
-enum class SnippetNotice { PASTED, NO_TERMINAL, SAVED, DELETED }
+enum class SnippetNotice { NO_TERMINAL, SAVED, DELETED }
 
 data class SnippetsUiState(
     val loaded: Boolean = false,
@@ -139,16 +139,18 @@ class SnippetsViewModel
             mutable.update { it.copy(run = null) }
         }
 
-        /** Types the command into this host's terminal (the user presses Enter there). */
+        /**
+         * Types the command into this host's terminal (the user presses Enter there). The terminal
+         * comes up with it, so the dialog just closes; with no terminal open on the host, the
+         * dialog stays and says so.
+         */
         fun paste() {
             val run = state.value.run ?: return
             viewModelScope.launch {
-                val pasted = target.paste(hostId, run.command)
-                mutable.update {
-                    it.copy(
-                        run = if (pasted) null else it.run,
-                        notice = if (pasted) SnippetNotice.PASTED else SnippetNotice.NO_TERMINAL,
-                    )
+                if (target.paste(hostId, run.command)) {
+                    mutable.update { it.copy(run = null) }
+                } else {
+                    mutable.update { it.copy(notice = SnippetNotice.NO_TERMINAL) }
                 }
             }
         }

@@ -1,6 +1,7 @@
 package com.kitefoldlabs.bridle.feature.terminal
 
 import android.content.Context
+import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.core.terminalui.EngineSink
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
@@ -17,6 +18,15 @@ import dagger.hilt.components.SingletonComponent
  */
 fun interface TerminalEngineFactory {
     fun create(): TerminalEngine
+}
+
+/**
+ * What starts with a host's terminal: [TerminalLauncher] calls it each time it opens a tab on a
+ * host, so it must do nothing for work that is already running. Bound to the host's auto-start
+ * port forwards ([com.kitefoldlabs.bridle.feature.forwards.ForwardManager.startAutoForwards]).
+ */
+fun interface HostAutoStart {
+    suspend fun start(hostId: EntityId)
 }
 
 /** Starts (or refreshes) the foreground service that keeps open tabs alive in the background. */

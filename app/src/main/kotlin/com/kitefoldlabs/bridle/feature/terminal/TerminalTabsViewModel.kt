@@ -27,8 +27,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -119,6 +121,14 @@ class TerminalTabsViewModel
             viewModelScope.launch {
                 combine(coordinator.tabs, settings.filterNotNull(), ::Pair).collect { (tabs, current) ->
                     syncScreens(tabs, current)
+                }
+            }
+            // A paste that must be confirmed (a snippet): its screen asks once it exists.
+            viewModelScope.launch {
+                navigator.pendingPaste.filterNotNull().collectLatest { paste ->
+                    val screen = mutableScreens.first { paste.tabId in it }.getValue(paste.tabId)
+                    navigator.pasteTaken(paste)
+                    screen.paste(paste.text)
                 }
             }
         }

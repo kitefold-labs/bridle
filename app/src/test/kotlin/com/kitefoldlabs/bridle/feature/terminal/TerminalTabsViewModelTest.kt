@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
+import com.kitefoldlabs.bridle.core.terminalui.PendingSend
 import com.kitefoldlabs.bridle.feature.FakeEngine
 import com.kitefoldlabs.bridle.feature.TestWorld
 import com.kitefoldlabs.bridle.feature.awaitUntil
@@ -55,7 +56,15 @@ class TerminalTabsViewModelTest {
     private val navigator = TerminalNavigator()
     private val engines = CopyOnWriteArrayList<FakeEngine>()
     private val launcher =
-        TerminalLauncher(world.coordinator, world.data.hosts, { FakeEngine().also { engines += it } }, {}, navigator)
+        TerminalLauncher(
+            world.coordinator,
+            world.data.hosts,
+            { FakeEngine().also { engines += it } },
+            {},
+            navigator,
+            {},
+            scope,
+        )
     private val store = ViewModelStore()
 
     @Before
@@ -191,5 +200,25 @@ class TerminalTabsViewModelTest {
             world.coordinator.tabs.value
                 .single()
                 .session.attach shouldBe AttachSpec.Tmux("api")
+        }
+
+    @Test
+    fun `a paste that needs confirming reaches its tab's screen, which asks first`() =
+        runBlocking<Unit> {
+            val vm = viewModel()
+            navigator.requestPaste("closed", "never shown") // no such screen: it waits, then is replaced
+            val tab = launcher.openTerminal(world.addHost())
+            awaitUntil { vm.screens.value[tab.id] != null && tab.session.state.value == TerminalState.Open }
+            val screen = vm.screens.value.getValue(tab.id)
+            engines.single().isBracketedPasteEnabled = false
+
+            navigator.requestPaste(tab.id, "cd /srv\nmake")
+            awaitUntil { navigator.pendingPaste.value == null }
+            val asked = PendingSend("cd /srv\nmake", submit = false)
+            awaitUntil { runBlocking { withContext(main) { screen.pendingSend } } == asked }
+            val shell = world.host.shells.single()
+            shell.typed() shouldBe ""
+            withContext(main) { screen.confirmPendingSend() }
+            awaitUntil { shell.typed() == "cd /srv\rmake" }
         }
 }

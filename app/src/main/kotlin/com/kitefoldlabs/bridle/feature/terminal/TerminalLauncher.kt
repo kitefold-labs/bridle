@@ -26,7 +26,8 @@ import javax.inject.Singleton
 /**
  * Opens terminal tabs. This is what other features call ("Connect" on a host, "Attach" on a tmux
  * session, a notification tap): it creates the emulator, wires it to the session in both
- * directions, starts the foreground service and brings the terminal screen up.
+ * directions, starts the foreground service and brings the terminal screen up. Then, in the
+ * background, it runs [autoStart] for the host (its auto-start port forwards).
  */
 @Singleton
 class TerminalLauncher
@@ -37,6 +38,8 @@ class TerminalLauncher
         private val engines: TerminalEngineFactory,
         private val service: SessionServiceStarter,
         private val navigator: TerminalNavigator,
+        private val autoStart: HostAutoStart,
+        @param:ApplicationScope private val scope: CoroutineScope,
     ) {
         private val attaching = Mutex()
 
@@ -128,7 +131,22 @@ class TerminalLauncher
                 }
             service.ensureRunning()
             navigator.show(tab.id)
+            startWithHost(hostId)
             return tab
+        }
+
+        /** Runs [autoStart] without holding up the terminal, which is open already and must stay so. */
+        private fun startWithHost(hostId: EntityId) {
+            scope.launch {
+                try {
+                    autoStart.start(hostId)
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") _: Exception,
+                ) {
+                    // Nothing to undo: the terminal works without its forwards, and the Port
+                    // forwards screen shows them stopped. Cancellation (nothing follows) ends here too.
+                }
+            }
         }
 
         private fun titleFor(

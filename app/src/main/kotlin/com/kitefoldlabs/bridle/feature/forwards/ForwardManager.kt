@@ -10,6 +10,11 @@ import com.kitefoldlabs.bridle.core.ssh.PortForwardHandle
 import com.kitefoldlabs.bridle.core.ssh.PortForwarder
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.di.ApplicationScope
+import com.kitefoldlabs.bridle.feature.terminal.HostAutoStart
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -82,7 +87,10 @@ class ForwardManager
             mutable.update { it - id }
         }
 
-        /** Starts the forwards of [hostId] marked "start automatically"; call when the host connects. */
+        /**
+         * Starts the forwards of [hostId] marked "start automatically" (those already running are
+         * left alone). Runs whenever a terminal opens on the host ([ForwardsModule]).
+         */
         suspend fun startAutoForwards(hostId: EntityId) {
             repository
                 .observeForHost(hostId)
@@ -136,3 +144,11 @@ class ForwardManager
             if (jobs.containsKey(id)) mutable.update { it + (id to status) }
         }
     }
+
+/** A host's auto-start forwards come up with its terminal: the terminal launcher runs this hook. */
+@Module
+@InstallIn(SingletonComponent::class)
+object ForwardsModule {
+    @Provides
+    fun hostAutoStart(forwards: ForwardManager): HostAutoStart = HostAutoStart { forwards.startAutoForwards(it) }
+}
