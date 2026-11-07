@@ -53,15 +53,11 @@ controller keeps host credentials outside guests and supports Docker services
 inside each guest. Existing coverage, license, release and security gates remain
 required.
 
-Under QEMU software emulation (`KITEFOLD_CI_ACCELERATOR=tcg`), the CodeQL build
-interprets `kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue` instead
-of JIT-compiling or inlining it. This is a temporary workaround for an observed
-Temurin 21 C1-compiled-method SIGSEGV; the underlying emulator/tracer fault is
-unproven. It follows [Oracle's compiled-code crash guidance](https://docs.oracle.com/en/java/javase/21/troubleshoot/troubleshoot-system-crashes.html).
-The complete Gradle assembly and `security-extended` analysis still run. Hardware
-accelerated guests do not receive this workaround. Remove it after a supported
-runtime fixes the crash and the complete CodeQL job passes; do not accumulate
-method exclusions if a crash moves elsewhere.
+Runner runtime updates require boot, .NET, Java, Android SDK and network
+qualification, followed by the application's mandatory CI and CodeQL gates.
+Preserve normal JVM compilation settings and the complete Gradle assembly and
+`security-extended` analysis. The controller retains bounded fatal JVM summaries
+in private host logs for diagnosis of daemon crashes during builds or tracing.
 
 ### Pre-commit hooks
 
