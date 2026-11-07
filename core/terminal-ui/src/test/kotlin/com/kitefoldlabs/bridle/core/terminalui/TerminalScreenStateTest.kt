@@ -123,12 +123,35 @@ class TerminalScreenStateTest {
             state.onTerminalTap()
             state.isKeyboardVisible shouldBe true
             state.showSoftKeyboard shouldBe true
-            state.onImeVisibilityChanged(false)
+            state.onImeVisibilityChanged(true)
+            state.onImeVisibilityChanged(false) // dismissed, e.g. the back gesture
             state.isKeyboardVisible shouldBe false
             state.toggleKeyboard()
             state.isKeyboardVisible shouldBe true
             state.toggleKeyboard()
             state.isKeyboardVisible shouldBe false
+        }
+
+    @Test
+    fun `hidden reports before the keyboard comes up do not cancel the request`() =
+        runTest {
+            val state = screen()
+            state.onTerminalTap()
+            // termlib's first report, and the ones while the show settles: cancelling on these
+            // made termlib hide and re-show the keyboard in a loop.
+            state.onImeVisibilityChanged(false)
+            state.onImeVisibilityChanged(false)
+            state.showSoftKeyboard shouldBe true
+            state.onImeVisibilityChanged(true)
+            state.showSoftKeyboard shouldBe true
+        }
+
+    @Test
+    fun `the keyboard coming up on its own is reflected`() =
+        runTest {
+            val state = screen()
+            state.onImeVisibilityChanged(true)
+            state.isKeyboardVisible shouldBe true
         }
 
     @Test
