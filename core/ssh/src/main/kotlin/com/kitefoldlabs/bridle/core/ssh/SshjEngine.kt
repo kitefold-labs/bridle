@@ -3,6 +3,7 @@ package com.kitefoldlabs.bridle.core.ssh
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -378,8 +379,15 @@ internal class SshjShellChannel(
         }
     }
 
+    /**
+     * Returns at once and closes the channel on [ioDispatcher]: sshj sends CHANNEL_CLOSE on the
+     * socket from the closing thread, and the UI closes tabs from the main thread, where Android
+     * forbids network I/O. [isOpen] is false from the moment this is called.
+     */
     override fun close() {
-        if (closed.compareAndSet(false, true)) closeQuietly(session)
+        if (closed.compareAndSet(false, true)) {
+            CoroutineScope(ioDispatcher).launch(IgnoreFailures) { closeQuietly(session) }
+        }
     }
 }
 
