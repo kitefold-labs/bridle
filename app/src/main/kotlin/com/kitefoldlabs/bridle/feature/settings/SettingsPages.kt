@@ -23,9 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.kitefoldlabs.bridle.R
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /** Edits the key-bar layout as JSON; invalid layouts show the parser's message and are not saved. */
 @Composable
@@ -51,7 +51,7 @@ internal fun KeyBarEditorPage(
                 onValueChange = viewModel::editKeyBarJson,
                 isError = editor.error != null,
                 supportingText = editor.error?.let { { Text(stringResource(R.string.key_bar_invalid, it)) } },
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
                 label = { Text(stringResource(R.string.key_bar_json)) },
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )

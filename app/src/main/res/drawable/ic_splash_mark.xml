@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Bridle mark for the splash screen, in the theme's colours (values / values-night). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:translateX="18" android:translateY="18" android:scaleX="2.25" android:scaleY="2.25">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="@color/bridle_mark_line"
+            android:strokeWidth="2.5"
+            android:pathData="M10,11.5 H22 A3.5,3.5 0 0 1 22,18.5 H10 A3.5,3.5 0 0 1 10,11.5 Z" />
+        <group android:rotation="45" android:pivotX="16" android:pivotY="16">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="@color/bridle_mark_kite"
+                android:strokeWidth="2.5"
+                android:pathData="M12.5,9 H19.5 A3.5,3.5 0 0 1 23,12.5 V19.5 A3.5,3.5 0 0 1 19.5,23 H12.5 A3.5,3.5 0 0 1 9,19.5 V12.5 A3.5,3.5 0 0 1 12.5,9 Z" />
+        </group>
+    </group>
+</vector>

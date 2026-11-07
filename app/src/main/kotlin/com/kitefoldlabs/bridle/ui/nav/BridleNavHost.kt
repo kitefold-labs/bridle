@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +19,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -92,22 +95,41 @@ fun BridleNavHost(
     }
 }
 
+/**
+ * Shows [tab], saving the tab being left and restoring [tab]'s own back stack. Every switch to a
+ * top-level tab must go through here: a tab pushed without `popUpTo(start) { saveState = true }`
+ * is saved under the start tab's state when the next switch pops it, so going back to the start
+ * tab would restore that tab instead.
+ */
+fun NavHostController.openTab(tab: TopLevel) {
+    navigate(tab.route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
 @Composable
 private fun BottomBar(
     nav: NavHostController,
     current: String?,
 ) {
-    NavigationBar {
+    val colors = MaterialTheme.colorScheme
+    // Accent on the selected icon over a soft accent pill; labels stay neutral.
+    val itemColors =
+        NavigationBarItemDefaults.colors(
+            selectedIconColor = colors.primary,
+            selectedTextColor = colors.onSurface,
+            indicatorColor = colors.secondaryContainer,
+            unselectedIconColor = colors.onSurfaceVariant,
+            unselectedTextColor = colors.onSurfaceVariant,
+        )
+    NavigationBar(containerColor = colors.surfaceContainerLow, tonalElevation = 0.dp) {
         TopLevel.entries.forEach { dest ->
             NavigationBarItem(
                 selected = current == dest.route,
-                onClick = {
-                    nav.navigate(dest.route) {
-                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onClick = { nav.openTab(dest) },
+                colors = itemColors,
                 icon = { Icon(dest.icon, contentDescription = null) },
                 label = { Text(stringResource(dest.label)) },
             )

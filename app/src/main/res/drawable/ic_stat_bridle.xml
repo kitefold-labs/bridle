@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The Bridle mark as a single-colour status bar icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M12,2 L19,10 L12,18 L5,10 Z M11.25,18 h1.5 v4 h-1.5 Z" />
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M10,11.5 H22 A3.5,3.5 0 0 1 22,18.5 H10 A3.5,3.5 0 0 1 10,11.5 Z" />
+    <group android:rotation="45" android:pivotX="16" android:pivotY="16">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.5"
+            android:pathData="M12.5,9 H19.5 A3.5,3.5 0 0 1 23,12.5 V19.5 A3.5,3.5 0 0 1 19.5,23 H12.5 A3.5,3.5 0 0 1 9,19.5 V12.5 A3.5,3.5 0 0 1 12.5,9 Z" />
+    </group>
 </vector>

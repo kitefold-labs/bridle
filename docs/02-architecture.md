@@ -52,7 +52,7 @@ Key ideas:
 
 | Concern | Choice |
 |---------|--------|
-| Language / UI | Kotlin 2.x, Jetpack Compose, Material 3 (dynamic color) |
+| Language / UI | Kotlin 2.x, Jetpack Compose, Material 3 with the Kitefold Labs theme shared with Halyard (Space Grotesk, JetBrains Mono, cyan accent); dynamic color optional |
 | Architecture | MVVM + unidirectional data flow; Coroutines/Flow |
 | DI | Hilt |
 | Persistence | Room (structured data), Proto DataStore (preferences) |

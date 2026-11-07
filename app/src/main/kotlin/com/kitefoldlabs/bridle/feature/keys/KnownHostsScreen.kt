@@ -22,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -31,6 +30,7 @@ import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.KnownHost
 import com.kitefoldlabs.bridle.feature.hosts.BackButton
 import com.kitefoldlabs.bridle.feature.hosts.ConfirmDialog
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /**
  * The trusted host keys screen, with its own view model. Public so Settings can show it too;
@@ -98,7 +98,7 @@ private fun KnownHostRow(
                 Text(host.keyType, style = MaterialTheme.typography.bodySmall)
                 Text(
                     host.fingerprintSha256,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
                 )
             }
         },

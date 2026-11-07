@@ -28,6 +28,7 @@ import com.kitefoldlabs.bridle.ui.nav.OnTabRequest
 import com.kitefoldlabs.bridle.ui.nav.TabRequest
 import com.kitefoldlabs.bridle.ui.nav.TabRequests
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
+import com.kitefoldlabs.bridle.ui.nav.openTab
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
 import com.kitefoldlabs.bridle.ui.theme.DarkColors
 import com.kitefoldlabs.bridle.ui.theme.LightColors
@@ -54,6 +55,30 @@ class AppUiTest {
         rule.onNodeWithText("keys screen").assertExists()
         rule.onNodeWithText("Settings").performClick()
         rule.onAllNodesWithText("Settings").fetchSemanticsNodes().size shouldBe 2
+    }
+
+    @Test
+    fun `bottom bar returns to the start tab after a tab was opened from outside it`() {
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            BridleTheme {
+                BridleNavHost(
+                    mapOf(
+                        TopLevel.HOSTS to { Text("hosts screen") },
+                        TopLevel.KEYS to { Text("keys screen") },
+                    ),
+                    nav = nav,
+                )
+            }
+        }
+        rule.runOnUiThread { nav.openTab(TopLevel.KEYS) } // as onboarding's "Generate a key" does
+        rule.onNodeWithText("keys screen").assertExists()
+        rule.onNodeWithText("Hosts").performClick()
+        rule.onNodeWithText("hosts screen").assertExists()
+        rule.onNodeWithText("Settings").performClick()
+        rule.onNodeWithText("Hosts").performClick()
+        rule.onNodeWithText("hosts screen").assertExists()
     }
 
     @Test

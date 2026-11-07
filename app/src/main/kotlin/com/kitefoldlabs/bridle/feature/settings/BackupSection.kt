@@ -24,13 +24,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.backup.BackupCrypto
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /** The Backup section of settings: export and import rows, and their dialogs. */
 @Composable
@@ -209,7 +209,7 @@ internal fun ImportReviewDialog(
                             conflict.backupFingerprint,
                         ),
                         color = MaterialTheme.colorScheme.error,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = MonoFamily,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

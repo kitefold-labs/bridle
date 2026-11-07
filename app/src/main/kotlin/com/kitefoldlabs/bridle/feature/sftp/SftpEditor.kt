@@ -29,9 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.kitefoldlabs.bridle.R
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /** Full-screen editor for a small remote text file. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,7 +71,7 @@ internal fun SftpEditor(
                 value = editor.text,
                 onValueChange = viewModel::editText,
                 readOnly = !editor.editable,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily),
                 label = { Text(editor.path) },
                 modifier = Modifier.fillMaxSize(),
             )

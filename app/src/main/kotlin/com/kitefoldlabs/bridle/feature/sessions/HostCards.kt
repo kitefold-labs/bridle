@@ -33,12 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.tmux.HostHelper
 import com.kitefoldlabs.bridle.core.tmux.HostProbe
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /**
  * What the host offers: tmux (with install instructions when it is missing or too old), Claude
@@ -84,7 +84,7 @@ private fun TmuxProblem(problem: String) {
     SelectionContainer {
         Text(
             stringResource(R.string.host_tmux_install),
-            fontFamily = FontFamily.Monospace,
+            fontFamily = MonoFamily,
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -138,7 +138,7 @@ private fun InstallHelperBody(
         Text(stringResource(R.string.install_body))
         Text(stringResource(R.string.install_checksum), style = MaterialTheme.typography.labelLarge)
         SelectionContainer {
-            Text(HostHelper.sha256, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            Text(HostHelper.sha256, fontFamily = MonoFamily, style = MaterialTheme.typography.bodySmall)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -44,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
@@ -56,6 +55,7 @@ import com.kitefoldlabs.bridle.feature.hosts.BackButton
 import com.kitefoldlabs.bridle.feature.hosts.Choice
 import com.kitefoldlabs.bridle.feature.hosts.ChoiceField
 import com.kitefoldlabs.bridle.feature.hosts.ConfirmDialog
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /*
  * Callbacks built here are @DontMemoize: they only forward to the view model, so re-creating them
@@ -147,7 +147,7 @@ private fun KeySummary(
     SelectionContainer {
         Text(
             fingerprint ?: stringResource(R.string.keys_fingerprint_unknown),
-            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily),
         )
     }
 }
@@ -162,7 +162,7 @@ private fun PublicKeyCard(publicKey: String) {
         SelectionContainer {
             Text(
                 publicKey,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
                 modifier = Modifier.padding(12.dp),
             )
         }

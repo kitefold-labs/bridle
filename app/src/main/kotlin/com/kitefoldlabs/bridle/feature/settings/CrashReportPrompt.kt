@@ -22,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +30,7 @@ import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.backup.CrashReport
 import com.kitefoldlabs.bridle.core.data.settings.SettingsRepository
 import com.kitefoldlabs.bridle.crash.CrashReporter
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -137,7 +137,7 @@ private fun ReviewDialog(
                 Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         report.text,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = MonoFamily,
                         style = MaterialTheme.typography.bodySmall,
                         modifier =
                             Modifier
