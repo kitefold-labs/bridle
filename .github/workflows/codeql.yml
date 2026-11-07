@@ -30,6 +30,9 @@ jobs:
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: java-kotlin
+          # Leave room for Gradle and compiler daemons in the 16 GiB guest.
+          ram: 8192
+          threads: 4
           build-mode: manual
           queries: security-extended
       - name: Build
