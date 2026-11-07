@@ -46,6 +46,23 @@ Every pull request must pass all of these in CI (`.github/workflows/ci.yml`):
    `config/license/allowed-licenses.json`. No GPL/AGPL.
 6. **CodeQL** (`security-extended` queries) for Kotlin/Java.
 
+### Local CI runtime
+
+Workflows use fresh, one-job Ubuntu guests on the `kitefold-ghost` runner. The
+controller keeps host credentials outside guests and supports Docker services
+inside each guest. Existing coverage, license, release and security gates remain
+required.
+
+Under QEMU software emulation (`KITEFOLD_CI_ACCELERATOR=tcg`), the CodeQL build
+interprets `kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue` instead
+of JIT-compiling or inlining it. This is a temporary workaround for an observed
+Temurin 21 C1-compiled-method SIGSEGV; the underlying emulator/tracer fault is
+unproven. It follows [Oracle's compiled-code crash guidance](https://docs.oracle.com/en/java/javase/21/troubleshoot/troubleshoot-system-crashes.html).
+The complete Gradle assembly and `security-extended` analysis still run. Hardware
+accelerated guests do not receive this workaround. Remove it after a supported
+runtime fixes the crash and the complete CodeQL job passes; do not accumulate
+method exclusions if a crash moves elsewhere.
+
 ### Pre-commit hooks
 
 ```sh
