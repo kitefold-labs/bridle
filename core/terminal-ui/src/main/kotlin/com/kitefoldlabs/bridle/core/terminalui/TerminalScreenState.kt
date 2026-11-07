@@ -90,6 +90,9 @@ public class TerminalScreenState(
     public var isKeyboardVisible: Boolean by mutableStateOf(false)
         private set
 
+    /** Whether the soft keyboard has been reported visible since it was last reported hidden. */
+    private var imeShown = false
+
     /** The terminal shows the keyboard when wanted, except while the compose box has it. */
     override val showSoftKeyboard: Boolean get() = isKeyboardVisible && !isComposeOpen
 
@@ -135,8 +138,20 @@ public class TerminalScreenState(
         isKeyboardVisible = true
     }
 
+    /**
+     * Only a keyboard that came up and then went away (the back gesture, another window) counts as
+     * dismissed. The first report is always "hidden", and reports flip while a show is settling;
+     * cancelling the request on those made termlib hide the keyboard, report again, and show it,
+     * so the keyboard flashed until the reports happened to settle.
+     */
     override fun onImeVisibilityChanged(visible: Boolean) {
-        isKeyboardVisible = visible
+        if (visible) {
+            imeShown = true
+            isKeyboardVisible = true
+        } else if (imeShown) {
+            imeShown = false
+            isKeyboardVisible = false
+        }
     }
 
     public fun toggleKeyboard() {
