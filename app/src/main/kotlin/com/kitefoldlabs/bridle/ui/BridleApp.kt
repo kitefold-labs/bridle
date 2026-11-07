@@ -23,6 +23,7 @@ import com.kitefoldlabs.bridle.ui.nav.LocalTabRequests
 import com.kitefoldlabs.bridle.ui.nav.TabRequest
 import com.kitefoldlabs.bridle.ui.nav.TabRequests
 import com.kitefoldlabs.bridle.ui.nav.TopLevel
+import com.kitefoldlabs.bridle.ui.nav.openTab
 import com.kitefoldlabs.bridle.ui.theme.BridleTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -83,6 +84,5 @@ private fun NavHostController.openTab(
     requests: TabRequests,
 ) {
     requests.request(request)
-    // Single top: Hosts is usually showing already, and a second copy would race it for the request.
-    navigate(tab.route) { launchSingleTop = true }
+    openTab(tab)
 }
