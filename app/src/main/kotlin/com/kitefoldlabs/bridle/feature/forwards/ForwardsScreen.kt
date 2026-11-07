@@ -22,7 +22,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -56,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.PortForward
 import com.kitefoldlabs.bridle.core.model.PortForwardType
+import com.kitefoldlabs.bridle.ui.theme.CreateFab
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +80,7 @@ fun ForwardsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = viewModel::create) {
+            CreateFab(onClick = viewModel::create) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.forwards_add))
             }
         },

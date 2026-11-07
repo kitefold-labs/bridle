@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bridle_sky">#FF0F2A47</color>
-    <color name="bridle_kite">#FFFFB547</color>
+    <!-- The app icon is the same in light and dark: the mark on the dark canvas. -->
+    <color name="bridle_icon_top">#FF1B1F25</color>
+    <color name="bridle_icon_bottom">#FF0A0B0D</color>
+    <color name="bridle_icon_kite">#FFE9EBEE</color>
+    <color name="bridle_icon_line">#FF26D2EE</color>
+
+    <!-- Window and splash screen, matching the Compose theme's canvas (light here, dark in values-night). -->
+    <color name="bridle_canvas">#FFFBFBF9</color>
+    <color name="bridle_mark_kite">#FF16181C</color>
+    <color name="bridle_mark_line">#FF0C8FA8</color>
 </resources>

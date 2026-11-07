@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -50,12 +49,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.Snippet
 import com.kitefoldlabs.bridle.core.model.SnippetRunMode
+import com.kitefoldlabs.bridle.ui.theme.CreateFab
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +91,7 @@ fun SnippetsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = viewModel::create) {
+            CreateFab(onClick = viewModel::create) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.snippets_add))
             }
         },
@@ -147,7 +147,7 @@ private fun SnippetRow(
         headlineContent = { Text(snippet.name) },
         overlineContent = snippet.packageName?.let { { Text(it) } },
         supportingContent = {
-            Text(snippet.body.lineSequence().first(), fontFamily = FontFamily.Monospace, maxLines = 1)
+            Text(snippet.body.lineSequence().first(), fontFamily = MonoFamily, maxLines = 1)
         },
         trailingContent = {
             Row {
@@ -215,7 +215,7 @@ private fun SnippetEditorDialog(
                     onValueChange = { body -> viewModel.updateDraft { it.copy(body = body) } },
                     label = { Text(stringResource(R.string.snippets_command)) },
                     supportingText = { Text(stringResource(R.string.snippets_variables_hint)) },
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily),
                     minLines = 3,
                 )
                 if (draft.variables.isNotEmpty()) {
@@ -288,7 +288,7 @@ private fun SnippetRunDialog(
                 Text(stringResource(R.string.snippets_preview), style = MaterialTheme.typography.labelLarge)
                 Text(
                     run.command,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = MonoFamily,
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                 )
                 ExecResultView(run)
@@ -327,7 +327,7 @@ private fun ExecResultView(run: SnippetRun) {
     }
     Text(
         output.text.ifEmpty { stringResource(R.string.snippets_no_output) },
-        fontFamily = FontFamily.Monospace,
+        fontFamily = MonoFamily,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
     )

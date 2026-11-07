@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A kite on its bridle lines. -->
+<!-- The Bridle mark: a kite (rounded square on its point) over its cyan spreader spar, drawn on a
+     32-unit grid with 2.5-unit strokes and scaled into the adaptive icon's safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="@color/bridle_kite"
-        android:pathData="M54,22 L74,46 L54,70 L34,46 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:pathData="M54,22 L54,70 M34,46 L74,46" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#CCFFFFFF"
-        android:strokeWidth="1.5"
-        android:pathData="M54,70 L54,86 M34,46 L54,86 M74,46 L54,86" />
+    <group android:translateX="18" android:translateY="18" android:scaleX="2.25" android:scaleY="2.25">
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="@color/bridle_icon_line"
+            android:strokeWidth="2.5"
+            android:pathData="M10,11.5 H22 A3.5,3.5 0 0 1 22,18.5 H10 A3.5,3.5 0 0 1 10,11.5 Z" />
+        <group android:rotation="45" android:pivotX="16" android:pivotY="16">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="@color/bridle_icon_kite"
+                android:strokeWidth="2.5"
+                android:pathData="M12.5,9 H19.5 A3.5,3.5 0 0 1 23,12.5 V19.5 A3.5,3.5 0 0 1 19.5,23 H12.5 A3.5,3.5 0 0 1 9,19.5 V12.5 A3.5,3.5 0 0 1 12.5,9 Z" />
+        </group>
+    </group>
 </vector>

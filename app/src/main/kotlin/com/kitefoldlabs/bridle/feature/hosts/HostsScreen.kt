@@ -24,7 +24,6 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +52,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.ui.nav.HostTool
+import com.kitefoldlabs.bridle.ui.theme.CreateFab
+import com.kitefoldlabs.bridle.ui.theme.LocalStatusColors
+import com.kitefoldlabs.bridle.ui.theme.StatusColors
 
 @Composable
 internal fun HostsRoute(
@@ -89,7 +91,7 @@ fun HostsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = navigation.onAdd) {
+            CreateFab(onClick = navigation.onAdd) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.hosts_add))
             }
         },
@@ -277,7 +279,7 @@ private fun HostMenu(
 /** Connection-state dot: grey idle, amber connecting/reconnecting, green connected, red failed. */
 @Composable
 internal fun StatusDot(dot: ConnectionDot) {
-    val color = dot.color(MaterialTheme.colorScheme)
+    val color = dot.color(MaterialTheme.colorScheme, LocalStatusColors.current)
     val label = stringResource(dot.description())
     Box(
         Modifier
@@ -287,12 +289,15 @@ internal fun StatusDot(dot: ConnectionDot) {
     )
 }
 
-/** The dot's colour in [scheme]. */
-internal fun ConnectionDot.color(scheme: ColorScheme): Color =
+/** The dot's colour in [scheme] and [status]. */
+internal fun ConnectionDot.color(
+    scheme: ColorScheme,
+    status: StatusColors,
+): Color =
     when (this) {
-        ConnectionDot.IDLE -> scheme.outline
-        ConnectionDot.CONNECTING, ConnectionDot.RECONNECTING -> Amber
-        ConnectionDot.CONNECTED -> Green
+        ConnectionDot.IDLE -> status.idle
+        ConnectionDot.CONNECTING, ConnectionDot.RECONNECTING -> status.warning
+        ConnectionDot.CONNECTED -> status.success
         ConnectionDot.FAILED -> scheme.error
     }
 
@@ -306,6 +311,3 @@ internal fun ConnectionDot.description(): Int =
         ConnectionDot.CONNECTED -> R.string.connection_connected
         ConnectionDot.FAILED -> R.string.connection_failed
     }
-
-private val Amber = Color(0xFFFFB300)
-private val Green = Color(0xFF2E7D32)

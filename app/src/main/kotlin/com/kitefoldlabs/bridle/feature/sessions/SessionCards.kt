@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.LaunchProfile
@@ -45,6 +44,7 @@ import com.kitefoldlabs.bridle.core.tmux.ClaudeState
 import com.kitefoldlabs.bridle.core.tmux.ClaudeStatus
 import com.kitefoldlabs.bridle.core.tmux.SessionSummary
 import com.kitefoldlabs.bridle.core.tmux.StatusSource
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /** True if the session runs Claude Code (by its process, or because the helper reports on it). */
 internal val SessionSummary.isClaude: Boolean get() = claudeRunning || claude != null
@@ -177,7 +177,7 @@ private fun PanePreview(text: String) {
     ) {
         Text(
             text,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = MonoFamily,
             style = MaterialTheme.typography.bodySmall,
             maxLines = ClaudeStatusHub.PREVIEW_KEEP,
             modifier = Modifier.padding(8.dp),
@@ -254,7 +254,7 @@ internal fun ProfileCard(
                 stringResource(R.string.profile_summary, profile.sessionName, profile.workingDir),
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text(profile.command, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            Text(profile.command, fontFamily = MonoFamily, style = MaterialTheme.typography.bodySmall)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(onClick = { actions.startProfile(profile) }) {
                     Text(stringResource(if (running) R.string.session_attach else R.string.profile_start))

@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -32,13 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
+import com.kitefoldlabs.bridle.ui.theme.CreateFab
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 @Composable
 internal fun KeysRoute(
@@ -71,7 +71,7 @@ fun KeysScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = navigation.onGenerate) {
+            CreateFab(onClick = navigation.onGenerate) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.keys_generate))
             }
         },
@@ -110,7 +110,7 @@ private fun KeyRowItem(
                 }
                 Text(
                     row.fingerprint ?: stringResource(R.string.keys_fingerprint_unknown),
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
                 )
             }
         },

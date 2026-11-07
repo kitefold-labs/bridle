@@ -32,13 +32,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.feature.hosts.BackButton
 import com.kitefoldlabs.bridle.feature.hosts.rememberDocumentPicker
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 @Composable
 internal fun KeyImportRoute(
@@ -81,7 +81,7 @@ fun KeyImportScreen(
                 value = state.keyText,
                 onValueChange = actions::setKeyText,
                 label = { Text(stringResource(R.string.key_import_paste)) },
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),

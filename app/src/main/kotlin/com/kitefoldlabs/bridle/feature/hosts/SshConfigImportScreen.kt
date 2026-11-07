@@ -37,10 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kitefoldlabs.bridle.R
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /*
  * Callbacks built here are @DontMemoize: they only forward to the view model, so re-creating them
@@ -112,7 +112,7 @@ private fun ImportInput(
             value = state.text,
             onValueChange = @DontMemoize { actions.setText(it) },
             label = { Text(stringResource(R.string.ssh_import_paste)) },
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFamily),
             keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
             minLines = 8,
             modifier = Modifier.fillMaxWidth(),

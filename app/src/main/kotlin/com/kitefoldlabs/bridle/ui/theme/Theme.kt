@@ -2,23 +2,18 @@ package com.kitefoldlabs.bridle.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import com.kitefoldlabs.bridle.core.data.settings.ThemeMode
 
-private val Sky = Color(0xFF0F2A47)
-private val Kite = Color(0xFFFFB547)
-
-internal val LightColors: ColorScheme = lightColorScheme(primary = Sky, secondary = Kite)
-internal val DarkColors: ColorScheme = darkColorScheme(primary = Kite, secondary = Color(0xFF9CC3F0))
-
+/**
+ * Bridle's Material theme: the Kitefold Labs palette ([DarkColors], [LightColors]) or wallpaper
+ * colours for [ThemeMode.DYNAMIC], with Space Grotesk type, small radii and [LocalStatusColors].
+ */
 @Composable
 fun BridleTheme(
     mode: ThemeMode = ThemeMode.DYNAMIC,
@@ -39,5 +34,7 @@ fun BridleTheme(
             dark -> DarkColors
             else -> LightColors
         }
-    MaterialTheme(colorScheme = colors, content = content)
+    CompositionLocalProvider(LocalStatusColors provides if (dark) DarkStatus else LightStatus) {
+        MaterialTheme(colorScheme = colors, typography = BridleTypography, shapes = BridleShapes, content = content)
+    }
 }

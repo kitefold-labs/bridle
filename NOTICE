@@ -2,3 +2,11 @@ Bridle
 Copyright 2026 Kitefold Labs
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles the following fonts, licensed under the SIL Open Font License,
+Version 1.1 (see app/src/main/assets/licenses/OFL.txt):
+
+- Space Grotesk, Copyright 2020 The Space Grotesk Project Authors
+  (https://github.com/floriankarsten/space-grotesk)
+- JetBrains Mono, Copyright 2020 The JetBrains Mono Project Authors
+  (https://github.com/JetBrains/JetBrainsMono)

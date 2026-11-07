@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -46,6 +45,7 @@ import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.connect.Interaction
 import com.kitefoldlabs.bridle.core.ssh.HostKeyChangedException
 import com.kitefoldlabs.bridle.feature.hosts.ConfirmDialog
+import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /*
  * Callbacks built here are @DontMemoize: they only forward to the view model, so re-creating them
@@ -94,7 +94,7 @@ private fun TrustHostDialog(
                 SelectionContainer {
                     Text(
                         prompt.fingerprintSha256,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily),
                     )
                 }
                 Text(stringResource(R.string.trust_how_to_check), style = MaterialTheme.typography.bodySmall)
@@ -211,7 +211,7 @@ private fun FingerprintBlock(
     SelectionContainer {
         Column {
             fingerprints.forEach {
-                Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
+                Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFamily))
             }
         }
     }
