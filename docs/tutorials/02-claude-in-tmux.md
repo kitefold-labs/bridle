@@ -60,6 +60,8 @@ In the terminal:
 - the **key bar** has the keys Claude Code needs (Esc, ⇧Tab, Ctrl+C, arrows);
 - the **compose box** (pencil button) is the easiest way to write a long prompt. **Send** pastes
   it as one block and presses Enter, and ↑/↓ go through what you sent before on this host.
+  Swipe typing and autocorrect work there, and the keyboard's Enter sends. To type new lines on
+  the soft keyboard instead, turn off **Settings → Enter sends from the compose box**.
   That history is saved on the phone, so type passwords on the terminal keyboard, not in the
   compose box (or turn off **Settings → Remember compose history**).
 

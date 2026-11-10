@@ -39,12 +39,13 @@ public fun TerminalScreen(
     onReconnect: () -> Unit,
     modifier: Modifier = Modifier,
     keyBarLayout: KeyBarLayout = KeyBarLayout.DEFAULT,
+    composeEnterSends: Boolean = false,
 ) {
     val terminalState by state.terminalState.collectAsState()
     Column(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         TerminalStatusBanner(terminalState, onReconnect)
         TerminalPane(state, Modifier.weight(1f).fillMaxWidth())
-        if (state.isComposeOpen) ComposeBox(state)
+        if (state.isComposeOpen) ComposeBox(state, enterSends = composeEnterSends)
         Row(Modifier.fillMaxWidth()) {
             KeyBar(keyBarLayout, state.sticky, state::onKeyBarAction, Modifier.weight(1f))
             ScreenButtons(state, rows = keyBarLayout.rows.size)

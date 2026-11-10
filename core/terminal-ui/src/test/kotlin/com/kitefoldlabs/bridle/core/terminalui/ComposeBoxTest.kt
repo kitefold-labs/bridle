@@ -18,6 +18,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextInputSelection
@@ -55,7 +56,7 @@ class ComposeBoxTest {
         scope.cancel()
     }
 
-    private fun show() {
+    private fun show(enterSends: Boolean = false) {
         rule.setContent {
             MaterialTheme {
                 ComposeBox(
@@ -68,6 +69,8 @@ class ComposeBoxTest {
                     onHistoryPrevious = { events += "previous" },
                     onHistoryNext = { events += "next" },
                     onClose = { events += "close" },
+                    enterSends = enterSends,
+                    onEnter = { events += "enter" },
                 )
             }
         }
@@ -122,6 +125,27 @@ class ComposeBoxTest {
         events shouldContainExactly listOf("send")
         field.performKeyInput { pressKey(Key.Enter) }
         events.last() shouldBe "text:x\n"
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `with Enter sends, Enter calls onEnter and Shift+Enter types a newline`() {
+        text = "x"
+        show(enterSends = true)
+        field.performKeyInput { pressKey(Key.Enter) }
+        events shouldContainExactly listOf("enter")
+        field.performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.Enter) } }
+        events.last() shouldBe "text:x\n"
+        field.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.Enter) } }
+        events.last() shouldBe "send"
+    }
+
+    @Test
+    fun `with Enter sends, the keyboard's Send action calls onEnter`() {
+        text = "x"
+        show(enterSends = true)
+        field.performImeAction()
+        events shouldContainExactly listOf("enter")
     }
 
     @Test

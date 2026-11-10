@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -33,25 +36,32 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 
 /** Most lines the compose box grows to before it scrolls. */
 private const val MAX_VISIBLE_LINES = 6
 
+/** The soft keyboard shows Send in place of Enter. */
+private val SendOnEnter = KeyboardOptions(imeAction = ImeAction.Send)
+
 /**
- * The compose box for [state]: a full text field for writing multi-line prompts, sent with
- * [TerminalScreenState.submitCompose].
+ * The compose box for [state]: a full text field, sent with [TerminalScreenState.submitCompose].
+ * With [enterSends], the keyboard's Enter calls [TerminalScreenState.composeEnter].
  */
 @Composable
 public fun ComposeBox(
     state: TerminalScreenState,
     modifier: Modifier = Modifier,
+    enterSends: Boolean = false,
 ) {
     ComposeBox(
         text = state.composeText,
         onTextChange = state::updateComposeText,
         onSend = state::submitCompose,
+        enterSends = enterSends,
+        onEnter = state::composeEnter,
         onHistoryPrevious = state::historyPrevious,
         onHistoryNext = state::historyNext,
         onClose = state::closeCompose,
@@ -64,6 +74,9 @@ public fun ComposeBox(
  * host's compose history and a close button. The field takes focus, and the soft keyboard,
  * when shown. When [text] changes from outside (history, or cleared after sending) the cursor
  * moves to its end.
+ *
+ * With [enterSends], the soft keyboard's Enter becomes a Send action and a hardware Enter
+ * without Shift does the same; both call [onEnter]. Shift+Enter still types a newline.
  */
 @Composable
 public fun ComposeBox(
@@ -74,6 +87,8 @@ public fun ComposeBox(
     onHistoryNext: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    enterSends: Boolean = false,
+    onEnter: () -> Unit = onSend,
 ) {
     val focusRequester = remember { FocusRequester() }
     var edited by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
@@ -107,15 +122,20 @@ public fun ComposeBox(
                 },
                 label = { Text(stringResource(R.string.bridle_compose_label)) },
                 maxLines = MAX_VISIBLE_LINES,
+                keyboardOptions = if (enterSends) SendOnEnter else KeyboardOptions.Default,
+                keyboardActions = KeyboardActions(onSend = { onEnter() }),
                 modifier =
                     Modifier
                         .weight(1f)
                         .focusRequester(focusRequester)
                         .onPreviewKeyEvent { event ->
-                            val send =
-                                event.type == KeyEventType.KeyDown && event.key == Key.Enter && event.isCtrlPressed
-                            if (send) onSend()
-                            send
+                            val enter = event.type == KeyEventType.KeyDown && event.key == Key.Enter
+                            when {
+                                enter && event.isCtrlPressed -> onSend()
+                                enter && enterSends && !event.isShiftPressed -> onEnter()
+                                else -> return@onPreviewKeyEvent false
+                            }
+                            true
                         },
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {

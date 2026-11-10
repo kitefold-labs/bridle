@@ -265,6 +265,21 @@ class TerminalScreenStateTest {
         }
 
     @Test
+    fun `compose Enter sends the text, or presses Enter when the box is blank`() =
+        runTest {
+            val state = screen()
+            state.updateComposeText("ls -la")
+            state.composeEnter()
+            connection.sentText() shouldBe "ls -la\r"
+            history.entries shouldContainExactly listOf("ls -la")
+            state.updateComposeText("  ")
+            state.composeEnter()
+            connection.sentText() shouldBe "ls -la\r\r"
+            state.composeText shouldBe ""
+            history.entries shouldContainExactly listOf("ls -la")
+        }
+
+    @Test
     fun `multi-line compose send without bracketed mode asks first and keeps the text if cancelled`() =
         runTest {
             val state = screen()
