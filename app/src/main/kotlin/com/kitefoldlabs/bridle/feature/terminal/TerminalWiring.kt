@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature.terminal
 
 import android.content.Context
 import com.kitefoldlabs.bridle.core.model.EntityId
+import com.kitefoldlabs.bridle.core.terminalui.CommandLineSuggestions
 import com.kitefoldlabs.bridle.core.terminalui.EngineSink
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
@@ -47,15 +48,17 @@ fun interface SessionServiceStarter {
 
 /**
  * What a tab opened by [TerminalLauncher] keeps in
- * [com.kitefoldlabs.bridle.service.TerminalTab.attachment]: its emulator and the sink feeding it.
- * Both live as long as the tab, so the screen survives navigation and rotation; closing the tab
- * closes them.
+ * [com.kitefoldlabs.bridle.service.TerminalTab.attachment]: its emulator, the sink feeding it,
+ * and its command-line suggestions. All live as long as the tab, so the screen survives
+ * navigation and rotation; closing the tab closes them.
  */
 class TerminalAttachment(
     val engine: TerminalEngine,
     val sink: EngineSink,
+    val suggestions: CommandLineSuggestions? = null,
 ) : AutoCloseable {
     override fun close() {
+        suggestions?.close()
         sink.close()
         engine.close()
     }

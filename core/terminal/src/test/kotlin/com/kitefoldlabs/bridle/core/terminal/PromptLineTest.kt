@@ -186,6 +186,20 @@ class PromptLineTest {
     }
 
     @Test
+    fun `reset forgets the line and the pane`() {
+        prompt("%0")
+        type("cd w")
+        type("\u001b[A") // pending: would make the next prompt unknown
+        line.reset()
+        line.snapshot shouldBe Snapshot(null, null)
+        prompt("%1") // any pane, and nothing pending
+        line.snapshot shouldBe Snapshot("", "%1")
+        line.reset()
+        line.reset() // no change: not reported
+        changes.count { it == Snapshot(null, null) } shouldBe 2
+    }
+
+    @Test
     fun `changes are reported once each`() {
         prompt()
         type("a")

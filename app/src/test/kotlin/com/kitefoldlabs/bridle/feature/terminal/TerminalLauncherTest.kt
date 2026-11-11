@@ -9,6 +9,8 @@ import com.kitefoldlabs.bridle.core.model.PortForwardType
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TermlibEngine
 import com.kitefoldlabs.bridle.feature.FakeEngine
@@ -115,6 +117,26 @@ class TerminalLauncherTest {
             launcher.close(tab.id)
             engines[0].closed shouldBe true
             world.coordinator.tabs.value shouldBe emptyList()
+        }
+
+    @Test
+    fun `typing at a prompt reaches the tab's suggestions, which list over the tab's connection`() =
+        runBlocking<Unit> {
+            val tab = launcher.openTerminal(world.addHost())
+            awaitUntil { tab.session.state.value == TerminalState.Open }
+            val suggestions = tab.attachment.shouldBeInstanceOf<TerminalAttachment>().suggestions!!
+            val engine = engines.single()
+            engine.shellPrompt.value =
+                ShellPrompt(active = true, atPrompt = true, directories = mapOf(null to "/home/me"))
+            engine.onShellEvent!!(ShellEvent.PromptStart())
+
+            tab.session.send("cd w".toByteArray())
+            // The scripted host has no SFTP: the lookup reaches it, fails, and suggests nothing.
+            awaitUntil { suggestions.suggestions.value.line == "cd w" }
+            suggestions.suggestions.value.items shouldBe emptyList()
+
+            launcher.close(tab.id)
+            engine.onShellEvent shouldBe null
         }
 
     @Test

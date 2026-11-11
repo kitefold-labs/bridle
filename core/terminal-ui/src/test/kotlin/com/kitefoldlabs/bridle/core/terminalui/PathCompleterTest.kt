@@ -2,94 +2,11 @@ package com.kitefoldlabs.bridle.core.terminalui
 
 import com.kitefoldlabs.bridle.core.ssh.RemoteFile
 import com.kitefoldlabs.bridle.core.ssh.SftpSession
-import com.kitefoldlabs.bridle.core.ssh.TransferProgress
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
-
-/** An SFTP session over an in-memory tree that counts what it is asked. */
-private class FakeSftp(
-    private val tree: Map<String, List<RemoteFile>>,
-    private val links: Map<String, RemoteFile.Type?> = emptyMap(),
-    private val failing: Set<String> = emptySet(),
-) : SftpSession {
-    val listed = mutableListOf<String>()
-    val statted = mutableListOf<String>()
-    var closed = false
-    var onList: () -> Unit = {}
-
-    override suspend fun canonicalize(path: String): String = if (path.isEmpty()) "/home/me" else path
-
-    override suspend fun list(path: String): List<RemoteFile> {
-        listed += path
-        onList()
-        if (path in failing) throw IOException("Permission denied")
-        return tree[path] ?: throw IOException("No such file")
-    }
-
-    override suspend fun stat(path: String): RemoteFile? {
-        statted += path
-        if (path in failing) throw IOException("gone")
-        return links[path]?.let { entry(path.substringAfterLast('/'), it) }
-    }
-
-    override fun close() {
-        closed = true
-    }
-
-    override suspend fun mkdir(path: String) = error("unused")
-
-    override suspend fun rename(
-        from: String,
-        to: String,
-    ) = error("unused")
-
-    override suspend fun delete(
-        path: String,
-        recursive: Boolean,
-    ) = error("unused")
-
-    override suspend fun chmod(
-        path: String,
-        permissions: Int,
-    ) = error("unused")
-
-    override suspend fun download(
-        path: String,
-        sink: OutputStream,
-        progress: TransferProgress,
-    ): Long = error("unused")
-
-    override suspend fun upload(
-        source: InputStream,
-        path: String,
-        size: Long?,
-        overwrite: Boolean,
-        progress: TransferProgress,
-    ): Long = error("unused")
-
-    override suspend fun readText(
-        path: String,
-        limit: Long,
-    ): Pair<String, RemoteFile> = error("unused")
-
-    override suspend fun writeText(
-        path: String,
-        text: String,
-        opened: RemoteFile?,
-    ): RemoteFile = error("unused")
-}
-
-private fun entry(
-    name: String,
-    type: RemoteFile.Type = RemoteFile.Type.FILE,
-) = RemoteFile(name, "/x/$name", type, 0, 0, 0)
-
-private fun dir(name: String) = entry(name, RemoteFile.Type.DIRECTORY)
 
 class PathCompleterTest {
     private val home =

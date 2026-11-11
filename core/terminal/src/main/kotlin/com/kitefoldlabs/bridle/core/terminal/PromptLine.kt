@@ -63,6 +63,21 @@ public class PromptLine {
         changed()
     }
 
+    /**
+     * Forgets everything: the line is unknown until the next prompt, from any pane. For when the
+     * connection drops or a tmux session is reattached, after which the shell's state is unknown.
+     */
+    @Synchronized
+    public fun reset() {
+        val before = snapshot
+        mode = Mode.UNKNOWN
+        text = StringBuilder()
+        hasOwner = false
+        owner = null
+        typedAhead = false
+        if (snapshot != before) changed()
+    }
+
     /** Records [bytes] sent to the remote side, exactly as sent. */
     @Synchronized
     public fun onInput(bytes: ByteArray) {

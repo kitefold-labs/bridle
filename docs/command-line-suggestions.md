@@ -1,6 +1,6 @@
 # Command-line suggestions
 
-Status: **design, spikes done.** Nothing in the app uses this yet.
+Status: **built; not yet tried on a phone.**
 
 A strip of chips above the key bar suggests file and directory names while you type at a shell
 prompt. Type `w` in a directory containing `work/` and a `work/` chip appears; tap it and Bridle
@@ -103,6 +103,15 @@ and a real phone.
   a *visible, inactive* pane can take over before you type; its directory is used until your
   next prompt.
 - **Shells without the script** send no codes, and the strip never appears.
+- **Stale chips.** Chips stay on screen while the next lookup runs, so they don't flicker as you
+  type. Each set records the line it was made for, and a tap on a chip whose line has changed
+  does nothing.
+- **Reconnects.** When the session drops or a tmux session is reattached, the line is forgotten
+  until the next prompt.
+- **Input from elsewhere.** Everything the tab sends passes through `TerminalSession.send`,
+  which `PromptLine` watches, snippets included. Text typed into the pane by other means (the
+  Sessions screen's quick replies use `tmux send-keys`) isn't seen; it is meant for Claude
+  Code panes, not shell prompts.
 
 ## Security
 
@@ -119,9 +128,10 @@ are rate-limited.
 | `:core:tmux` | Done: `ShellIntegration` uploads the helper and scripts with checksum checks and runs `install-shell`; `HostProbe.shellIntegration` reports which rc files load it; removing the helper also runs `uninstall-shell`. |
 | `:core:terminal-ui` | Done: `TerminalModeTracker` parses OSC 133 (with `aid`) and OSC 7; `TerminalEngine.shellPrompt` and `onShellEvent`. |
 | `:core:terminal` | Done: `ShellEvent`, `ShellEvents.parseOsc` and the `ShellPrompt` reducer; `PromptLine`, the line model; `PathWord`, which extracts, unquotes, resolves and escapes the last word. |
-| `:core:terminal-ui` | Done: `PathCompleter` (SFTP listing, cache, symlinks, ordering). To do: a `TerminalConnection` decorator feeding `PromptLine`, and the `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
-| `:app` | Done: install and remove buttons on the Sessions host card, with a consent dialog showing checksums. To do: give each terminal tab a `PathCompleter` on its host's connection, and a per-host "Command-line suggestions" toggle. |
-| `docs/` | `host-helper.md`, `terminal-input.md` (codes and security), a tutorial section. |
+| `:core:terminal-ui` | Done: `PathCompleter` (SFTP listing, cache, symlinks, ordering); `CommandLineSuggestions`, which ties a tab's engine events, `PromptLine` and completer together and publishes the suggestions; `SuggestionStrip`, between `TerminalPane` and the key bar in `TerminalScreen`. |
+| `:core:session` | Done: `TerminalSession.onInput` sees every byte sent; `openSftp()` opens SFTP on the live connection. |
+| `:app` | Done: install and remove buttons on the Sessions host card; each tab's `TerminalAttachment` owns its `CommandLineSuggestions`; a "Suggest file names" switch in Settings. |
+| `docs/` | Done: `host-helper.md`, `terminal-input.md`. |
 
 ## Order of work
 
@@ -131,8 +141,11 @@ are rate-limited.
 3. ~~Tracker changes and `ShellPrompt`~~.
 4. ~~`PromptLine` and `PathWord`~~. `PathWordTest` has real bash (and zsh where installed)
    read back escaped names in every quoting context.
-5. ~~Completion source with a fake SFTP session~~, then the strip and the setting.
-6. Docs, then a phone run against bash and zsh, with and without tmux.
+5. ~~Completion source, the strip and the setting~~.
+6. ~~Docs~~, then a phone run against bash and zsh, with and without tmux.
+
+The setting is one switch for the app rather than per host: installing the shell integration is
+already the per-host choice, and a host without it never shows the strip.
 
 ## Limits
 

@@ -93,6 +93,7 @@ class SettingsViewModelTest {
         vm.setFont(TerminalFont.SERIF_MONOSPACE)
         vm.setBackspaceMode(BackspaceMode.CTRL_H)
         vm.setKeepScreenOn(true)
+        vm.setCommandLineSuggestions(false)
         vm.setAppLock(true)
         vm.setSecureScreen(true)
         vm.setNotifications(false)
@@ -106,6 +107,7 @@ class SettingsViewModelTest {
         s.fontFamilyId shouldBe "serif-monospace"
         s.backspaceMode shouldBe BackspaceMode.CTRL_H
         s.keepScreenOn shouldBe true
+        s.commandLineSuggestions shouldBe false
         s.appLockEnabled shouldBe true
         s.secureScreenEnabled shouldBe true
         s.notificationsEnabled shouldBe false

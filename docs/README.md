@@ -20,7 +20,7 @@ Step-by-step guides for using the app.
 | Doc | What it covers |
 |-----|----------------|
 | [host-helper.md](host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
-| [terminal-input.md](terminal-input.md) | Key encodings, safe bracketed paste, customising the extra-keys bar |
+| [terminal-input.md](terminal-input.md) | Key encodings, safe bracketed paste, customising the extra-keys bar, file-name suggestions |
 | [backup-and-privacy.md](backup-and-privacy.md) | What backups contain, how they are encrypted, how crash reports are scrubbed |
 
 ## Design

@@ -48,6 +48,8 @@ public data class Settings(
      * lasts only while Bridle runs.
      */
     val rememberComposeHistory: Boolean = true,
+    /** Suggest file names while typing at a shell prompt, on hosts with Bridle's shell integration. */
+    val commandLineSuggestions: Boolean = true,
     /** Master switch for local notifications; see [notifies]. */
     val notificationsEnabled: Boolean = true,
     val notificationEvents: Set<NotificationEvent> = NotificationEvent.entries.toSet(),
