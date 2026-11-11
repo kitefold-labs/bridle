@@ -70,7 +70,7 @@ class ShellEventsTest {
 
     @Test
     fun `parsing never throws`() =
-        runBlocking {
+        runBlocking<Unit> {
             checkAll(Arb.string(0..64)) { s ->
                 ShellEvents.parseOsc("133;$s")
                 ShellEvents.parseOsc("7;file://$s")
