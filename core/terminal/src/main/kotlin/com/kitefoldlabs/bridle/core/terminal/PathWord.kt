@@ -15,6 +15,11 @@ public data class PathWord(
     val quote: Quote,
     /** True when the path starts with an unquoted `~/`, which the shell expands to the home directory. */
     val tilde: Boolean = false,
+    /**
+     * True when the word names the command to run (the first word, or one after `; | & ( )`):
+     * the shell looks it up in PATH unless it contains a `/`.
+     */
+    val isCommand: Boolean = false,
 ) {
     public enum class Quote { NONE, SINGLE, DOUBLE }
 
@@ -25,19 +30,22 @@ public data class PathWord(
     val directory: String get() = path.substring(0, path.length - prefix.length)
 
     /**
-     * The absolute directory to list, given the shell's working directory [cwd] and [home]
-     * (needed for `~/`); null when either is needed and missing or not absolute.
+     * The absolute directory to list, ending in `/`, given the shell's working directory [cwd] and
+     * [home] (needed for `~/`); null when either is needed and missing or not absolute. `.`
+     * segments and repeated slashes are removed; `..` is kept, since it depends on symlinks.
      */
     public fun resolveDirectory(
         cwd: String?,
         home: String?,
     ): String? {
         val dir = directory
-        return when {
-            tilde -> home?.takeIf { it.startsWith("/") }?.let { join(it, dir.substring(2)) }
-            dir.startsWith("/") -> dir
-            else -> cwd?.takeIf { it.startsWith("/") }?.let { join(it, dir) }
-        }
+        val absolute =
+            when {
+                tilde -> home?.takeIf { it.startsWith("/") }?.let { join(it, dir.substring(2)) }
+                dir.startsWith("/") -> dir
+                else -> cwd?.takeIf { it.startsWith("/") }?.let { join(it, dir) }
+            }
+        return absolute?.let(::normalize)
     }
 
     /**
@@ -63,7 +71,8 @@ public data class PathWord(
     public companion object {
         private val DOUBLE_SPECIAL = Regex("[\"\\\\$`]")
         private const val PLAIN_PUNCTUATION = "_./+,:@%-"
-        private const val OPERATORS = ";|&<>()"
+        private const val OPERATORS = ";|&()"
+        private const val REDIRECTIONS = "<>"
         private const val EXPANSIONS = "$`*?[{!"
 
         /** Characters typed unquoted as themselves; everything else gets a backslash. */
@@ -79,7 +88,12 @@ public data class PathWord(
         private fun join(
             base: String,
             relative: String,
-        ): String = base.trimEnd('/') + "/" + relative
+        ): String = "$base/$relative"
+
+        private fun normalize(dir: String): String {
+            val segments = dir.split('/').filter { it.isNotEmpty() && it != "." }
+            return if (segments.isEmpty()) "/" else segments.joinToString("/", prefix = "/", postfix = "/")
+        }
 
         /** The path the [line] ends with, or null if there is none to complete. */
         public fun parse(line: String): PathWord? = Parser(line).run()
@@ -94,6 +108,7 @@ public data class PathWord(
         private var wordStarted = false
         private var tilde = false
         private var refused = false
+        private var commandWord = true
 
         fun run(): PathWord? {
             var i = 0
@@ -108,7 +123,7 @@ public data class PathWord(
             }
             // "~" alone has no directory yet, and "~user" isn't supported.
             val tildeOk = !tilde || (value.length > 1 && value[1] == '/')
-            return if (refused || !tildeOk) null else PathWord(value.toString(), quote, tilde)
+            return if (refused || !tildeOk) null else PathWord(value.toString(), quote, tilde, commandWord)
         }
 
         /** Handles [c] inside single quotes, where nothing is special but the closing quote. */
@@ -157,8 +172,22 @@ public data class PathWord(
 
         private fun unquoted(c: Char) {
             when {
-                c == ' ' || c == '\t' || c in OPERATORS -> newWord()
-                c == '=' -> newWord(keepStarted = true) // --opt=path: complete after the '='
+                c == ' ' || c == '\t' -> {
+                    if (wordStarted) commandWord = false
+                    newWord()
+                }
+                c in REDIRECTIONS -> {
+                    newWord()
+                    commandWord = false // the target of > or < is a file
+                }
+                c in OPERATORS -> {
+                    newWord()
+                    commandWord = true
+                }
+                c == '=' -> {
+                    newWord(keepStarted = true) // --opt=path: complete after the '='
+                    commandWord = false
+                }
                 c == '\'' -> quoteStart(Quote.SINGLE)
                 c == '"' -> quoteStart(Quote.DOUBLE)
                 c in EXPANSIONS -> refused = true

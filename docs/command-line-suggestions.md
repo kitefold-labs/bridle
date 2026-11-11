@@ -55,9 +55,14 @@ types `ork/`. Enter still runs the command, so you can always run exactly what y
    `'\''` inside single quotes, and `\` before `" \ $` and backticks inside double quotes,
    where a name containing `!` is never offered (history expansion).
 
-   Entries come from SFTP over the host's existing connection; each directory listing is cached
-   until the next `A`. Directories come first with a trailing `/`; dotfiles appear only when the
-   word starts with `.`; names with control characters or invalid UTF-8 are never offered.
+   `PathCompleter` lists the directory over SFTP on the host's existing connection. Each
+   listing is cached until the next `A` (a directory that can't be listed is cached as empty),
+   and at most 10,000 entries are read from one directory. A word in command position (the first
+   word, or one after `; | & ( )`) is only completed when it contains a `/`, because otherwise
+   the shell looks it up in PATH. Prefixes are case-sensitive. Directories, and symlinks to
+   them, come first with a trailing `/`; dotfiles appear only when the word starts with `.`;
+   names with control characters or invalid UTF-8 are never offered. An I/O error drops the
+   SFTP session, and the next request opens a new one.
 
 5. **Accepting.** Tapping a chip sends the rest of the name, shell-escaped (`\ `, `\'` …), as
    printable bytes. The line model records it, so picking a directory moves the strip straight
@@ -114,8 +119,8 @@ are rate-limited.
 | `:core:tmux` | Done: `ShellIntegration` uploads the helper and scripts with checksum checks and runs `install-shell`; `HostProbe.shellIntegration` reports which rc files load it; removing the helper also runs `uninstall-shell`. |
 | `:core:terminal-ui` | Done: `TerminalModeTracker` parses OSC 133 (with `aid`) and OSC 7; `TerminalEngine.shellPrompt` and `onShellEvent`. |
 | `:core:terminal` | Done: `ShellEvent`, `ShellEvents.parseOsc` and the `ShellPrompt` reducer; `PromptLine`, the line model; `PathWord`, which extracts, unquotes, resolves and escapes the last word. |
-| `:core:terminal-ui` | A `TerminalConnection` decorator feeding `PromptLine`. `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
-| `:app` | Done: install and remove buttons on the Sessions host card, with a consent dialog showing checksums. To do: a completion source per host (SFTP session, cache, rate limit) and a per-host "Command-line suggestions" toggle. |
+| `:core:terminal-ui` | Done: `PathCompleter` (SFTP listing, cache, symlinks, ordering). To do: a `TerminalConnection` decorator feeding `PromptLine`, and the `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
+| `:app` | Done: install and remove buttons on the Sessions host card, with a consent dialog showing checksums. To do: give each terminal tab a `PathCompleter` on its host's connection, and a per-host "Command-line suggestions" toggle. |
 | `docs/` | `host-helper.md`, `terminal-input.md` (codes and security), a tutorial section. |
 
 ## Order of work
@@ -126,7 +131,7 @@ are rate-limited.
 3. ~~Tracker changes and `ShellPrompt`~~.
 4. ~~`PromptLine` and `PathWord`~~. `PathWordTest` has real bash (and zsh where installed)
    read back escaped names in every quoting context.
-5. Completion source with a fake SFTP session, then the strip and the setting.
+5. ~~Completion source with a fake SFTP session~~, then the strip and the setting.
 6. Docs, then a phone run against bash and zsh, with and without tmux.
 
 ## Limits

@@ -23,11 +23,24 @@ class PathWordTest {
         parse("cd wo") shouldBe PathWord("wo", Quote.NONE)
         parse("ls -l src/ma") shouldBe PathWord("src/ma", Quote.NONE)
         parse("cd ") shouldBe PathWord("", Quote.NONE)
-        parse("") shouldBe PathWord("", Quote.NONE)
-        parse("make && ./bu") shouldBe PathWord("./bu", Quote.NONE)
+        parse("") shouldBe PathWord("", Quote.NONE, isCommand = true)
+        parse("make && ./bu") shouldBe PathWord("./bu", Quote.NONE, isCommand = true)
         parse("cat <in|sort>ou") shouldBe PathWord("ou", Quote.NONE)
         parse("cp a\tb") shouldBe PathWord("b", Quote.NONE)
         parse("tar --file=dist/ar") shouldBe PathWord("dist/ar", Quote.NONE)
+    }
+
+    @Test
+    fun `words in command position are marked`() {
+        parse("ls")!!.isCommand shouldBe true
+        parse("  ls")!!.isCommand shouldBe true
+        parse("ls ")!!.isCommand shouldBe false
+        parse("ls | gr")!!.isCommand shouldBe true
+        parse("a; (b")!!.isCommand shouldBe true
+        parse("cat >ou")!!.isCommand shouldBe false
+        parse(">ou")!!.isCommand shouldBe false
+        parse("FOO=ba")!!.isCommand shouldBe false
+        parse("'my scr")!!.isCommand shouldBe true
     }
 
     @Test
@@ -83,6 +96,9 @@ class PathWordTest {
         parse("cd ~/wo")!!.resolveDirectory("/srv", "/home/me") shouldBe "/home/me/"
         parse("cd ~/a/b")!!.resolveDirectory("/srv", "/home/me/") shouldBe "/home/me/a/"
         parse("cd ~/wo")!!.resolveDirectory("/srv", null).shouldBeNull()
+        parse("cd ./a/.//b/../c")!!.resolveDirectory("/srv/", null) shouldBe "/srv/a/b/../"
+        parse("cd /")!!.resolveDirectory(null, null) shouldBe "/"
+        parse("cd wo")!!.resolveDirectory("/", null) shouldBe "/"
     }
 
     @Test
