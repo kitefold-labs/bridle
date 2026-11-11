@@ -94,7 +94,8 @@ are rate-limited.
 
 | Module | Change |
 |--------|--------|
-| `host-helper/` | `shell-integration.bash` and `shell-integration.zsh` (spike versions are in place). `bridle-helper install-shell` / `uninstall-shell` adds or removes one marked `source` line at the end of `~/.bashrc` and `~/.zshrc`, idempotently. |
+| `host-helper/` | Done: `shell-integration.bash` and `shell-integration.zsh`, and `bridle-helper install-shell` / `uninstall-shell` (see [host-helper.md](host-helper.md#shell-integration)). |
+| `:core:tmux` | Bundles the scripts (done). Uploads them with a checksum check, like `HostHelper.installScript`, then runs `install-shell`; detects whether the block is installed. |
 | `:core:terminal-ui` | `TerminalModeTracker`: OSC 133 with `aid`, OSC 7 with percent-decoding. `TerminalEngine.shellPrompt: StateFlow<ShellPrompt>`. |
 | `:core:terminal` | `PromptLine`: the line model. `PathWord`: extracts, unquotes and escapes words. Both pure Kotlin. |
 | `:core:terminal-ui` | A `TerminalConnection` decorator feeding `PromptLine`. `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
@@ -104,8 +105,8 @@ are rate-limited.
 ## Order of work
 
 1. ~~Spikes~~ (see results above).
-2. `install-shell` / `uninstall-shell`, plus tests that run bash and zsh in a pseudo-terminal
-   and check the codes, in CI.
+2. ~~`install-shell` / `uninstall-shell`, with tests that run bash and zsh and check the
+   codes~~ (`ShellIntegrationTest`; CI installs zsh).
 3. Tracker changes and `ShellPrompt`.
 4. `PromptLine` and `PathWord`, covered to the 95% gate.
 5. Completion source with a fake SFTP session, then the strip, the setting and the install
@@ -125,4 +126,5 @@ are rate-limited.
 - Should → on the key bar accept the first chip when the line is known, as zsh-autosuggestions
   does? Tapping works either way.
 - Should the shell integration install with bridle-helper, or from its own button? The plan
-  assumes its own button, since it edits `~/.bashrc`.
+  assumes its own button, since it edits `~/.bashrc`. Either way the app uploads the helper and
+  the scripts, then runs `install-shell`.
