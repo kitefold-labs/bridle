@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.kitefoldlabs.bridle.core.session.TerminalState
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executor
@@ -31,6 +33,9 @@ class FakeTerminalEngine(
 
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
+    override val shellPrompt = MutableStateFlow(ShellPrompt())
+
+    @Volatile override var onShellEvent: ((ShellEvent) -> Unit)? = null
     override var onRemoteInput: ((ByteArray) -> Unit)? = null
 
     override fun feed(

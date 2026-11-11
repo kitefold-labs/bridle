@@ -23,8 +23,12 @@ types `ork/`. Enter still runs the command, so you can always run exactly what y
    `allow-passthrough` for its own pane, and tags each OSC 133 code with `aid=$TMUX_PANE`.
    tmux unwraps passthrough, so Bridle always receives plain OSC 133 and OSC 7.
 
-2. **Tracking.** `TerminalModeTracker` parses OSC 133 and OSC 7 and publishes a `ShellPrompt`
-   state on the engine: at a prompt or not, the working directory and the pane.
+2. **Tracking.** `TerminalModeTracker` parses OSC 133 and OSC 7 (`ShellEvents` in
+   `:core:terminal`). The engine passes each `ShellEvent` to `onShellEvent` in output order, and
+   folds them into `shellPrompt`: whether the shell has the integration, whether it is at a
+   prompt, the pane of the last code, and each pane's working directory. An OSC 7 directory
+   belongs to the pane whose `A` follows it. Malformed codes, and paths with control characters
+   or invalid UTF-8, are dropped.
 
 3. **The typed line.** Bridle builds the line from the bytes it sends; it does not read the
    screen. Every send (soft and hardware keyboard, key bar, paste, compose box) goes through one
@@ -96,8 +100,8 @@ are rate-limited.
 |--------|--------|
 | `host-helper/` | Done: `shell-integration.bash` and `shell-integration.zsh`, and `bridle-helper install-shell` / `uninstall-shell` (see [host-helper.md](host-helper.md#shell-integration)). |
 | `:core:tmux` | Done: `ShellIntegration` uploads the helper and scripts with checksum checks and runs `install-shell`; `HostProbe.shellIntegration` reports which rc files load it; removing the helper also runs `uninstall-shell`. |
-| `:core:terminal-ui` | `TerminalModeTracker`: OSC 133 with `aid`, OSC 7 with percent-decoding. `TerminalEngine.shellPrompt: StateFlow<ShellPrompt>`. |
-| `:core:terminal` | `PromptLine`: the line model. `PathWord`: extracts, unquotes and escapes words. Both pure Kotlin. |
+| `:core:terminal-ui` | Done: `TerminalModeTracker` parses OSC 133 (with `aid`) and OSC 7; `TerminalEngine.shellPrompt` and `onShellEvent`. |
+| `:core:terminal` | Done: `ShellEvent`, `ShellEvents.parseOsc` and the `ShellPrompt` reducer. To do: `PromptLine`, the line model, and `PathWord`, which extracts, unquotes and escapes words. Both pure Kotlin. |
 | `:core:terminal-ui` | A `TerminalConnection` decorator feeding `PromptLine`. `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
 | `:app` | Done: install and remove buttons on the Sessions host card, with a consent dialog showing checksums. To do: a completion source per host (SFTP session, cache, rate limit) and a per-host "Command-line suggestions" toggle. |
 | `docs/` | `host-helper.md`, `terminal-input.md` (codes and security), a tutorial section. |
@@ -107,7 +111,7 @@ are rate-limited.
 1. ~~Spikes~~ (see results above).
 2. ~~`install-shell` / `uninstall-shell`, with tests that run bash and zsh and check the
    codes~~ (`ShellIntegrationTest`; CI installs zsh). ~~Install and remove from the app~~.
-3. Tracker changes and `ShellPrompt`.
+3. ~~Tracker changes and `ShellPrompt`~~.
 4. `PromptLine` and `PathWord`, covered to the 95% gate.
 5. Completion source with a fake SFTP session, then the strip and the setting.
 6. Docs, then a phone run against bash and zsh, with and without tmux.

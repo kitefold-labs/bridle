@@ -1,13 +1,17 @@
 package com.kitefoldlabs.bridle.core.terminalui
 
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellEvents
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Follows the few terminal modes the input layer needs, by watching the remote output stream:
- * bracketed paste (`CSI ? 2004 h/l`), application cursor keys (DECCKM, `CSI ? 1 h/l`) and the
- * window title (OSC 0 / OSC 2).
+ * bracketed paste (`CSI ? 2004 h/l`), application cursor keys (DECCKM, `CSI ? 1 h/l`), the
+ * window title (OSC 0 / OSC 2), and the shell integration's prompt marks (OSC 133) and working
+ * directory (OSC 7).
  *
  * termlib keeps these inside libvterm without exposing them, so the engine feeds every output
  * byte through this tracker as well. It is a small VT500-style parser: sequences split across
@@ -15,13 +19,23 @@ import kotlinx.coroutines.flow.asStateFlow
  * SUB abort a sequence, and RIS (`ESC c`) and DECSTR (`CSI ! p`) reset both modes, as libvterm
  * does. OSC strings and CSI parameters are capped, so hostile output cannot grow memory.
  *
- * [feed] must be called from one thread at a time; the modes and [title] can be read anywhere.
+ * [feed] must be called from one thread at a time, which is also the thread [onShellEvent] runs
+ * on; the modes, [title] and [shellPrompt] can be read anywhere.
  */
 public class TerminalModeTracker {
     private val mutableTitle = MutableStateFlow("")
 
     /** The last title set with OSC 0 or OSC 2, without control or bidirectional formatting characters. */
     public val title: StateFlow<String> = mutableTitle.asStateFlow()
+
+    private val mutableShellPrompt = MutableStateFlow(ShellPrompt())
+
+    /** The shell integration's state, folded from every [ShellEvent] seen. */
+    public val shellPrompt: StateFlow<ShellPrompt> = mutableShellPrompt.asStateFlow()
+
+    /** Called with each [ShellEvent] in output order, after [shellPrompt] has been updated. */
+    @Volatile
+    public var onShellEvent: ((ShellEvent) -> Unit)? = null
 
     @Volatile
     public var isBracketedPasteEnabled: Boolean = false
@@ -180,7 +194,13 @@ public class TerminalModeTracker {
         if (separator < 0) return
         when (text.substring(0, separator)) {
             "0", "2" -> mutableTitle.value = cleanTitle(text.substring(separator + 1))
+            "7", "133" -> ShellEvents.parseOsc(text)?.let(::shellEvent)
         }
+    }
+
+    private fun shellEvent(event: ShellEvent) {
+        mutableShellPrompt.value = mutableShellPrompt.value.after(event)
+        onShellEvent?.invoke(event)
     }
 
     private fun resetModes() {

@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,10 +21,10 @@ import kotlin.math.ceil
  * [TerminalEngine] backed by ConnectBot's termlib (libvterm through JNI, drawn by Compose).
  *
  * Deliberately thin: termlib does the emulation, drawing, selection, scrollback and soft
- * keyboard. This adapter adds what termlib does not expose (the modes and title, via
- * [TerminalModeTracker]), applies the key bar's sticky modifiers to termlib's keyboard, and
- * routes termlib's paste menu through Bridle's sanitising paste. It can live in the service:
- * only [Content] needs a UI.
+ * keyboard. This adapter adds what termlib does not expose (the modes, title and shell
+ * integration codes, via [TerminalModeTracker]), applies the key bar's sticky modifiers to
+ * termlib's keyboard, and routes termlib's paste menu through Bridle's sanitising paste. It can
+ * live in the service: only [Content] needs a UI.
  */
 public class TermlibEngine(
     initialSize: TerminalGridSize = TerminalGridSize(DEFAULT_COLUMNS, DEFAULT_ROWS),
@@ -48,6 +50,12 @@ public class TermlibEngine(
     override val title: StateFlow<String> get() = modes.title
     override val isBracketedPasteEnabled: Boolean get() = modes.isBracketedPasteEnabled
     override val isApplicationCursorKeys: Boolean get() = modes.isApplicationCursorKeys
+    override val shellPrompt: StateFlow<ShellPrompt> get() = modes.shellPrompt
+    override var onShellEvent: ((ShellEvent) -> Unit)?
+        get() = modes.onShellEvent
+        set(value) {
+            modes.onShellEvent = value
+        }
 
     override fun feed(
         bytes: ByteArray,

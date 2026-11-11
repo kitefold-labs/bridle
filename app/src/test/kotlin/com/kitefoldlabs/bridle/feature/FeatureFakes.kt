@@ -23,6 +23,8 @@ import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminalui.CellMetrics
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TerminalGridSize
@@ -48,6 +50,9 @@ class FakeEngine(
 
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
+    override val shellPrompt = MutableStateFlow(ShellPrompt())
+
+    @Volatile override var onShellEvent: ((ShellEvent) -> Unit)? = null
 
     @Volatile override var isBracketedPasteEnabled = true
     override val isApplicationCursorKeys = false
