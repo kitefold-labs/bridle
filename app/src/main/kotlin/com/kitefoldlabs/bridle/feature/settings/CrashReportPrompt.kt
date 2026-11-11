@@ -1,5 +1,7 @@
 package com.kitefoldlabs.bridle.feature.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -56,7 +59,8 @@ sealed interface CrashPrompt {
 
 /**
  * Offers the report saved by the last crash. Nothing is sent: "Open GitHub issue" opens a
- * pre-filled issue in the browser that the user reviews and submits themselves.
+ * pre-filled issue in the browser that the user reviews and submits themselves, and copies the
+ * report so it can be pasted where the form isn't pre-filled (the GitHub app keeps only the title).
  */
 @HiltViewModel
 class CrashReportViewModel
@@ -89,6 +93,12 @@ class CrashReportViewModel
             report: CrashReport,
             notes: String,
         ): String = reporter.issueUrl(report, notes.trim())
+
+        /** The text copied for pasting into the issue: the user's [notes], if any, then the whole report. */
+        fun clipText(
+            report: CrashReport,
+            notes: String,
+        ): String = notes.trim().let { if (it.isEmpty()) report.text else "$it\n\n${report.text}" }
 
         /** Deletes the report without filing it. */
         fun discard() {
@@ -128,6 +138,7 @@ private fun ReviewDialog(
     var notes by rememberSaveable { mutableStateOf("") }
     var noBrowser by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     AlertDialog(
         onDismissRequest = {},
         title = { Text(stringResource(R.string.crash_title)) },
@@ -159,6 +170,10 @@ private fun ReviewDialog(
             // The report is only deleted once the issue page actually opened.
             TextButton(
                 onClick = @DontMemoize {
+                    // The report is scrubbed, so the clip isn't marked sensitive.
+                    context
+                        .getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText(report.title, viewModel.clipText(report, notes)))
                     noBrowser = !uriHandler.tryOpen(viewModel.issueUrl(report, notes))
                     if (!noBrowser) viewModel.discard()
                 },

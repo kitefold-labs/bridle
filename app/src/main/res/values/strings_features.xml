@@ -221,7 +221,7 @@
     <string name="crash_ask_message">Bridle saved a crash report on this phone, with hostnames, usernames and paths removed. Would you like to review it and report the problem on GitHub?</string>
     <string name="crash_review">Review report</string>
     <string name="crash_no_thanks">No thanks</string>
-    <string name="crash_review_message">This is the full report. Nothing is sent until you submit the issue on GitHub, where you can still edit it.</string>
+    <string name="crash_review_message">This is the full report. Opening the issue also copies it, so if the GitHub form is empty, paste it in. Nothing is sent until you submit the issue on GitHub, where you can still edit it.</string>
     <string name="crash_notes">What were you doing? (optional)</string>
     <string name="crash_open_issue">Open GitHub issue</string>
     <string name="crash_no_browser">No app on this phone can open the GitHub page. The report is kept until you file or discard it.</string>

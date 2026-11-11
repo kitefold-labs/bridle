@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.feature.settings
 
 import android.app.Application
 import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,6 +29,7 @@ import com.kitefoldlabs.bridle.feature.onboarding.OnboardingViewModel
 import com.kitefoldlabs.bridle.feature.testData
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -126,6 +128,15 @@ class GatesUiTest {
         uris.noBrowser = false
         rule.onNodeWithText("Open GitHub issue").performClick()
         uris.opened.single() shouldStartWith "https://github.com/"
+        val clip =
+            context
+                .getSystemService(ClipboardManager::class.java)
+                .primaryClip!!
+                .getItemAt(0)
+                .text
+                .toString()
+        clip shouldStartWith "opened a tab\n\nBridle crash report\n"
+        clip shouldContain "IllegalStateException"
         rule.onNodeWithText("Bridle closed unexpectedly").assertDoesNotExist()
         reporter.pending() shouldBe null
     }
