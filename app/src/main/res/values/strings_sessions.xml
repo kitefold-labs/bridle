@@ -83,6 +83,10 @@
     <string name="host_helper_missing">Install bridle-helper for accurate Claude status. Without it, status is guessed from the screen.</string>
     <string name="host_helper_install">Install bridle-helper</string>
     <string name="host_helper_remove">Remove helper</string>
+    <string name="host_shell_missing">Shell integration lets Bridle suggest file names as you type at a bash or zsh prompt. It adds a few lines to ~/.bashrc or ~/.zshrc.</string>
+    <string name="host_shell_install">Install shell integration</string>
+    <string name="host_shell_installed">Shell integration: %1$s</string>
+    <string name="host_shell_remove">Remove shell integration</string>
 
     <!-- Dialogs -->
     <string name="dialog_cancel">Cancel</string>
@@ -98,8 +102,12 @@
     <string name="install_hooks">Also add Claude Code hooks to ~/.claude/settings.json (a backup is kept). Without hooks the helper has no status to report.</string>
     <string name="install_confirm">Install</string>
     <string name="uninstall_title">Remove bridle-helper?</string>
-    <string name="uninstall_body">Removes its Claude Code hooks and the script. Claude status goes back to being guessed from the screen.</string>
+    <string name="uninstall_body">Removes its Claude Code hooks, the shell integration and the script. Claude status goes back to being guessed from the screen.</string>
     <string name="uninstall_confirm">Remove</string>
+    <string name="shell_install_title">Install shell integration?</string>
+    <string name="shell_install_body">Bridle uploads bridle-helper and two shell scripts to ~/.local/share/bridle and checks their SHA-256 on the host. bridle-helper then adds a block that loads the scripts to the end of ~/.bashrc and ~/.zshrc: each one that exists, plus your login shell\'s. A backup of each file is kept. Shells opened afterwards use it.</string>
+    <string name="shell_uninstall_title">Remove shell integration?</string>
+    <string name="shell_uninstall_body">Removes the block from ~/.bashrc and ~/.zshrc (a backup is kept) and deletes the scripts. Shells already open keep it until they exit.</string>
 
     <!-- Messages -->
     <string name="sessions_restarted">Restarted %1$s</string>
@@ -108,6 +116,8 @@
     <string name="sessions_profile_deleted">Deleted %1$s</string>
     <string name="sessions_helper_installed">bridle-helper installed</string>
     <string name="sessions_helper_removed">bridle-helper removed</string>
+    <string name="sessions_shell_installed">Shell integration installed. New shells use it.</string>
+    <string name="sessions_shell_removed">Shell integration removed</string>
     <string name="sessions_error_no_tmux">tmux isn\'t installed on this host</string>
     <string name="sessions_error">Failed: %1$s</string>
 

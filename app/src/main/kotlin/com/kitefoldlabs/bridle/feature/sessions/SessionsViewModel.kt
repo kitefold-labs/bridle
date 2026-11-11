@@ -56,6 +56,11 @@ sealed interface SessionsDialog {
     ) : SessionsDialog
 
     data object ConfirmUninstallHelper : SessionsDialog
+
+    /** Consent to upload the shell integration and edit the rc files, showing checksums. */
+    data object InstallShellIntegration : SessionsDialog
+
+    data object ConfirmUninstallShellIntegration : SessionsDialog
 }
 
 /** Everything the sessions screen shows. */
@@ -122,6 +127,10 @@ interface SessionsActions {
     fun setInstallHooks(enabled: Boolean)
 
     fun requestUninstallHelper()
+
+    fun requestInstallShellIntegration()
+
+    fun requestUninstallShellIntegration()
 
     fun confirmDialog()
 
@@ -321,6 +330,14 @@ class SessionsViewModel
             showDialog(SessionsDialog.ConfirmUninstallHelper)
         }
 
+        override fun requestInstallShellIntegration() {
+            showDialog(SessionsDialog.InstallShellIntegration)
+        }
+
+        override fun requestUninstallShellIntegration() {
+            showDialog(SessionsDialog.ConfirmUninstallShellIntegration)
+        }
+
         override fun confirmDialog() {
             val dialog = local.value.dialog ?: return
             local.update { it.copy(dialog = null) }
@@ -336,6 +353,10 @@ class SessionsViewModel
                     withTmux(UserMessage(R.string.sessions_helper_installed)) { it.installHelper(dialog.installHooks) }
                 SessionsDialog.ConfirmUninstallHelper ->
                     withTmux(UserMessage(R.string.sessions_helper_removed)) { it.uninstallHelper() }
+                SessionsDialog.InstallShellIntegration ->
+                    withTmux(UserMessage(R.string.sessions_shell_installed)) { it.installShellIntegration() }
+                SessionsDialog.ConfirmUninstallShellIntegration ->
+                    withTmux(UserMessage(R.string.sessions_shell_removed)) { it.uninstallShellIntegration() }
             }
         }
 

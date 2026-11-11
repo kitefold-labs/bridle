@@ -120,6 +120,24 @@ public class TmuxController(
     }
 
     /**
+     * Uploads the helper and the shell integration scripts, then sources them from the rc files
+     * of [shells] (when empty, each rc file that exists plus the login shell's).
+     */
+    public suspend fun installShellIntegration(shells: Set<IntegratedShell> = emptySet()) {
+        val result = connection.runScript(ShellIntegration.installScript(shells))
+        if (!result.isSuccess || ShellIntegration.INSTALLED_MARKER !in result.stdout) {
+            throw RemoteCommandException("Installing shell integration failed", result)
+        }
+    }
+
+    public suspend fun uninstallShellIntegration() {
+        val result = connection.runScript(ShellIntegration.uninstallScript())
+        if (!result.isSuccess || ShellIntegration.REMOVED_MARKER !in result.stdout) {
+            throw RemoteCommandException("Removing shell integration failed", result)
+        }
+    }
+
+    /**
      * The host's tmux version, which decides how [TmuxScripts.launch] sets environment variables.
      * Probed (once per controller) only when [profile] has any.
      */

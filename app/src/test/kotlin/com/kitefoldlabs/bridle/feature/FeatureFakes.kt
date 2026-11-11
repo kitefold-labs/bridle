@@ -112,6 +112,9 @@ class ScriptedHost : SshConnection {
 
     @Volatile var helper = ""
 
+    /** The probe's `shell=` value: shells with the integration installed, e.g. " bash". */
+    @Volatile var shellIntegration = ""
+
     @Volatile var sessions: List<FakeSession> = emptyList()
 
     @Volatile var helperStates = ""
@@ -145,10 +148,12 @@ class ScriptedHost : SshConnection {
         val sep = ":|:"
         val out =
             when {
-                // The install script embeds the whole helper, so it is recognised first.
+                // The install scripts embed the whole helper, so they are recognised first.
+                "BRIDLE_SHELL_INSTALLED" in script -> "BRIDLE_SHELL_INSTALLED\n"
                 "BRIDLE_HELPER_INSTALLED" in script -> "BRIDLE_HELPER_INSTALLED\n"
+                "BRIDLE_SHELL_REMOVED" in script -> "BRIDLE_SHELL_REMOVED\n"
                 "uninstall-hooks" in script -> "removed\n"
-                "printf 'tmux=%s" in script -> "tmux=$tmux\nclaude=$claude\nhelper=$helper\n"
+                "printf 'tmux=%s" in script -> "tmux=$tmux\nclaude=$claude\nhelper=$helper\nshell=$shellIntegration\n"
                 "list-sessions" in script ->
                     sessions.joinToString(
                         "\n",

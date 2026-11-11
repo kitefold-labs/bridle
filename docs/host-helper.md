@@ -39,7 +39,8 @@ cp host-helper/bridle-helper ~/.local/share/bridle/ && chmod 700 ~/.local/share/
 ## Removing
 
 **Sessions → (pick the host) → This host → Remove helper**, or run
-`bridle-helper uninstall-hooks` and delete the script. State files can be deleted with
+`bridle-helper uninstall-hooks` and `bridle-helper uninstall-shell`, then delete the script.
+Removing the helper in Bridle also removes the [shell integration](#shell-integration). State files can be deleted with
 `rm -r ~/.local/state/bridle`.
 
 ## Protocol
@@ -60,6 +61,12 @@ Two more scripts, `shell-integration.bash` (bash 4.4+) and `shell-integration.zs
 prompt with OSC 133 and report the working directory with OSC 7. Bridle will use them for
 [command-line suggestions](command-line-suggestions.md). Inside tmux they turn on
 `allow-passthrough` for their own pane only.
+
+In Bridle: **Sessions → (pick the host) → This host → Install shell integration**. Bridle shows
+the SHA-256 of the helper and both scripts and asks for confirmation, then uploads them to
+`~/.local/share/bridle/`, verifies the checksums on the host, and runs
+`bridle-helper install-shell`. **Remove shell integration** runs `uninstall-shell`. Shells
+already open keep their current setup until they exit.
 
 `bridle-helper install-shell` adds this block to the end of `~/.bashrc` and/or
 `${ZDOTDIR:-~}/.zshrc`:

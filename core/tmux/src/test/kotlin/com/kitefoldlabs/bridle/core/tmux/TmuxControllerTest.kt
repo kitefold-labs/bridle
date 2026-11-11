@@ -285,6 +285,56 @@ class TmuxControllerTest {
         }
 
     @Test
+    fun `shell integration installs, shows in the probe and uninstalls`() =
+        runBlocking<Unit> {
+            val bashrc = home.resolve(".bashrc")
+            val share = home.resolve(".local/share/bridle")
+            tmux.probe().shellIntegration shouldBe emptySet()
+            // No rc file and a login shell that is neither bash nor zsh: nothing to pick.
+            shouldThrow<RemoteCommandException> { tmux.installShellIntegration() }.message shouldContain
+                "no ~/.bashrc or ~/.zshrc"
+
+            bashrc.toFile().writeText("alias ll='ls -l'\n")
+            tmux.installShellIntegration()
+
+            tmux.probe().shellIntegration shouldBe setOf(IntegratedShell.BASH)
+            share.resolve("shell-integration.bash").toFile().readText() shouldBe
+                ShellIntegration.script(IntegratedShell.BASH)
+            share.resolve("shell-integration.zsh").toFile().readText() shouldBe
+                ShellIntegration.script(IntegratedShell.ZSH)
+            PosixFilePermissions.toString(Files.getPosixFilePermissions(share.resolve("bridle-helper"))) shouldBe
+                "rwx------"
+            bashrc.toFile().readText() shouldContain ShellIntegration.BLOCK_BEGIN
+
+            tmux.installShellIntegration(setOf(IntegratedShell.ZSH))
+            tmux.probe().shellIntegration shouldBe setOf(IntegratedShell.BASH, IntegratedShell.ZSH)
+
+            tmux.uninstallShellIntegration()
+            tmux.probe().shellIntegration shouldBe emptySet()
+            bashrc.toFile().readText() shouldBe "alias ll='ls -l'\n"
+            Files.exists(share.resolve("shell-integration.bash")) shouldBe false
+            Files.exists(share.resolve("bridle-helper")) shouldBe true
+        }
+
+    @Test
+    fun `removing the helper also removes the shell integration`() =
+        runBlocking<Unit> {
+            home.resolve(".bashrc").toFile().writeText("x\n")
+            tmux.installShellIntegration()
+            tmux.probe().shellIntegration shouldBe setOf(IntegratedShell.BASH)
+
+            tmux.uninstallHelper()
+
+            tmux.probe().shellIntegration shouldBe emptySet()
+            home.resolve(".bashrc").toFile().readText() shouldBe "x\n"
+            // Without the helper, uninstalling just deletes any scripts left behind.
+            Files.createDirectories(home.resolve(".local/share/bridle"))
+            home.resolve(".local/share/bridle/shell-integration.zsh").toFile().writeText("leftover")
+            tmux.uninstallShellIntegration()
+            Files.exists(home.resolve(".local/share/bridle/shell-integration.zsh")) shouldBe false
+        }
+
+    @Test
     fun `hook install edits a symlinked settings file in place and quotes the helper path`() =
         runBlocking<Unit> {
             tmux.installHelper(installHooks = false)
@@ -345,10 +395,14 @@ class TmuxControllerTest {
             shouldThrow<RemoteCommandException> { broken.kill("x") }.message shouldContain "boom"
             shouldThrow<RemoteCommandException> { broken.installHelper(false) }
             shouldThrow<RemoteCommandException> { broken.uninstallHelper() }
+            shouldThrow<RemoteCommandException> { broken.installShellIntegration() }
+            shouldThrow<RemoteCommandException> { broken.uninstallShellIntegration() }
             val odd = TmuxController(FixedResult(ExecResult(0, "???", "")))
             shouldThrow<RemoteCommandException> { odd.launch(profile()) }
             shouldThrow<RemoteCommandException> { odd.restart(profile()) }
             shouldThrow<RemoteCommandException> { odd.installHelper(false) }
+            shouldThrow<RemoteCommandException> { odd.installShellIntegration() }
+            shouldThrow<RemoteCommandException> { odd.uninstallShellIntegration() }
             odd.listSessions(useHelper = true).shouldBeEmpty()
         }
 }

@@ -65,6 +65,7 @@ public object TmuxScripts {
             "printf 'tmux=%s\\n' \"\$(tmux -V 2>/dev/null)\"",
             "printf 'claude=%s\\n' \"\$(command -v claude 2>/dev/null)\"",
             "printf 'helper=%s\\n' \"\$(${ShellQuote.quotePath(helperPath)} version 2>/dev/null)\"",
+            ShellIntegration.probeLine(),
         )
 
     /** Lists sessions, then [PANES_MARKER], then all panes. Prints nothing if no server runs. */

@@ -15,6 +15,7 @@ public object TmuxParsers {
             tmuxVersion = values["tmux"]?.let(TmuxVersion::parse),
             claudePath = values["claude"]?.takeIf { it.isNotEmpty() },
             helperVersion = values["helper"]?.removePrefix("bridle-helper ")?.toIntOrNull(),
+            shellIntegration = ShellIntegration.parseProbeValue(values["shell"]),
         )
     }
 
