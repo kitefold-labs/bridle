@@ -30,22 +30,34 @@ types `ork/`. Enter still runs the command, so you can always run exactly what y
    belongs to the pane whose `A` follows it. Malformed codes, and paths with control characters
    or invalid UTF-8, are dropped.
 
-3. **The typed line.** Bridle builds the line from the bytes it sends; it does not read the
-   screen. Every send (soft and hardware keyboard, key bar, paste, compose box) goes through one
-   decorator on `TerminalConnection`:
+3. **The typed line.** `PromptLine` builds the line from the bytes Bridle sends; it does not
+   read the screen. Every send (soft and hardware keyboard, key bar, paste, compose box) goes
+   through one decorator on `TerminalConnection`:
    - `A` starts a new, empty, known line. `B` alone is a redraw and keeps the line.
-   - Printable text is appended. DEL removes a character; Ctrl-U and Ctrl-W act as in readline.
-   - Any other control byte or escape sequence (arrows, history, Tab, a tmux prefix key, mouse
-     reports) makes the line unknown, and the strip hides until the next `A`.
-   - Bytes sent between `C` and the next `A` (typeahead) make that line unknown.
-   - Terminal query replies (`CSI row;col R`, `CSI ? … c`) are not keystrokes and are ignored.
+   - Printable text and bracketed pastes of printable text are appended. DEL and BS remove a
+     character, Ctrl-U clears the line, Ctrl-L changes nothing.
+   - Ctrl-W removes the last word only when it is letters, digits and `_ . ~ / -`, where bash's
+     unix-word-rubout and zsh's backward-kill-word agree; otherwise the line becomes unknown.
+   - Any other control byte or escape sequence (Enter, arrows, history, Tab, a tmux prefix key,
+     mouse reports) makes the line unknown, and the strip hides until the next `A`.
+   - Bytes sent while the line isn't known, and not yet submitted with Enter or Ctrl-C
+     (typeahead during a command, a key pressed after a tmux pane switch), make the next `A`
+     unknown too, because the shell may already hold them.
+   - Terminal replies on the same path (cursor position, device attributes, mode reports,
+     focus events, OSC and DCS replies) are not keystrokes and are ignored.
 
-4. **Completion.** Bridle takes the word before the end of the line and resolves it against
-   the working directory (`~`, `~/…`, absolute and relative paths). Words containing `$`, `*`,
-   backticks or unbalanced quotes get no suggestions. Entries come from SFTP over the host's
-   existing connection; each directory listing is cached until the next `A`. Directories come
-   first with a trailing `/`; dotfiles appear only when the word starts with `.`; names with
-   control characters or invalid UTF-8 are never offered.
+4. **Completion.** `PathWord` takes the word at the end of the line as bash and zsh read it:
+   it splits on unquoted whitespace, operators (`; | & < > ( )`) and `=` (for `--opt=path`),
+   removes quotes and backslashes, and remembers a quote still open at the end. It resolves the
+   word against the working directory (`~/…` against home, absolute and relative paths). Words
+   the shell would expand (`$`, backticks, `* ? [ {`, `!`, `~user`) and comments get no
+   suggestions. A chosen name is escaped for the quote the line is in: backslashes unquoted,
+   `'\''` inside single quotes, and `\` before `" \ $` and backticks inside double quotes,
+   where a name containing `!` is never offered (history expansion).
+
+   Entries come from SFTP over the host's existing connection; each directory listing is cached
+   until the next `A`. Directories come first with a trailing `/`; dotfiles appear only when the
+   word starts with `.`; names with control characters or invalid UTF-8 are never offered.
 
 5. **Accepting.** Tapping a chip sends the rest of the name, shell-escaped (`\ `, `\'` …), as
    printable bytes. The line model records it, so picking a directory moves the strip straight
@@ -101,7 +113,7 @@ are rate-limited.
 | `host-helper/` | Done: `shell-integration.bash` and `shell-integration.zsh`, and `bridle-helper install-shell` / `uninstall-shell` (see [host-helper.md](host-helper.md#shell-integration)). |
 | `:core:tmux` | Done: `ShellIntegration` uploads the helper and scripts with checksum checks and runs `install-shell`; `HostProbe.shellIntegration` reports which rc files load it; removing the helper also runs `uninstall-shell`. |
 | `:core:terminal-ui` | Done: `TerminalModeTracker` parses OSC 133 (with `aid`) and OSC 7; `TerminalEngine.shellPrompt` and `onShellEvent`. |
-| `:core:terminal` | Done: `ShellEvent`, `ShellEvents.parseOsc` and the `ShellPrompt` reducer. To do: `PromptLine`, the line model, and `PathWord`, which extracts, unquotes and escapes words. Both pure Kotlin. |
+| `:core:terminal` | Done: `ShellEvent`, `ShellEvents.parseOsc` and the `ShellPrompt` reducer; `PromptLine`, the line model; `PathWord`, which extracts, unquotes, resolves and escapes the last word. |
 | `:core:terminal-ui` | A `TerminalConnection` decorator feeding `PromptLine`. `SuggestionStrip` composable, placed between `TerminalPane` and the key bar in `TerminalScreen`. |
 | `:app` | Done: install and remove buttons on the Sessions host card, with a consent dialog showing checksums. To do: a completion source per host (SFTP session, cache, rate limit) and a per-host "Command-line suggestions" toggle. |
 | `docs/` | `host-helper.md`, `terminal-input.md` (codes and security), a tutorial section. |
@@ -112,7 +124,8 @@ are rate-limited.
 2. ~~`install-shell` / `uninstall-shell`, with tests that run bash and zsh and check the
    codes~~ (`ShellIntegrationTest`; CI installs zsh). ~~Install and remove from the app~~.
 3. ~~Tracker changes and `ShellPrompt`~~.
-4. `PromptLine` and `PathWord`, covered to the 95% gate.
+4. ~~`PromptLine` and `PathWord`~~. `PathWordTest` has real bash (and zsh where installed)
+   read back escaped names in every quoting context.
 5. Completion source with a fake SFTP session, then the strip and the setting.
 6. Docs, then a phone run against bash and zsh, with and without tmux.
 
