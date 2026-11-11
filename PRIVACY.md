@@ -65,9 +65,10 @@ Bridle has no crash-reporting service, and nothing is ever sent automatically:
 2. On the next launch, Bridle asks whether you want to look at it. If you have turned on
    **Offer to report crashes** in Settings, it shows you the full text straight away instead.
    If you decline or discard it, the report is deleted.
-3. If you choose to, Bridle opens a pre-filled issue on GitHub in your browser. You can edit or
-   delete anything, and nothing is sent until you submit it yourself. GitHub's own privacy policy
-   applies to issues you file there.
+3. If you choose to, Bridle opens a pre-filled issue on GitHub in your browser and copies the
+   report, with any notes you added, to your clipboard, in case the GitHub app opens the link and
+   leaves the form empty. You can edit or delete anything, and nothing is sent until you submit it
+   yourself. GitHub's own privacy policy applies to issues you file there.
 
 Terminal content is never part of a report. See
 [docs/backup-and-privacy.md](docs/backup-and-privacy.md) for exactly what reports contain.
