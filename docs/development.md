@@ -46,6 +46,19 @@ Every pull request must pass all of these in CI (`.github/workflows/ci.yml`):
    `config/license/allowed-licenses.json`. No GPL/AGPL.
 6. **CodeQL** (`security-extended` queries) for Kotlin/Java.
 
+### Local CI runtime
+
+Workflows use fresh, one-job Ubuntu guests on the `kitefold-ghost` runner. The
+controller keeps host credentials outside guests and supports Docker services
+inside each guest. Existing coverage, license, release and security gates remain
+required.
+
+Runner runtime updates require boot, .NET, Java, Android SDK and network
+qualification, followed by the application's mandatory CI and CodeQL gates.
+Preserve normal JVM compilation settings and the complete Gradle assembly and
+`security-extended` analysis. The controller retains bounded fatal JVM summaries
+in private host logs for diagnosis of daemon crashes during builds or tracing.
+
 ### Pre-commit hooks
 
 ```sh

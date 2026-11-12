@@ -13,7 +13,7 @@ permissions:
 jobs:
   analyze:
     name: Analyze (java-kotlin)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, kitefold-ghost, ephemeral]
     timeout-minutes: 45
     permissions:
       security-events: write
@@ -30,6 +30,9 @@ jobs:
       - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: java-kotlin
+          # Leave room for Gradle and compiler daemons in the 16 GiB guest.
+          ram: 8192
+          threads: 4
           build-mode: manual
           queries: security-extended
       - name: Build

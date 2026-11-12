@@ -25,6 +25,8 @@ class BouncyCastleRegistrationTest {
 
     @BeforeEach
     fun saveProviders() {
+        // Snapshot after sshj's lazy registration so cleanup retains its cached provider.
+        SecurityUtils.getSecurityProvider()
         original = Security.getProviders().toList()
     }
 
