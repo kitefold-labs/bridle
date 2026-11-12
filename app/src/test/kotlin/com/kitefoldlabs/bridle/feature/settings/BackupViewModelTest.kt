@@ -36,6 +36,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -46,6 +49,7 @@ class BackupViewModelTest {
     private lateinit var target: DataModule
     private val documents = FakeDocuments()
     private val cheap = Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1)
+    private val epoch = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
     private val passphrase = "correct horse battery"
 
     @Before
@@ -67,7 +71,7 @@ class BackupViewModelTest {
     }
 
     private fun viewModel(data: DataModule) =
-        BackupViewModel(data.backup, documents, cheap, Dispatchers.Unconfined) { 0L }
+        BackupViewModel(data.backup, documents, cheap, Dispatchers.Unconfined, clock = epoch)
 
     private fun uri(name: String) = Uri.parse("content://docs/$name")
 
@@ -196,9 +200,18 @@ class BackupViewModelTest {
     }
 
     @Test
+    fun `the suggested name uses the date in the clock's time zone`() {
+        val behindUtc = Clock.fixed(Instant.EPOCH, ZoneOffset.ofHours(-5))
+        val vm = BackupViewModel(source.backup, documents, cheap, Dispatchers.Unconfined, clock = behindUtc)
+        vm.startExport()
+        vm.submitExportPassphrase(passphrase.toCharArray(), passphrase.toCharArray())
+        vm.state.value.suggestedName shouldBe "bridle-1969-12-31.bridle"
+    }
+
+    @Test
     fun `a backup is only decrypted when its key derivation fits in memory`() {
         documents.inputs[uri("backup").toString()] = exportFile()
-        val small = BackupViewModel(target.backup, documents, cheap, Dispatchers.Unconfined, { 1L }) { 0L }
+        val small = BackupViewModel(target.backup, documents, cheap, Dispatchers.Unconfined, { 1L }, clock = epoch)
         small.importFrom(uri("backup"))
         eventually { small.state.value.importDialog }
         val typed = passphrase.toCharArray()
@@ -219,7 +232,8 @@ class BackupViewModelTest {
                 cheap,
                 Dispatchers.Unconfined,
                 { throw OutOfMemoryError() },
-            ) { 0L }
+                clock = epoch,
+            )
         oom.importFrom(uri("backup"))
         eventually { oom.state.value.importDialog }
         oom.submitImportPassphrase(passphrase.toCharArray())

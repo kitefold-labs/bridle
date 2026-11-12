@@ -28,9 +28,8 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Clock
+import java.time.LocalDate
 import javax.inject.Inject
 
 enum class PassphraseProblem { TOO_SHORT, MISMATCH }
@@ -110,11 +109,11 @@ class BackupViewModel(
     private val params: Argon2Params,
     private val crypto: CoroutineDispatcher,
     private val availableMemory: () -> Long = ::availableHeap,
-    private val clock: () -> Long,
+    private val clock: Clock,
 ) : ViewModel() {
     @Inject
     constructor(backups: BackupRepository, documents: DocumentAccess) :
-        this(backups, documents, Argon2Params.DEFAULT, Dispatchers.Default, ::availableHeap, System::currentTimeMillis)
+        this(backups, documents, Argon2Params.DEFAULT, Dispatchers.Default, ::availableHeap, Clock.systemDefaultZone())
 
     private val mutable = MutableStateFlow(BackupUiState())
     val state: StateFlow<BackupUiState> = mutable.asStateFlow()
@@ -149,7 +148,7 @@ class BackupViewModel(
         }
         wipeExport()
         exportPassphrase = passphrase
-        val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(clock()))
+        val date = LocalDate.now(clock)
         mutable.update {
             it.copy(
                 exportDialog = false,
@@ -186,7 +185,7 @@ class BackupViewModel(
         viewModelScope.launch {
             val result =
                 try {
-                    val payload = backups.export(clock(), BuildConfig.VERSION_NAME)
+                    val payload = backups.export(clock.millis(), BuildConfig.VERSION_NAME)
                     if (affordable(params, fileBytes = 0)) {
                         withContext(crypto) {
                             val bytes = BackupCrypto.encrypt(payload, passphrase, params)

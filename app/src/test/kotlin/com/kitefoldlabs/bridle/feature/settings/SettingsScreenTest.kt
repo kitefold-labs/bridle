@@ -52,6 +52,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -63,6 +66,7 @@ class SettingsScreenTest {
     private val documents = FakeDocuments()
     private val results = FakeResults()
     private val uris = FakeUris()
+    private val epoch = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
     private var available = true
     private lateinit var backup: BackupViewModel
 
@@ -78,7 +82,8 @@ class SettingsScreenTest {
                 Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
                 Dispatchers.Default,
                 memory,
-            ) { 0L }
+                clock = epoch,
+            )
         rule.setContent { TestHost(results, uris) { SettingsScreen(vm, backup) } }
         waitForText("Appearance")
         return vm
@@ -329,9 +334,8 @@ class SettingsScreenTest {
                 documents,
                 Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
                 Dispatchers.Default,
-            ) {
-                0L
-            }
+                clock = epoch,
+            )
         val restoration = StateRestorationTester(rule)
         restoration.setContent { TestHost(results, uris) { BackupSection(vm) } }
         rule.onNodeWithText("Export encrypted backup").performClick()
