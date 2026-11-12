@@ -73,6 +73,7 @@ fun TerminalTabsRoute(
         selectedTabId = selected,
         screens = screens,
         keyBarLayout = settings?.keyBarLayout ?: KeyBarLayout.DEFAULT,
+        composeEnterSends = settings?.composeEnterSends ?: true,
         actions = viewModel,
         onBack = onBack,
         onOpenTool = @DontMemoize { hostId, tool -> tools.open(hostId, tool) },
@@ -94,6 +95,7 @@ fun TerminalTabsScreen(
     onBack: () -> Unit,
     onOpenTool: (EntityId, HostTool) -> Unit,
     modifier: Modifier = Modifier,
+    composeEnterSends: Boolean = true,
 ) {
     val selectedIndex = tabs.indexOfFirst { it.id == selectedTabId }.coerceAtLeast(0)
     val current = tabs.getOrNull(selectedIndex)
@@ -130,7 +132,12 @@ fun TerminalTabsScreen(
                 if (state == null) {
                     Box(Modifier.fillMaxSize())
                 } else {
-                    TerminalScreen(state, onReconnect = { actions.reconnect(current.id) }, keyBarLayout = keyBarLayout)
+                    TerminalScreen(
+                        state,
+                        onReconnect = { actions.reconnect(current.id) },
+                        keyBarLayout = keyBarLayout,
+                        composeEnterSends = composeEnterSends,
+                    )
                 }
             }
         }

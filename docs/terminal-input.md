@@ -43,6 +43,14 @@ as one paste instead of typed keys: a shell doesn't run each line, and Claude Co
 multi-line prompt together. The compose box's **Send** pastes the text this way and then sends
 Enter outside the markers, so the prompt is submitted.
 
+The terminal itself asks the keyboard for raw keystrokes, which turns off swipe typing,
+autocorrect and suggestions. The compose box is an ordinary text field, so they all work there.
+With **Settings → Enter sends from the compose box** on (the default), the keyboard's Enter key
+becomes Send, and Enter in an empty box presses Enter in the terminal, so the box can stand in
+for the terminal keyboard. Shift+Enter on a hardware keyboard still starts a new line. Turn the
+setting off to write multi-line prompts on the soft keyboard; then only **Send** (or Ctrl+Enter)
+sends.
+
 Pasted text is always cleaned first:
 
 - Any `ESC[201~` inside the text is removed. Without this, a malicious snippet (from a web page,
