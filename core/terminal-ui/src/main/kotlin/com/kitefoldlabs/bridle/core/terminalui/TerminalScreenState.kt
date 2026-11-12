@@ -9,6 +9,7 @@ import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.BracketedPaste
 import com.kitefoldlabs.bridle.core.terminal.ComposeHistory
 import com.kitefoldlabs.bridle.core.terminal.InputDispatcher
+import com.kitefoldlabs.bridle.core.terminal.Key
 import com.kitefoldlabs.bridle.core.terminal.KeyAction
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
 import com.kitefoldlabs.bridle.core.terminal.StickyState
@@ -223,6 +224,19 @@ public class TerminalScreenState(
     /** The compose box's Send: pastes the text and presses Enter. May ask first. */
     public fun submitCompose() {
         if (composeText.isNotBlank()) send(PendingSend(composeText, submit = true))
+    }
+
+    /**
+     * Enter in the compose box when Enter sends: sends the text like [submitCompose] or, when the
+     * box is blank, presses Enter in the terminal.
+     */
+    public fun composeEnter() {
+        if (composeText.isBlank()) {
+            composeText = ""
+            onKeyBarAction(KeyAction.Press(Key.Enter))
+        } else {
+            submitCompose()
+        }
     }
 
     /** The user confirmed [pendingSend]. */

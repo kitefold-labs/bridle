@@ -94,6 +94,8 @@ class SettingsViewModel
                 if (!enabled) history.clearAll()
             }
 
+        fun setComposeEnterSends(enabled: Boolean) = write { setComposeEnterSends(enabled) }
+
         fun setAppLock(enabled: Boolean) = write { setAppLockEnabled(enabled && availability.isAvailable()) }
 
         fun setSecureScreen(enabled: Boolean) = write { setSecureScreenEnabled(enabled) }

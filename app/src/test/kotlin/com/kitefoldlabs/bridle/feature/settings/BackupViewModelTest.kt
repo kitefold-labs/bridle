@@ -15,6 +15,7 @@ import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
 import com.kitefoldlabs.bridle.core.model.KeySource
 import com.kitefoldlabs.bridle.core.model.Snippet
 import com.kitefoldlabs.bridle.core.model.Validation
+import com.kitefoldlabs.bridle.feature.EPOCH_UTC
 import com.kitefoldlabs.bridle.feature.FakeDocuments
 import com.kitefoldlabs.bridle.feature.TestMain
 import com.kitefoldlabs.bridle.feature.eventually
@@ -67,7 +68,7 @@ class BackupViewModelTest {
     }
 
     private fun viewModel(data: DataModule) =
-        BackupViewModel(data.backup, documents, cheap, Dispatchers.Unconfined) { 0L }
+        BackupViewModel(data.backup, documents, cheap, Dispatchers.Unconfined, clock = EPOCH_UTC)
 
     private fun uri(name: String) = Uri.parse("content://docs/$name")
 
@@ -198,7 +199,7 @@ class BackupViewModelTest {
     @Test
     fun `a backup is only decrypted when its key derivation fits in memory`() {
         documents.inputs[uri("backup").toString()] = exportFile()
-        val small = BackupViewModel(target.backup, documents, cheap, Dispatchers.Unconfined, { 1L }) { 0L }
+        val small = BackupViewModel(target.backup, documents, cheap, Dispatchers.Unconfined, { 1L }, EPOCH_UTC)
         small.importFrom(uri("backup"))
         eventually { small.state.value.importDialog }
         val typed = passphrase.toCharArray()
@@ -219,7 +220,8 @@ class BackupViewModelTest {
                 cheap,
                 Dispatchers.Unconfined,
                 { throw OutOfMemoryError() },
-            ) { 0L }
+                EPOCH_UTC,
+            )
         oom.importFrom(uri("backup"))
         eventually { oom.state.value.importDialog }
         oom.submitImportPassphrase(passphrase.toCharArray())

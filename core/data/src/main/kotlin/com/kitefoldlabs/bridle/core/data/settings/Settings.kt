@@ -50,6 +50,11 @@ public data class Settings(
     val rememberComposeHistory: Boolean = true,
     /** Suggest file names while typing at a shell prompt, on hosts with Bridle's shell integration. */
     val commandLineSuggestions: Boolean = true,
+    /**
+     * The soft keyboard's Enter sends the compose box's text (on an empty box, presses Enter).
+     * Off, Enter starts a new line and only Send sends.
+     */
+    val composeEnterSends: Boolean = true,
     /** Master switch for local notifications; see [notifies]. */
     val notificationsEnabled: Boolean = true,
     val notificationEvents: Set<NotificationEvent> = NotificationEvent.entries.toSet(),
