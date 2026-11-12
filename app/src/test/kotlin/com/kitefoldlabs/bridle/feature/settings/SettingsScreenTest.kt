@@ -35,6 +35,7 @@ import com.kitefoldlabs.bridle.core.model.KeyAlgorithm
 import com.kitefoldlabs.bridle.core.model.KeySource
 import com.kitefoldlabs.bridle.core.model.Validation
 import com.kitefoldlabs.bridle.core.terminal.BackspaceMode
+import com.kitefoldlabs.bridle.feature.EPOCH_UTC
 import com.kitefoldlabs.bridle.feature.FakeDocuments
 import com.kitefoldlabs.bridle.feature.FakeResults
 import com.kitefoldlabs.bridle.feature.FakeUris
@@ -78,7 +79,8 @@ class SettingsScreenTest {
                 Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
                 Dispatchers.Default,
                 memory,
-            ) { 0L }
+                clock = EPOCH_UTC,
+            )
         rule.setContent { TestHost(results, uris) { SettingsScreen(vm, backup) } }
         waitForText("Appearance")
         return vm
@@ -329,9 +331,8 @@ class SettingsScreenTest {
                 documents,
                 Argon2Params(Argon2Params.MIN_MEMORY_KIB, 1, 1),
                 Dispatchers.Default,
-            ) {
-                0L
-            }
+                clock = EPOCH_UTC,
+            )
         val restoration = StateRestorationTester(rule)
         restoration.setContent { TestHost(results, uris) { BackupSection(vm) } }
         rule.onNodeWithText("Export encrypted backup").performClick()

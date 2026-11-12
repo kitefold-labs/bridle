@@ -59,6 +59,9 @@ import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.MGF1ParameterSpec
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -150,6 +153,9 @@ object TestMain {
 
     private val IMMEDIATE: MainCoroutineDispatcher = Switch(isImmediate = true)
 }
+
+/** A clock stopped at 1970-01-01T00:00Z, so dates don't depend on the machine's time zone. */
+val EPOCH_UTC: Clock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)
 
 /** An in-memory database plus the session plumbing view models need. */
 class TestEnv(
