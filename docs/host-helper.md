@@ -39,7 +39,8 @@ cp host-helper/bridle-helper ~/.local/share/bridle/ && chmod 700 ~/.local/share/
 ## Removing
 
 **Sessions → (pick the host) → This host → Remove helper**, or run
-`bridle-helper uninstall-hooks` and delete the script. State files can be deleted with
+`bridle-helper uninstall-hooks` and `bridle-helper uninstall-shell`, then delete the script.
+Removing the helper in Bridle also removes the [shell integration](#shell-integration). State files can be deleted with
 `rm -r ~/.local/state/bridle`.
 
 ## Protocol
@@ -53,3 +54,44 @@ Each line of `list` output is a JSON object:
 
 `v` is the protocol version (`bridle-helper version` prints it). Unknown fields are ignored, so
 newer helpers stay compatible with older apps.
+
+## Shell integration
+
+Two more scripts, `shell-integration.bash` (bash 4.4+) and `shell-integration.zsh`, mark each
+prompt with OSC 133 and report the working directory with OSC 7. Bridle will use them for
+[command-line suggestions](command-line-suggestions.md). Inside tmux they turn on
+`allow-passthrough` for their own pane only.
+
+In Bridle: **Sessions → (pick the host) → This host → Install shell integration**. Bridle shows
+the SHA-256 of the helper and both scripts and asks for confirmation, then uploads them to
+`~/.local/share/bridle/`, verifies the checksums on the host, and runs
+`bridle-helper install-shell`. **Remove shell integration** runs `uninstall-shell`. Shells
+already open keep their current setup until they exit.
+
+`bridle-helper install-shell` adds this block to the end of `~/.bashrc` and/or
+`${ZDOTDIR:-~}/.zshrc`:
+
+```sh
+# >>> bridle shell integration >>>
+# Added by bridle-helper install-shell; remove with bridle-helper uninstall-shell.
+if [ -r "$HOME/.local/share/bridle/shell-integration.bash" ]; then . "$HOME/.local/share/bridle/shell-integration.bash"; fi
+# <<< bridle shell integration <<<
+```
+
+- Without arguments it edits each of those files that exists, plus the login shell's. Name the
+  shells to choose: `install-shell bash zsh`.
+- The block must stay last, after anything that sets the prompt. Running `install-shell` again
+  moves it back to the end; if it is already there the file is not touched.
+- Each edit first copies the file to `<file>.bridle-backup-<timestamp>`. A symlinked rc file
+  (from a dotfile manager) is edited through the link and stays a symlink.
+- If the markers don't pair up, the file is left alone and the command fails.
+- `--dry-run` prints the result without writing.
+
+`bridle-helper uninstall-shell` removes the block from both files and deletes the two scripts.
+
+Manual install:
+
+```sh
+cp host-helper/shell-integration.bash host-helper/shell-integration.zsh ~/.local/share/bridle/
+~/.local/share/bridle/bridle-helper install-shell
+```

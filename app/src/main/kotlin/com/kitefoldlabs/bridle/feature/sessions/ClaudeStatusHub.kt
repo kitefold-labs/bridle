@@ -83,7 +83,7 @@ object SessionsModule {
 /** What the sessions screen shows for one host. */
 data class HostStatus(
     val connection: HostConnectionState = HostConnectionState.Idle,
-    /** What the host offers (tmux, claude, bridle-helper); null until probed. */
+    /** What the host offers (tmux, claude, bridle-helper, shell integration); null until probed. */
     val probe: HostProbe? = null,
     val sessions: List<SessionSummary> = emptyList(),
     /** The last few non-blank lines of each session's active pane, while the sessions screen is open. */

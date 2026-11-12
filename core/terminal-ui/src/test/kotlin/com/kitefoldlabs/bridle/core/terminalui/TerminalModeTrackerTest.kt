@@ -1,5 +1,7 @@
 package com.kitefoldlabs.bridle.core.terminalui
 
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import org.junit.Test
@@ -215,5 +217,39 @@ class TerminalModeTrackerTest {
         tracker.title.value shouldBe ""
         feed("\u001b[?2004h")
         tracker.isBracketedPasteEnabled shouldBe true
+    }
+
+    @Test
+    fun `shell integration codes update the prompt and reach the listener in order`() {
+        val seen = mutableListOf<Pair<ShellEvent, ShellPrompt>>()
+        tracker.onShellEvent = { seen += it to tracker.shellPrompt.value }
+        // What tmux forwards for one bash prompt: passthrough already unwrapped, each code
+        // followed by ESC ( B. Fed a byte at a time to cover codes split across reads.
+        val bytes =
+            (
+                "\u001b]133;D;1;aid=%0\u0007\u001b(B\u001b]7;file://box/tmp/a%20b\u0007\u001b(B" +
+                    "\u001b]133;A;aid=%0\u0007\u001b(B\u001b]133;B;aid=%0\u0007\u001b(Bme@box:/tmp/a b\$ "
+            ).toByteArray()
+        bytes.indices.forEach { tracker.feed(bytes, it, 1) }
+
+        seen.map { it.first } shouldBe
+            listOf(
+                ShellEvent.CommandEnd(1, "%0"),
+                ShellEvent.WorkingDirectory("box", "/tmp/a b"),
+                ShellEvent.PromptStart("%0"),
+                ShellEvent.InputStart("%0"),
+            )
+        seen.last().second shouldBe tracker.shellPrompt.value // updated before the listener runs
+        tracker.shellPrompt.value.atPrompt shouldBe true
+        tracker.shellPrompt.value.directory("%0") shouldBe "/tmp/a b"
+    }
+
+    @Test
+    fun `shell integration codes end with ST too and leave the title alone`() {
+        feed("\u001b]2;kept\u0007\u001b]133;C\u001b\\\u001b]133;Z\u0007\u001b]7;file://box/bad%zz\u0007")
+        tracker.shellPrompt.value shouldBe ShellPrompt(active = true, atPrompt = false)
+        tracker.title.value shouldBe "kept"
+        feed("\u001bc") // RIS resets modes, not what the shell reported
+        tracker.shellPrompt.value.active shouldBe true
     }
 }

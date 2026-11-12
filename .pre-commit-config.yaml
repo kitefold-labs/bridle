@@ -35,6 +35,11 @@ repos:
     hooks:
       - id: shellcheck
         args: [--severity=style, --shell=sh]
+        types: [sh]
+      - id: shellcheck
+        name: shellcheck (bash)
+        args: [--severity=style, --shell=bash]
+        types: [bash]
 
   - repo: local
     hooks:

@@ -13,8 +13,13 @@
 #   bridle-helper prune [days]           Remove state older than N days (default 7).
 #   bridle-helper install-hooks [--dry-run]    Add hooks to ~/.claude/settings.json (backs it up).
 #   bridle-helper uninstall-hooks        Remove Bridle's hooks from ~/.claude/settings.json.
+#   bridle-helper install-shell [--dry-run] [bash] [zsh]
+#                                        Source the shell integration from ~/.bashrc and/or
+#                                        ~/.zshrc (backs them up). Without shells: each rc file
+#                                        that exists, plus the login shell's.
+#   bridle-helper uninstall-shell        Remove that from both rc files and delete the scripts.
 #
-# Requires: POSIX sh, sed, date, mv, mkdir. install-hooks also needs python3 (or jq).
+# Requires: POSIX sh, sed, awk, date, mv, mkdir. install-hooks also needs python3 (or jq).
 
 set -u
 
@@ -23,6 +28,9 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bridle/sessions"
 SETTINGS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
 SELF_PATH="${BRIDLE_HELPER_PATH:-$HOME/.local/share/bridle/bridle-helper}"
 HOOK_EVENTS="SessionStart UserPromptSubmit PreToolUse Notification Stop SessionEnd"
+SHARE_DIR="$(dirname "$SELF_PATH")"
+BLOCK_BEGIN="# >>> bridle shell integration >>>"
+BLOCK_END="# <<< bridle shell integration <<<"
 
 die() {
   printf 'bridle-helper: %s\n' "$*" >&2
@@ -177,6 +185,112 @@ print("BRIDLE_HOOKS_" + ("CHANGED" if changed else "UNCHANGED"), file=sys.stderr
 PY
 }
 
+rc_file() {
+  case "$1" in
+    bash) printf '%s' "$HOME/.bashrc" ;;
+    zsh) printf '%s' "${ZDOTDIR:-$HOME}/.zshrc" ;;
+  esac
+}
+
+# The path to source, as "$HOME/..." when it is under $HOME so the rc file survives a moved home.
+integration_path() {
+  path="$SHARE_DIR/shell-integration.$1"
+  # shellcheck disable=SC2016 # $HOME is written literally, for the rc file to expand
+  case "$path" in
+    "$HOME"/*) printf '"$HOME%s"' "${path#"$HOME"}" ;;
+    *) printf "'%s'" "$(printf '%s' "$path" | sed "s/'/'\\\\''/g")" ;;
+  esac
+}
+
+# Prints $1 without Bridle's block (and the blank line before it), or fails if the markers
+# don't pair up, so a damaged block can never swallow the rest of the file.
+strip_block() {
+  [ -f "$1" ] || return 0
+  awk -v b="$BLOCK_BEGIN" -v e="$BLOCK_END" '
+    $0 == b { if (inside) exit 3; inside = 1; blank = 0; next }
+    $0 == e { if (!inside) exit 3; inside = 0; next }
+    inside { next }
+    $0 == "" { blank++; next }
+    { while (blank > 0) { print ""; blank-- } print }
+    END { if (inside) exit 3; while (blank > 0) { print ""; blank-- } }
+  ' "$1"
+}
+
+# Writes $2 to rc file $1 if it differs, after a timestamped backup. Writes through the path
+# (not mv) so a symlinked rc file stays a symlink and keeps its permissions.
+replace_rc() {
+  if [ -f "$1" ] && cmp -s "$2" "$1"; then
+    rm -f "$2"
+    return 1
+  fi
+  [ -f "$1" ] && cp -p "$1" "$1.bridle-backup-$(date +%Y%m%d%H%M%S)"
+  cat "$2" >"$1" && rm -f "$2"
+}
+
+cmd_install_shell() {
+  dry_run=0
+  shells=""
+  for arg in "$@"; do
+    case "$arg" in
+      --dry-run) dry_run=1 ;;
+      bash | zsh) shells="$shells $arg" ;;
+      *) die "install-shell: unknown argument: $arg" ;;
+    esac
+  done
+  if [ -z "$shells" ]; then
+    login="$(basename "${SHELL:-}")"
+    for sh in bash zsh; do
+      if [ -f "$(rc_file "$sh")" ] || [ "$login" = "$sh" ]; then shells="$shells $sh"; fi
+    done
+  fi
+  [ -n "$shells" ] || die "install-shell: no ~/.bashrc or ~/.zshrc, and the login shell is neither bash nor zsh"
+  changed=0
+  for sh in $shells; do
+    [ -r "$SHARE_DIR/shell-integration.$sh" ] || die "install-shell: $SHARE_DIR/shell-integration.$sh is missing"
+    rc="$(rc_file "$sh")"
+    tmp="$(mktemp "${TMPDIR:-/tmp}/bridle-rc.XXXXXX")" || exit 1
+    if ! strip_block "$rc" >"$tmp"; then
+      rm -f "$tmp"
+      die "install-shell: Bridle's block in $rc is damaged; fix or remove it by hand"
+    fi
+    if [ -s "$tmp" ]; then echo >>"$tmp"; fi
+    {
+      echo "$BLOCK_BEGIN"
+      echo "# Added by bridle-helper install-shell; remove with bridle-helper uninstall-shell."
+      echo "if [ -r $(integration_path "$sh") ]; then . $(integration_path "$sh"); fi"
+      echo "$BLOCK_END"
+    } >>"$tmp"
+    if [ "$dry_run" = 1 ]; then
+      echo "==> $rc"
+      cat "$tmp"
+      rm -f "$tmp"
+    elif replace_rc "$rc" "$tmp"; then
+      changed=1
+    fi
+  done
+  [ "$dry_run" = 1 ] || shell_marker "$changed"
+}
+
+cmd_uninstall_shell() {
+  changed=0
+  for sh in bash zsh; do
+    rc="$(rc_file "$sh")"
+    [ -f "$rc" ] || continue
+    tmp="$(mktemp "${TMPDIR:-/tmp}/bridle-rc.XXXXXX")" || exit 1
+    if ! strip_block "$rc" >"$tmp"; then
+      rm -f "$tmp"
+      die "uninstall-shell: Bridle's block in $rc is damaged; fix or remove it by hand"
+    fi
+    if replace_rc "$rc" "$tmp"; then changed=1; fi
+  done
+  rm -f "$SHARE_DIR/shell-integration.bash" "$SHARE_DIR/shell-integration.zsh"
+  shell_marker "$changed"
+}
+
+shell_marker() {
+  if [ "$1" = 1 ]; then echo BRIDLE_SHELL_CHANGED >&2; else echo BRIDLE_SHELL_UNCHANGED >&2; fi
+}
+
 main() {
   sub="${1:-}"
   [ $# -gt 0 ] && shift
@@ -189,7 +303,9 @@ main() {
       if [ "${1:-}" = "--dry-run" ]; then edit_settings install 1; else edit_settings install 0; fi
       ;;
     uninstall-hooks) edit_settings uninstall 0 ;;
-    *) die "usage: bridle-helper {version|hook <event>|list|prune [days]|install-hooks [--dry-run]|uninstall-hooks}" ;;
+    install-shell) cmd_install_shell "$@" ;;
+    uninstall-shell) cmd_uninstall_shell ;;
+    *) die "usage: bridle-helper {version|hook <event>|list|prune [days]|install-hooks [--dry-run]|uninstall-hooks|install-shell [--dry-run] [bash] [zsh]|uninstall-shell}" ;;
   esac
 }
 

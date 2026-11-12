@@ -60,6 +60,8 @@ public data class HostProbe(
     val tmuxVersion: TmuxVersion?,
     val claudePath: String?,
     val helperVersion: Int?,
+    /** Shells whose rc file sources Bridle's shell integration. */
+    val shellIntegration: Set<IntegratedShell> = emptySet(),
 ) {
     val tmuxSupported: Boolean get() = tmuxVersion != null && tmuxVersion >= TmuxVersion.MINIMUM
 }

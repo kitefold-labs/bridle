@@ -17,6 +17,9 @@
     <string name="bridle_toolbar_show_keyboard">Show keyboard</string>
     <string name="bridle_toolbar_hide_keyboard">Hide keyboard</string>
 
+    <!-- Suggestion strip -->
+    <string name="bridle_suggestion_description">Complete %1$s</string>
+
     <!-- Compose box -->
     <string name="bridle_compose_label">Message to send</string>
     <string name="bridle_compose_send">Send</string>

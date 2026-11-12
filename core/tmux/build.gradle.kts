@@ -14,9 +14,11 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
-// The host helper ships inside the app as a resource; its sha256 is verified after upload.
+// The host helper and the shell integration scripts ship inside the app as resources; their
+// sha256 is verified after upload.
 tasks.processResources {
-    from(rootProject.file("host-helper/bridle-helper")) {
+    from(rootProject.file("host-helper")) {
+        include("bridle-helper", "shell-integration.bash", "shell-integration.zsh")
         into("com/kitefoldlabs/bridle/core/tmux")
     }
 }

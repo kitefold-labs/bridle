@@ -17,6 +17,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -73,6 +74,32 @@ class TerminalSessionTest {
             session.state.value
                 .shouldBeInstanceOf<TerminalState.Ended>()
                 .reason shouldBe "Closed"
+        }
+
+    @Test
+    fun `input is seen before it is written, and SFTP opens on the live connection`() =
+        runBlocking<Unit> {
+            val (session, connector) = setUp(AttachSpec.Shell)
+            val seen = mutableListOf<String>()
+            session.onInput = { seen += it.toString(Charsets.UTF_8) }
+            withTimeout(5.seconds) { session.state.first { it == TerminalState.Open } }
+
+            session.send("ls\r".toByteArray())
+            session.send(ByteArray(0))
+            seen shouldBe listOf("ls\r")
+            eventually {
+                connector.made
+                    .single()
+                    .shells
+                    .single()
+                    .writtenText() == "ls\r"
+            }
+
+            // FakeConnection has no SFTP: reaching it proves the session used the live connection.
+            shouldThrow<UnsupportedOperationException> { session.openSftp() }
+            connector.made.single().drop()
+            eventually { session.state.value != TerminalState.Open }
+            shouldThrow<IOException> { session.openSftp() }.message shouldBe "Not connected"
         }
 
     @Test

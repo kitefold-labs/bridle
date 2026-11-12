@@ -45,6 +45,7 @@ public fun TerminalScreen(
     Column(modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         TerminalStatusBanner(terminalState, onReconnect)
         TerminalPane(state, Modifier.weight(1f).fillMaxWidth())
+        state.suggestions?.let { Suggestions(it, state::acceptSuggestion) }
         if (state.isComposeOpen) ComposeBox(state, enterSends = composeEnterSends)
         Row(Modifier.fillMaxWidth()) {
             KeyBar(keyBarLayout, state.sticky, state::onKeyBarAction, Modifier.weight(1f))
@@ -52,6 +53,17 @@ public fun TerminalScreen(
         }
     }
     state.pendingSend?.let { PasteConfirmationDialog(it, state::confirmPendingSend, state::dismissPendingSend) }
+}
+
+/** The strip, once the shell has shown its integration; it then keeps its row even when empty. */
+@Composable
+private fun Suggestions(
+    suggestions: CommandLineSuggestions,
+    onAccept: (PathSuggestion) -> Unit,
+) {
+    val available by suggestions.available.collectAsState()
+    val current by suggestions.suggestions.collectAsState()
+    if (available) SuggestionStrip(current.items, onAccept)
 }
 
 /** Compose-box and keyboard toggles, as tall as the key bar so they stay in thumb reach. */

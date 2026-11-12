@@ -38,11 +38,13 @@ import androidx.core.content.ContextCompat
 import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.tmux.HostHelper
 import com.kitefoldlabs.bridle.core.tmux.HostProbe
+import com.kitefoldlabs.bridle.core.tmux.IntegratedShell
+import com.kitefoldlabs.bridle.core.tmux.ShellIntegration
 import com.kitefoldlabs.bridle.ui.theme.MonoFamily
 
 /**
  * What the host offers: tmux (with install instructions when it is missing or too old), Claude
- * Code, and bridle-helper (install or remove).
+ * Code, bridle-helper and the shell integration (install or remove each).
  */
 @Composable
 internal fun HostCapabilityCard(
@@ -74,6 +76,25 @@ internal fun HostCapabilityCard(
                     Text(stringResource(R.string.host_helper_remove))
                 }
             }
+            ShellIntegrationRow(probe.shellIntegration, actions)
+        }
+    }
+}
+
+@Composable
+private fun ShellIntegrationRow(
+    shells: Set<IntegratedShell>,
+    actions: SessionsActions,
+) {
+    if (shells.isEmpty()) {
+        Text(stringResource(R.string.host_shell_missing))
+        Button(onClick = actions::requestInstallShellIntegration) {
+            Text(stringResource(R.string.host_shell_install))
+        }
+    } else {
+        Text(stringResource(R.string.host_shell_installed, shells.sorted().joinToString(", ") { it.id }))
+        TextButton(onClick = actions::requestUninstallShellIntegration) {
+            Text(stringResource(R.string.host_shell_remove))
         }
     }
 }
@@ -107,6 +128,10 @@ internal fun SessionsDialogContent(
             SessionsDialog.ConfirmUninstallHelper ->
                 stringResource(R.string.uninstall_title) to
                     R.string.uninstall_confirm
+            SessionsDialog.InstallShellIntegration ->
+                stringResource(R.string.shell_install_title) to R.string.install_confirm
+            SessionsDialog.ConfirmUninstallShellIntegration ->
+                stringResource(R.string.shell_uninstall_title) to R.string.uninstall_confirm
         }
     AlertDialog(
         onDismissRequest = actions::dismissDialog,
@@ -117,6 +142,8 @@ internal fun SessionsDialogContent(
                 is SessionsDialog.ConfirmDeleteProfile -> Text(stringResource(R.string.delete_profile_body))
                 is SessionsDialog.InstallHelper -> InstallHelperBody(dialog.installHooks, actions::setInstallHooks)
                 SessionsDialog.ConfirmUninstallHelper -> Text(stringResource(R.string.uninstall_body))
+                SessionsDialog.InstallShellIntegration -> InstallShellIntegrationBody()
+                SessionsDialog.ConfirmUninstallShellIntegration -> Text(stringResource(R.string.shell_uninstall_body))
             }
         },
         confirmButton = { TextButton(onClick = actions::confirmDialog) { Text(stringResource(confirm)) } },
@@ -147,6 +174,26 @@ private fun InstallHelperBody(
         ) {
             Checkbox(checked = installHooks, onCheckedChange = null)
             Text(stringResource(R.string.install_hooks), modifier = Modifier.padding(start = 8.dp))
+        }
+    }
+}
+
+/** Consent for the shell integration: what it changes, and the checksum of each uploaded file. */
+@Composable
+private fun InstallShellIntegrationBody() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.shell_install_body))
+        Text(stringResource(R.string.install_checksum), style = MaterialTheme.typography.labelLarge)
+        val files =
+            listOf("bridle-helper" to HostHelper.sha256) +
+                IntegratedShell.entries.map { "shell-integration.${it.id}" to ShellIntegration.sha256(it) }
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                for ((name, sha) in files) {
+                    Text(name, style = MaterialTheme.typography.labelMedium)
+                    Text(sha, fontFamily = MonoFamily, style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
     }
 }

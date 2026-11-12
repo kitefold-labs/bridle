@@ -29,7 +29,7 @@ Start at the [documentation index](docs/README.md), which also lists the tutoria
 | [docs/02-architecture.md](docs/02-architecture.md) | System architecture, modules, data model, SSH and terminal layers, tmux and Claude session model, host helper, security |
 | [docs/03-implementation-plan.md](docs/03-implementation-plan.md) | Phased plan, milestones, spikes, testing strategy, risks |
 | [docs/host-helper.md](docs/host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
-| [docs/terminal-input.md](docs/terminal-input.md) | Key encodings, safe bracketed paste, and customising the extra-keys bar (JSON format) |
+| [docs/terminal-input.md](docs/terminal-input.md) | Key encodings, safe bracketed paste, customising the extra-keys bar (JSON format), and file-name suggestions |
 | [docs/backup-and-privacy.md](docs/backup-and-privacy.md) | What encrypted backups contain (and never contain), how they are encrypted, how crash reports are scrubbed and filed |
 | [docs/tutorials/01-first-connection.md](docs/tutorials/01-first-connection.md) | Tutorial: generate a key, add a host (with Tailscale tips), install the key, connect and verify the fingerprint |
 | [PRIVACY.md](PRIVACY.md) | Privacy policy: no data collection, no servers, opt-in crash reports you file yourself |

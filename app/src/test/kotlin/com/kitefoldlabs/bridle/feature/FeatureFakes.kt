@@ -23,6 +23,8 @@ import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminalui.CellMetrics
 import com.kitefoldlabs.bridle.core.terminalui.TerminalEngine
 import com.kitefoldlabs.bridle.core.terminalui.TerminalGridSize
@@ -48,6 +50,9 @@ class FakeEngine(
 
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
+    override val shellPrompt = MutableStateFlow(ShellPrompt())
+
+    @Volatile override var onShellEvent: ((ShellEvent) -> Unit)? = null
 
     @Volatile override var isBracketedPasteEnabled = true
     override val isApplicationCursorKeys = false
@@ -112,6 +117,9 @@ class ScriptedHost : SshConnection {
 
     @Volatile var helper = ""
 
+    /** The probe's `shell=` value: shells with the integration installed, e.g. " bash". */
+    @Volatile var shellIntegration = ""
+
     @Volatile var sessions: List<FakeSession> = emptyList()
 
     @Volatile var helperStates = ""
@@ -145,10 +153,12 @@ class ScriptedHost : SshConnection {
         val sep = ":|:"
         val out =
             when {
-                // The install script embeds the whole helper, so it is recognised first.
+                // The install scripts embed the whole helper, so they are recognised first.
+                "BRIDLE_SHELL_INSTALLED" in script -> "BRIDLE_SHELL_INSTALLED\n"
                 "BRIDLE_HELPER_INSTALLED" in script -> "BRIDLE_HELPER_INSTALLED\n"
+                "BRIDLE_SHELL_REMOVED" in script -> "BRIDLE_SHELL_REMOVED\n"
                 "uninstall-hooks" in script -> "removed\n"
-                "printf 'tmux=%s" in script -> "tmux=$tmux\nclaude=$claude\nhelper=$helper\n"
+                "printf 'tmux=%s" in script -> "tmux=$tmux\nclaude=$claude\nhelper=$helper\nshell=$shellIntegration\n"
                 "list-sessions" in script ->
                     sessions.joinToString(
                         "\n",

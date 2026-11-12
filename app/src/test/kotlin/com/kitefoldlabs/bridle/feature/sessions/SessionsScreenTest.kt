@@ -38,7 +38,9 @@ import com.kitefoldlabs.bridle.core.tmux.ClaudeState
 import com.kitefoldlabs.bridle.core.tmux.ClaudeStatus
 import com.kitefoldlabs.bridle.core.tmux.HostHelper
 import com.kitefoldlabs.bridle.core.tmux.HostProbe
+import com.kitefoldlabs.bridle.core.tmux.IntegratedShell
 import com.kitefoldlabs.bridle.core.tmux.SessionSummary
+import com.kitefoldlabs.bridle.core.tmux.ShellIntegration
 import com.kitefoldlabs.bridle.core.tmux.StatusSource
 import com.kitefoldlabs.bridle.core.tmux.TmuxPane
 import com.kitefoldlabs.bridle.core.tmux.TmuxSession
@@ -142,6 +144,14 @@ class RecordingSessionsActions : SessionsActions {
 
     override fun requestUninstallHelper() {
         calls += "uninstall"
+    }
+
+    override fun requestInstallShellIntegration() {
+        calls += "install shell"
+    }
+
+    override fun requestUninstallShellIntegration() {
+        calls += "uninstall shell"
     }
 
     override fun confirmDialog() {
@@ -248,6 +258,8 @@ class SessionsScreenTest {
                 full.copy(dialog = SessionsDialog.InstallHelper(installHooks = true)),
                 full.copy(dialog = SessionsDialog.InstallHelper(installHooks = false)),
                 full.copy(dialog = SessionsDialog.ConfirmUninstallHelper),
+                full.copy(dialog = SessionsDialog.InstallShellIntegration),
+                full.copy(dialog = SessionsDialog.ConfirmUninstallShellIntegration),
                 full.copy(editor = form),
                 full.copy(editor = form.copy(name = "", env = listOf(EnvVar("A"), EnvVar("")))),
                 full.copy(editor = form.copy(id = 3, env = listOf(EnvVar("B", "2")))),
@@ -396,6 +408,21 @@ class SessionsScreenTest {
     }
 
     @Test
+    fun `the host card offers and removes the shell integration`() {
+        var state by mutableStateOf(full)
+        rule.setContent { MaterialTheme { SessionsScreen(state, actions, now = now) } }
+        rule.onNodeWithText(string(R.string.host_shell_missing)).assertExists()
+        rule.onNodeWithText("Install shell integration").performClick()
+
+        val installed = setOf(IntegratedShell.ZSH, IntegratedShell.BASH)
+        state = full.copy(status = full.status.copy(probe = probe.copy(shellIntegration = installed)))
+        rule.onNodeWithText("Shell integration: bash, zsh").assertExists()
+        rule.onNodeWithText(string(R.string.host_shell_missing)).assertDoesNotExist()
+        rule.onNodeWithText("Remove shell integration").performClick()
+        actions.calls shouldBe listOf("install shell", "uninstall shell")
+    }
+
+    @Test
     fun `dialogs confirm or cancel`() {
         var state by mutableStateOf(full.copy(dialog = SessionsDialog.ConfirmStop("api")))
         rule.setContent { MaterialTheme { SessionsScreen(state, actions, now = now) } }
@@ -417,7 +444,19 @@ class SessionsScreenTest {
         state = full.copy(dialog = SessionsDialog.ConfirmUninstallHelper)
         rule.onNodeWithText("Remove bridle-helper?").assertExists()
         rule.onNodeWithText("Remove").performClick()
-        actions.calls shouldBe listOf("dismiss", "confirm", "hooks false", "confirm", "confirm")
+
+        state = full.copy(dialog = SessionsDialog.InstallShellIntegration)
+        rule.onNodeWithText("Install shell integration?").assertExists()
+        rule.onNodeWithText("shell-integration.zsh").assertExists()
+        rule.onNodeWithText(ShellIntegration.sha256(IntegratedShell.BASH)).assertExists()
+        rule.onNodeWithText(HostHelper.sha256).assertExists()
+        rule.onNodeWithText("Install").performClick()
+
+        state = full.copy(dialog = SessionsDialog.ConfirmUninstallShellIntegration)
+        rule.onNodeWithText("Remove shell integration?").assertExists()
+        rule.onNodeWithText(string(R.string.shell_uninstall_body)).assertExists()
+        rule.onNodeWithText("Remove").performClick()
+        actions.calls shouldBe listOf("dismiss", "confirm", "hooks false", "confirm", "confirm", "confirm", "confirm")
     }
 
     @Test

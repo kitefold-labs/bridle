@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.core.session
 
 import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
+import com.kitefoldlabs.bridle.core.ssh.SftpSession
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.core.tmux.TmuxScripts
@@ -112,9 +113,30 @@ public class TerminalSession(
             }
     }
 
+    /**
+     * Sees every input [send] queues, on the caller's thread, before it is written. Everything
+     * typed into the tab goes through [send] (keyboard, key bar, paste, compose box, snippets),
+     * so this sees all of it.
+     */
+    @Volatile
+    public var onInput: ((ByteArray) -> Unit)? = null
+
     /** Sends keystrokes/paste bytes to the remote side. Ignored when not open. */
     public fun send(bytes: ByteArray) {
-        if (bytes.isNotEmpty()) input.trySend(bytes)
+        if (bytes.isEmpty()) return
+        onInput?.invoke(bytes)
+        input.trySend(bytes)
+    }
+
+    /**
+     * Opens an SFTP session on the host's current connection. Fails at once, without waiting,
+     * while the host is not connected.
+     *
+     * @throws IOException if the host is not connected.
+     */
+    public suspend fun openSftp(): SftpSession {
+        val connected = lease.state.value as? HostConnectionState.Connected ?: throw IOException("Not connected")
+        return connected.connection.openSftp()
     }
 
     /** Tells the server the terminal size changed (rotation, font zoom, split screen). */

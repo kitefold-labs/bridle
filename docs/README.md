@@ -20,7 +20,7 @@ Step-by-step guides for using the app.
 | Doc | What it covers |
 |-----|----------------|
 | [host-helper.md](host-helper.md) | The optional `bridle-helper` script for accurate Claude status |
-| [terminal-input.md](terminal-input.md) | Key encodings, safe bracketed paste, customising the extra-keys bar |
+| [terminal-input.md](terminal-input.md) | Key encodings, safe bracketed paste, customising the extra-keys bar, file-name suggestions |
 | [backup-and-privacy.md](backup-and-privacy.md) | What backups contain, how they are encrypted, how crash reports are scrubbed |
 
 ## Design
@@ -30,6 +30,7 @@ Step-by-step guides for using the app.
 | [01-product-and-competitive-review.md](01-product-and-competitive-review.md) | Goals, users, competitive review, feature list |
 | [02-architecture.md](02-architecture.md) | Modules, data model, SSH and terminal layers, tmux/Claude model, security |
 | [03-implementation-plan.md](03-implementation-plan.md) | Phases, testing strategy, risks, decisions |
+| [command-line-suggestions.md](command-line-suggestions.md) | Design and spike results for file-name suggestions at the shell prompt |
 | [adr/](adr/) | Architecture decision records |
 
 ## Contributing and releasing

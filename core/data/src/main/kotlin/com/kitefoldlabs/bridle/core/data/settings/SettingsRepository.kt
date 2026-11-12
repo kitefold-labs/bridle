@@ -75,6 +75,8 @@ public class SettingsRepository(
 
     public suspend fun setRememberComposeHistory(enabled: Boolean): Unit = update { it[COMPOSE_HISTORY] = enabled }
 
+    public suspend fun setCommandLineSuggestions(enabled: Boolean): Unit = update { it[SUGGESTIONS] = enabled }
+
     public suspend fun setComposeEnterSends(enabled: Boolean): Unit = update { it[COMPOSE_ENTER_SENDS] = enabled }
 
     public suspend fun setNotificationsEnabled(enabled: Boolean): Unit = update { it[NOTIFICATIONS] = enabled }
@@ -123,6 +125,7 @@ public class SettingsRepository(
         internal val SECURE_SCREEN = booleanPreferencesKey("secure_screen_enabled")
         internal val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         internal val COMPOSE_HISTORY = booleanPreferencesKey("remember_compose_history")
+        internal val SUGGESTIONS = booleanPreferencesKey("command_line_suggestions")
         internal val COMPOSE_ENTER_SENDS = booleanPreferencesKey("compose_enter_sends")
         internal val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
         internal val CRASH_REPORTING = booleanPreferencesKey("crash_reporting_opt_in")
@@ -175,6 +178,7 @@ public class SettingsRepository(
                 secureScreenEnabled = prefs[SECURE_SCREEN] ?: defaults.secureScreenEnabled,
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
                 rememberComposeHistory = prefs[COMPOSE_HISTORY] ?: defaults.rememberComposeHistory,
+                commandLineSuggestions = prefs[SUGGESTIONS] ?: defaults.commandLineSuggestions,
                 composeEnterSends = prefs[COMPOSE_ENTER_SENDS] ?: defaults.composeEnterSends,
                 notificationsEnabled = prefs[NOTIFICATIONS] ?: defaults.notificationsEnabled,
                 notificationEvents =

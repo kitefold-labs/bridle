@@ -184,6 +184,7 @@ class TerminalTabsViewModel
             }
             for (tab in tabs) {
                 val attachment = tab.attachment as? TerminalAttachment
+                attachment?.suggestions?.enabled?.value = current.commandLineSuggestions
                 if (attachment != null &&
                     tab.id !in tabScreens
                 ) {
@@ -217,6 +218,7 @@ class TerminalTabsViewModel
                             max = Settings.MAX_FONT_SIZE_SP.toFloat(),
                             default = current.terminalFontSizeSp.toFloat(),
                         ),
+                    suggestions = attachment.suggestions,
                 )
             // A submission clears the compose text: that is when history may have changed.
             scope.launch { snapshotFlow { state.composeText }.collect { persistHistory(tab.hostId) } }

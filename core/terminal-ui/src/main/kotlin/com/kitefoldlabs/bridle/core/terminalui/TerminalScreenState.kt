@@ -77,6 +77,8 @@ public class TerminalScreenState(
     initialFontSizeSp: Float = fontBounds.default,
     private val resizeDebounce: Duration = DEFAULT_RESIZE_DEBOUNCE,
     private val clock: () -> Long = ::monotonicMillis,
+    /** File-name suggestions for the tab, shown in a strip; null for none. */
+    public val suggestions: CommandLineSuggestions? = null,
 ) : TerminalViewHost {
     /** Connecting, open, reattaching or ended; drives [TerminalStatusBanner]. */
     public val terminalState: StateFlow<TerminalState> get() = connection.state
@@ -177,6 +179,11 @@ public class TerminalScreenState(
     public fun onKeyBarAction(action: KeyAction) {
         val bytes = dispatcher.onKeyBarAction(action, clock(), engine.isApplicationCursorKeys)
         if (bytes.isNotEmpty()) connection.send(bytes)
+    }
+
+    /** Types the rest of [suggestion], unless the line has changed since it was suggested. */
+    public fun acceptSuggestion(suggestion: PathSuggestion) {
+        suggestions?.accept(suggestion)?.let(connection::send)
     }
 
     /** Turns sticky Ctrl/Alt off, e.g. when leaving the screen. */

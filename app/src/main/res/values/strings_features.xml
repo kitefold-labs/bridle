@@ -125,6 +125,8 @@
     <string name="settings_compose_enter_sends_summary">The keyboard\'s Enter sends what you typed, so swipe typing and autocorrect work for every command. Off: Enter starts a new line and only Send sends.</string>
     <string name="settings_compose_history">Remember compose history</string>
     <string name="settings_compose_history_summary">Save what you send from the compose box on this phone, so ↑ finds it later. Off: forgotten when Bridle closes, and saved history is deleted.</string>
+    <string name="settings_suggestions">Suggest file names</string>
+    <string name="settings_suggestions_summary">While you type at a bash or zsh prompt, show matching files and folders above the keys. Needs the host\'s shell integration (Sessions → This host).</string>
     <string name="settings_keyboard">Keyboard</string>
     <string name="settings_key_bar">Extra keys bar</string>
     <string name="key_bar_default">Default</string>

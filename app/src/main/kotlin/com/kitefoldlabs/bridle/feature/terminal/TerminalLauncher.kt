@@ -6,9 +6,12 @@ import com.kitefoldlabs.bridle.core.data.HostRepository
 import com.kitefoldlabs.bridle.core.model.EntityId
 import com.kitefoldlabs.bridle.core.model.Host
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.core.session.TerminalSession
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
+import com.kitefoldlabs.bridle.core.terminalui.CommandLineSuggestions
 import com.kitefoldlabs.bridle.core.terminalui.EngineSink
+import com.kitefoldlabs.bridle.core.terminalui.PathCompleter
 import com.kitefoldlabs.bridle.core.terminalui.asTerminalConnection
 import com.kitefoldlabs.bridle.core.terminalui.sendRemoteInputTo
 import com.kitefoldlabs.bridle.di.ApplicationScope
@@ -20,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -109,7 +113,10 @@ class TerminalLauncher
             spec: AttachSpec,
         ): TerminalTab {
             val engine = engines.create()
-            val attachment = TerminalAttachment(engine, EngineSink(engine))
+            // The completer lists files over SFTP on the tab's connection, once the session exists.
+            var session: TerminalSession? = null
+            val completer = PathCompleter({ session?.openSftp() ?: throw IOException("Not connected") })
+            val attachment = TerminalAttachment(engine, EngineSink(engine), CommandLineSuggestions(engine, completer))
             val grid = engine.size.value
             val tab =
                 try {
@@ -120,7 +127,11 @@ class TerminalLauncher
                         sink = attachment.sink,
                         size = PtySpec(grid.columns, grid.rows),
                         attachment = attachment,
-                        onCreated = { session -> engine.sendRemoteInputTo(session.asTerminalConnection()) },
+                        onCreated = { created ->
+                            session = created
+                            engine.sendRemoteInputTo(created.asTerminalConnection())
+                            attachment.suggestions?.follow(created)
+                        },
                     )
                 } catch (
                     @Suppress("TooGenericExceptionCaught") e: Throwable,

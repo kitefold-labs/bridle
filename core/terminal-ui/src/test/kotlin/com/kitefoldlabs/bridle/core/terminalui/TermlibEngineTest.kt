@@ -5,12 +5,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.connectbot.terminal.SelectionController
 import org.connectbot.terminal.SelectionMode
 import org.connectbot.terminal.TerminalDimensions
@@ -67,6 +69,13 @@ class TermlibEngineTest {
         shouldThrow<LinkageError> { engine.feed(bytes, 0, bytes.size) }
         engine.isBracketedPasteEnabled shouldBe true
         engine.title.value shouldBe "claude"
+        val events = mutableListOf<ShellEvent>()
+        engine.onShellEvent = { events += it }
+        engine.onShellEvent shouldNotBe null
+        val prompt = "\u001b]133;A\u0007".toByteArray()
+        shouldThrow<LinkageError> { engine.feed(prompt, 0, prompt.size) }
+        events shouldBe listOf(ShellEvent.PromptStart())
+        engine.shellPrompt.value.atPrompt shouldBe true
         shouldThrow<LinkageError> { engine.resize(TerminalGridSize(100, 30)) }
         shouldThrow<LinkageError> { engine.resize(TerminalGridSize(80, 30)) }
     }

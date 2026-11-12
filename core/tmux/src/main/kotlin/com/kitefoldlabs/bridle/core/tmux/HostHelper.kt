@@ -11,8 +11,11 @@ import java.security.MessageDigest
 public object HostHelper {
     public const val PROTOCOL_VERSION: Int = 1
 
-    /** Where the helper is installed (`~` is the remote home directory). */
-    public const val INSTALL_PATH: String = "~/.local/share/bridle/bridle-helper"
+    /** The directory Bridle installs files to on the host (`~` is the remote home directory). */
+    public const val SHARE_DIR: String = "~/.local/share/bridle"
+
+    /** Where the helper is installed. */
+    public const val INSTALL_PATH: String = "$SHARE_DIR/bridle-helper"
 
     /**
      * Where the build puts the host scripts on the classpath. Absolute, because R8 moves classes
@@ -43,37 +46,50 @@ public object HostHelper {
     public fun installScript(
         content: String = script,
         installHooks: Boolean,
-    ): String {
-        require(content.lines().none { it == HEREDOC }) { "Helper content collides with the heredoc delimiter" }
-        val expected = sha256Hex(content.toByteArray(Charsets.UTF_8))
-        val path = ShellQuote.quotePath(INSTALL_PATH)
-        val hooks = if (installHooks) "$path install-hooks || exit 3" else ""
-        val text = if (content.endsWith("\n")) content else "$content\n"
-        return buildString {
+    ): String =
+        buildString {
             appendLine("set -e")
             appendLine("umask 077")
-            appendLine("mkdir -p ~/.local/share/bridle")
-            appendLine("tmp=\$(mktemp ~/.local/share/bridle/.helper.XXXXXX)")
-            appendLine("cat > \"\$tmp\" <<'$HEREDOC'")
-            append(text)
-            appendLine(HEREDOC)
-            appendLine("if command -v sha256sum >/dev/null 2>&1; then sum=\$(sha256sum \"\$tmp\" | cut -d' ' -f1);")
-            appendLine("else sum=\$(shasum -a 256 \"\$tmp\" | cut -d' ' -f1); fi")
-            appendLine(
-                "if [ \"\$sum\" != ${ShellQuote.quote(expected)} ]; then rm -f \"\$tmp\"; " +
-                    "echo 'checksum mismatch' >&2; exit 4; fi",
-            )
-            appendLine("chmod 700 \"\$tmp\"")
-            appendLine("mv -f \"\$tmp\" $path")
-            if (hooks.isNotEmpty()) appendLine(hooks)
+            appendLine("mkdir -p $SHARE_DIR")
+            appendUpload(content, INSTALL_PATH, executable = true)
+            if (installHooks) appendLine("${ShellQuote.quotePath(INSTALL_PATH)} install-hooks || exit 3")
             appendLine("echo $INSTALLED_MARKER")
         }
+
+    /**
+     * Lines that write [content] to [path] under [SHARE_DIR] through a temporary file, and move
+     * it into place only if its SHA-256 matches. Expects `set -e` and `umask 077`.
+     */
+    internal fun StringBuilder.appendUpload(
+        content: String,
+        path: String,
+        executable: Boolean,
+    ) {
+        require(content.lines().none { it == HEREDOC }) { "Upload content collides with the heredoc delimiter" }
+        val expected = sha256Hex(content.toByteArray(Charsets.UTF_8))
+        val text = if (content.endsWith("\n")) content else "$content\n"
+        appendLine("tmp=\$(mktemp $SHARE_DIR/.upload.XXXXXX)")
+        appendLine("cat > \"\$tmp\" <<'$HEREDOC'")
+        append(text)
+        appendLine(HEREDOC)
+        appendLine("if command -v sha256sum >/dev/null 2>&1; then sum=\$(sha256sum \"\$tmp\" | cut -d' ' -f1);")
+        appendLine("else sum=\$(shasum -a 256 \"\$tmp\" | cut -d' ' -f1); fi")
+        appendLine(
+            "if [ \"\$sum\" != ${ShellQuote.quote(expected)} ]; then rm -f \"\$tmp\"; " +
+                "echo 'checksum mismatch' >&2; exit 4; fi",
+        )
+        if (executable) appendLine("chmod 700 \"\$tmp\"")
+        appendLine("mv -f \"\$tmp\" ${ShellQuote.quotePath(path)}")
     }
 
-    /** Removes the hooks and the helper (state files are left for the user to delete). */
+    /**
+     * Removes the hooks, the shell integration and the helper (state files are left for the user
+     * to delete). Helpers older than `uninstall-shell` reject it, which is ignored.
+     */
     public fun uninstallScript(): String {
         val path = ShellQuote.quotePath(INSTALL_PATH)
-        return "if [ -x $path ]; then $path uninstall-hooks || true; rm -f $path; fi\necho removed\n"
+        return "if [ -x $path ]; then $path uninstall-hooks || true; $path uninstall-shell || true; rm -f $path; fi\n" +
+            "echo removed\n"
     }
 
     /** Command that prints all session states, one JSON object per line. */

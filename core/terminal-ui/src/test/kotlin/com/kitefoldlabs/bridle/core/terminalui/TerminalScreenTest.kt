@@ -7,6 +7,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalUriHandler
@@ -24,17 +26,21 @@ import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.ComposeHistory
 import com.kitefoldlabs.bridle.core.terminal.KeyBarLayout
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.floats.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -68,6 +74,33 @@ class TerminalScreenTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `the suggestion strip appears with the shell integration and a tap types the rest`() {
+        val sftp = FakeSftp(mapOf("/home/me/" to listOf(dir("work"), entry("wiki.txt"))))
+        val suggestions = CommandLineSuggestions(engine, PathCompleter({ sftp }), Dispatchers.Default, Duration.ZERO)
+        rule.setContent {
+            MaterialTheme {
+                val scope = rememberCoroutineScope()
+                state = remember { TerminalScreenState(engine, connection, scope, suggestions = suggestions) }
+                TerminalScreen(state, onReconnect = {})
+            }
+        }
+        rule.onNodeWithContentDescription("Complete work/").assertDoesNotExist()
+
+        engine.shellPrompt.value = ShellPrompt(active = true, atPrompt = true, directories = mapOf(null to "/home/me"))
+        engine.onShellEvent!!(ShellEvent.PromptStart())
+        suggestions.onInput("cd w".toByteArray())
+        rule.waitUntil(TIMEOUT_MS) {
+            rule.onAllNodesWithContentDescription("Complete work/").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithContentDescription("Complete wiki.txt").assertExists()
+        rule.onNodeWithText("work/", useUnmergedTree = true).assertExists()
+
+        rule.onNodeWithContentDescription("Complete work/").performClick()
+        connection.sentText() shouldBe "ork/"
+        suggestions.close()
     }
 
     @Test
@@ -222,5 +255,9 @@ class TerminalScreenTest {
         show(KeyBarLayout(listOf(KeyBarLayout.DEFAULT.rows.first())))
         rule.onNodeWithContentDescription("Open compose box").assertExists()
         rule.onNodeWithContentDescription("Tab").assertDoesNotExist()
+    }
+
+    private companion object {
+        const val TIMEOUT_MS = 5_000L
     }
 }

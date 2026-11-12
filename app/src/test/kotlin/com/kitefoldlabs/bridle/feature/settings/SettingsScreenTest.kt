@@ -128,6 +128,8 @@ class SettingsScreenTest {
         eventually { settings().keepScreenOn }
         click("Remember compose history")
         eventually { !settings().rememberComposeHistory }
+        click("Suggest file names")
+        eventually { !settings().commandLineSuggestions }
         click("Extra keys bar")
         clickInDialog("Claude Code")
         waitForText("Claude Code")

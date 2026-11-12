@@ -8,6 +8,7 @@ import com.kitefoldlabs.bridle.R
 import com.kitefoldlabs.bridle.core.model.LaunchProfile
 import com.kitefoldlabs.bridle.core.model.RestartMode
 import com.kitefoldlabs.bridle.core.session.AttachSpec
+import com.kitefoldlabs.bridle.core.tmux.IntegratedShell
 import com.kitefoldlabs.bridle.core.tmux.SessionSummary
 import com.kitefoldlabs.bridle.core.tmux.TmuxPane
 import com.kitefoldlabs.bridle.core.tmux.TmuxSession
@@ -272,6 +273,25 @@ class SessionsViewModelTest {
             awaitUntil { state.dialog != null }
             vm.dismissDialog()
             awaitUntil { state.dialog == null }
+        }
+
+    @Test
+    fun `the shell integration is installed with consent and removed`() =
+        runBlocking<Unit> {
+            selectedHost()
+            vm.requestInstallShellIntegration()
+            awaitUntil { state.dialog == SessionsDialog.InstallShellIntegration }
+            host.shellIntegration = " bash" // what the host reports once installed
+            vm.confirmDialog()
+            awaitMessage() shouldBe UserMessage(R.string.sessions_shell_installed)
+            lastScript("BRIDLE_SHELL_INSTALLED") shouldContain "bridle-helper install-shell\n"
+            awaitUntil { state.status.probe?.shellIntegration == setOf(IntegratedShell.BASH) } // re-probed
+
+            vm.requestUninstallShellIntegration()
+            awaitUntil { state.dialog == SessionsDialog.ConfirmUninstallShellIntegration }
+            vm.confirmDialog()
+            awaitMessage() shouldBe UserMessage(R.string.sessions_shell_removed)
+            lastScript("BRIDLE_SHELL_REMOVED") shouldContain "uninstall-shell"
         }
 
     @Test

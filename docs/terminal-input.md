@@ -139,6 +139,29 @@ A layout that breaks a rule is rejected with a message naming the field, for exa
 - **Claude**: ESC (swipe up for ESC ESC, which rewinds), ⇧TAB (cycle permission mode), ^C, `/`,
   ↑, Enter on the first row; `y`, `n`, `/compact`, `/clear`, `/resume`, ↓ on the second.
 
+## File-name suggestions
+
+On a host with Bridle's shell integration (**Sessions → This host → Install shell
+integration**), a strip above the key bar suggests file and folder names while you type at a
+bash or zsh prompt. Tap a chip to type the rest of the name: folders end in `/` and their
+contents come up next. Enter is unchanged and runs exactly what you typed. Turn suggestions off
+with **Settings → Suggest file names**.
+
+- The strip appears once the shell reports its first prompt and then keeps its row, so the
+  terminal doesn't change size as suggestions come and go.
+- Bridle follows what you type from the keys it sends. After Tab, arrow keys, history or a tmux
+  pane switch it can't tell what the line holds, so the strip stays empty until the next prompt.
+- Names are listed over SFTP on the existing connection, once per folder per prompt. Folders
+  come first; hidden files appear when you type a leading `.`.
+- Names are escaped for how the line is quoted (`my\ file`, `'it'\''s'`). A name with `!` is
+  not offered inside double quotes, where bash and zsh would expand it.
+- Words the shell would expand (`$VAR`, `*`, `{a,b}`, backticks, `~user`) get no suggestions.
+
+Any program can print the codes the shell integration uses, for example a file shown with
+`cat`. The worst this can do is list real files you can already read; a tap only types the
+escaped name and never presses Enter. See
+[command-line-suggestions.md](command-line-suggestions.md) for the design.
+
 ## Compose history
 
 Each host keeps its last 200 compose-box submissions, most recent first and without duplicates.

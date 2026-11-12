@@ -155,6 +155,12 @@ private fun LazyListScope.appearance(
             checked = settings.rememberComposeHistory,
             onChange = viewModel::setRememberComposeHistory,
         )
+        SwitchRow(
+            title = stringResource(R.string.settings_suggestions),
+            summary = stringResource(R.string.settings_suggestions_summary),
+            checked = settings.commandLineSuggestions,
+            onChange = viewModel::setCommandLineSuggestions,
+        )
     }
 }
 

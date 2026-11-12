@@ -2,6 +2,8 @@ package com.kitefoldlabs.bridle.core.terminalui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.kitefoldlabs.bridle.core.terminal.ShellEvent
+import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
 import kotlinx.coroutines.flow.StateFlow
 
@@ -34,6 +36,15 @@ public interface TerminalEngine : AutoCloseable {
 
     /** True while the remote program has application cursor keys on (DECCKM, `CSI ? 1 h`). */
     public val isApplicationCursorKeys: Boolean
+
+    /** What the shell integration (OSC 133 and OSC 7) has reported. */
+    public val shellPrompt: StateFlow<ShellPrompt>
+
+    /**
+     * Receives each shell integration event in output order, on the thread that calls [feed],
+     * after [shellPrompt] reflects it.
+     */
+    public var onShellEvent: ((ShellEvent) -> Unit)?
 
     /**
      * Receives bytes the emulator generates for the remote side: replies to queries (device

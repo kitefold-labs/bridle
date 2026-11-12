@@ -85,6 +85,8 @@ class SettingsViewModel
 
         fun setKeepScreenOn(enabled: Boolean) = write { setKeepScreenOn(enabled) }
 
+        fun setCommandLineSuggestions(enabled: Boolean) = write { setCommandLineSuggestions(enabled) }
+
         /** Turning it off also deletes the history already saved, for every host. */
         fun setRememberComposeHistory(enabled: Boolean) =
             write {

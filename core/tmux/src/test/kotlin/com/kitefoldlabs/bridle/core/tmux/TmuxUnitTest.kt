@@ -87,6 +87,26 @@ class TmuxUnitTest {
     }
 
     @Test
+    fun `shell integration bundle, scripts and probe parsing`() {
+        ShellIntegration.script(IntegratedShell.BASH) shouldContain "PROMPT_COMMAND"
+        ShellIntegration.script(IntegratedShell.ZSH) shouldContain "precmd_functions"
+        ShellIntegration.path(IntegratedShell.ZSH) shouldBe "~/.local/share/bridle/shell-integration.zsh"
+
+        val install = ShellIntegration.installScript(setOf(IntegratedShell.ZSH, IntegratedShell.BASH))
+        install shouldContain "~/.local/share/bridle/bridle-helper install-shell bash zsh\n"
+        install shouldContain "mv -f \"\$tmp\" ~/.local/share/bridle/shell-integration.bash"
+        ShellIntegration.installScript() shouldContain "bridle-helper install-shell\n"
+        ShellIntegration.uninstallScript() shouldContain "uninstall-shell"
+        HostHelper.uninstallScript() shouldContain "uninstall-shell || true"
+
+        TmuxParsers.parseProbe("shell= bash zsh fish\n").shellIntegration shouldBe
+            setOf(IntegratedShell.BASH, IntegratedShell.ZSH)
+        TmuxParsers.parseProbe("shell=\n").shellIntegration shouldBe emptySet()
+        TmuxParsers.parseProbe("").shellIntegration shouldBe emptySet()
+        IntegratedShell.fromId("fish") shouldBe null
+    }
+
+    @Test
     fun `probe and list parsing tolerate garbage`() {
         val probe = TmuxParsers.parseProbe("tmux=tmux 3.4\nclaude=\nhelper=bridle-helper 1\nnoise\n")
         probe shouldBe HostProbe(TmuxVersion(3, 4), null, 1)

@@ -146,6 +146,24 @@ class TerminalTabsViewModelTest {
         }
 
     @Test
+    fun `screens get the tab's suggestions, switched by the setting`() =
+        runBlocking<Unit> {
+            val vm = viewModel()
+            val tab = launcher.openTerminal(world.addHost())
+            awaitUntil { vm.screens.value[tab.id] != null }
+            val suggestions = (tab.attachment as TerminalAttachment).suggestions!!
+            vm.screens.value
+                .getValue(tab.id)
+                .suggestions shouldBe suggestions
+            suggestions.enabled.value shouldBe true
+
+            world.data.settings.setCommandLineSuggestions(false)
+            awaitUntil { !suggestions.enabled.value }
+            world.data.settings.setCommandLineSuggestions(true)
+            awaitUntil { suggestions.enabled.value }
+        }
+
+    @Test
     fun `tabs without an emulator get no screen`() =
         runBlocking<Unit> {
             val vm = viewModel()
