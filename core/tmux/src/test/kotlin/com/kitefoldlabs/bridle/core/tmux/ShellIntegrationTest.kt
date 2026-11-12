@@ -47,13 +47,9 @@ class ShellIntegrationTest {
         Files.createDirectories(share)
         share.resolve("bridle-helper").writeText(HostHelper.script)
         for (shell in listOf("bash", "zsh")) {
-            share.resolve("shell-integration.$shell").writeText(resource("shell-integration.$shell"))
+            share.resolve("shell-integration.$shell").writeText(HostHelper.resource("shell-integration.$shell"))
         }
     }
-
-    private fun resource(name: String): String =
-        checkNotNull(HostHelper::class.java.getResourceAsStream(name)) { "$name resource missing" }
-            .use { it.readBytes().toString(Charsets.UTF_8) }
 
     private fun run(
         command: List<String>,

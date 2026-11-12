@@ -17,17 +17,23 @@ public object HostHelper {
     /** Where the helper is installed. */
     public const val INSTALL_PATH: String = "$SHARE_DIR/bridle-helper"
 
-    private const val RESOURCE = "bridle-helper"
+    /**
+     * Where the build puts the host scripts on the classpath. Absolute, because R8 moves classes
+     * out of this package and a lookup relative to the class would then miss.
+     */
+    private const val RESOURCE_DIR = "/com/kitefoldlabs/bridle/core/tmux"
     private const val HEREDOC = "BRIDLE_HELPER_EOF_7f3a"
     internal const val INSTALLED_MARKER = "BRIDLE_HELPER_INSTALLED"
 
     private val json = Json { ignoreUnknownKeys = true }
 
     /** The helper script bundled with this build. */
-    public val script: String by lazy {
-        val stream =
-            checkNotNull(HostHelper::class.java.getResourceAsStream(RESOURCE)) { "bridle-helper resource missing" }
-        stream.use { it.readBytes().toString(Charsets.UTF_8) }
+    public val script: String by lazy { resource("bridle-helper") }
+
+    /** Reads the bundled host script [name]. */
+    internal fun resource(name: String): String {
+        val stream = HostHelper::class.java.getResourceAsStream("$RESOURCE_DIR/$name")
+        return checkNotNull(stream) { "$name resource missing" }.use { it.readBytes().toString(Charsets.UTF_8) }
     }
 
     /** SHA-256 of [script], shown to the user before installing and verified after upload. */

@@ -31,11 +31,7 @@ public object ShellIntegration {
     public fun path(shell: IntegratedShell): String = "${HostHelper.SHARE_DIR}/shell-integration.${shell.id}"
 
     private val scripts: Map<IntegratedShell, String> by lazy {
-        IntegratedShell.entries.associateWith { shell ->
-            val name = "shell-integration.${shell.id}"
-            val stream = ShellIntegration::class.java.getResourceAsStream(name)
-            checkNotNull(stream) { "$name resource missing" }.use { it.readBytes().toString(Charsets.UTF_8) }
-        }
+        IntegratedShell.entries.associateWith { shell -> HostHelper.resource("shell-integration.${shell.id}") }
     }
 
     /** The script for [shell] bundled with this build. */
