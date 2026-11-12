@@ -86,7 +86,8 @@ Bridle has no crash-reporting SDK and sends nothing automatically.
    that would be sent.
 3. If you agree, Bridle opens a pre-filled GitHub issue in your browser, using the repository's
    *Crash report* template. Nothing is sent until you press **Submit** on GitHub, and you can
-   edit or delete anything first.
+   edit or delete anything first. It also copies the report and your notes to the clipboard: the
+   GitHub app keeps only the issue title, so paste the report in if the form is empty.
 
 ### What a report contains
 

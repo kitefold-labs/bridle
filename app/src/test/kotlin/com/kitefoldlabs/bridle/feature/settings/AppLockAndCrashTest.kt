@@ -130,6 +130,9 @@ class AppLockAndCrashTest {
         val url = vm.issueUrl(vm.prompt.value!!.report, "  tapped connect  ")
         url shouldStartWith "https://github.com/"
         url shouldContain "tapped"
+        val report = vm.prompt.value!!.report
+        vm.clipText(report, "  tapped connect  ") shouldBe "tapped connect\n\n${report.text}"
+        vm.clipText(report, "  ") shouldBe report.text
         reporter.pending().shouldNotBeNull() // kept until the page has opened
         vm.discard()
         vm.prompt.value.shouldBeNull()
