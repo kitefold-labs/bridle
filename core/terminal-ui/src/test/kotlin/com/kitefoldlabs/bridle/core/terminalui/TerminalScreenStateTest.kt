@@ -6,6 +6,7 @@ import com.kitefoldlabs.bridle.core.terminal.ComposeHistory
 import com.kitefoldlabs.bridle.core.terminal.Key
 import com.kitefoldlabs.bridle.core.terminal.KeyAction
 import com.kitefoldlabs.bridle.core.terminal.ModifierState
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.StickyModifier
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -85,6 +86,43 @@ class TerminalScreenStateTest {
         shouldThrow<IllegalArgumentException> { TerminalGridSize(0, 1) }
         shouldThrow<IllegalArgumentException> { TerminalGridSize(1, 0) }
     }
+
+    @Test
+    fun `scroll gestures go to the remote only on the alternate screen`() =
+        runTest {
+            val state = screen()
+            state.takesScrollGesture shouldBe false
+            engine.isAlternateScreen = true
+            state.takesScrollGesture shouldBe true
+        }
+
+    @Test
+    fun `scroll gestures become cursor keys without mouse reporting`() =
+        runTest {
+            val state = screen()
+            state.onScrollGesture(2, column = 1, row = 1)
+            state.onScrollGesture(-1, column = 1, row = 1)
+            connection.sentText() shouldBe "\u001b[A\u001b[A\u001b[B"
+            engine.isApplicationCursorKeys = true
+            state.onScrollGesture(1, column = 1, row = 1)
+            connection.sentText() shouldBe "\u001b[A\u001b[A\u001b[B\u001bOA"
+            state.onScrollGesture(0, column = 1, row = 1)
+            connection.sent.size shouldBe 3
+        }
+
+    @Test
+    fun `scroll gestures become wheel events when the program wants the mouse`() =
+        runTest {
+            val state = screen()
+            engine.mouseReporting = MouseReporting.SGR
+            state.onScrollGesture(1, column = 7, row = 4)
+            state.onScrollGesture(-2, column = 7, row = 5)
+            connection.sentText() shouldBe "\u001b[<64;7;4M\u001b[<65;7;5M\u001b[<65;7;5M"
+            engine.mouseReporting = MouseReporting.X10
+            state.onScrollGesture(1, column = 1, row = 2)
+            String(connection.sent.last(), Charsets.ISO_8859_1) shouldBe "\u001b[M\u0060!\""
+            state.sticky.ctrl shouldBe ModifierState.OFF
+        }
 
     @Test
     fun `pinch zoom scales the font within bounds`() =

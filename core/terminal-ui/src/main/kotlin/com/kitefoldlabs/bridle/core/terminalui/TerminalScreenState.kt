@@ -11,6 +11,7 @@ import com.kitefoldlabs.bridle.core.terminal.ComposeHistory
 import com.kitefoldlabs.bridle.core.terminal.InputDispatcher
 import com.kitefoldlabs.bridle.core.terminal.Key
 import com.kitefoldlabs.bridle.core.terminal.KeyAction
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
 import com.kitefoldlabs.bridle.core.terminal.StickyState
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -172,6 +174,42 @@ public class TerminalScreenState(
 
     /** Copies the emulator's selection to the clipboard and returns it, or null if none. */
     public fun copySelection(): String? = engine.copySelection()
+
+    /**
+     * True when a one-finger vertical drag should go to the remote program instead of the
+     * engine's scrollback: on the alternate screen (vim, less, an attached tmux) the engine
+     * has nothing to scroll, and the program keeps its own history.
+     */
+    public val takesScrollGesture: Boolean get() = engine.isAlternateScreen
+
+    /**
+     * A vertical drag of [lines] whole lines (positive when the finger moved down, i.e. towards
+     * earlier output) with the finger at the 1-based cell [column], [row]. Sent as mouse-wheel
+     * events when the program asked for the mouse (tmux with `mouse on` scrolls its history),
+     * otherwise as Up/Down keys, like a desktop terminal on the alternate screen. Sticky
+     * modifiers are left alone.
+     */
+    public fun onScrollGesture(
+        lines: Int,
+        column: Int,
+        row: Int,
+    ) {
+        if (lines == 0) return
+        val up = lines > 0
+        val encoder = dispatcher.encoder
+        val notch =
+            when (engine.mouseReporting) {
+                MouseReporting.OFF ->
+                    encoder.encode(
+                        if (up) Key.Up else Key.Down,
+                        applicationCursorKeys = engine.isApplicationCursorKeys,
+                    )
+                else -> encoder.encodeWheel(up, column, row, engine.mouseReporting)
+            }
+        val bytes = ByteArray(notch.size * abs(lines))
+        for (i in 0 until abs(lines)) notch.copyInto(bytes, i * notch.size)
+        connection.send(bytes)
+    }
 
     // ---- Key bar -----------------------------------------------------------------------------
 

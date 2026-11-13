@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
 import io.kotest.assertions.throwables.shouldThrow
@@ -64,10 +65,12 @@ class TermlibEngineTest {
     @Test
     fun `modes are tracked before output reaches the native emulator`() {
         val engine = TermlibEngine()
-        val bytes = "\u001b[?2004h\u001b]2;claude\u0007".toByteArray()
+        val bytes = "\u001b[?2004h\u001b[?1049h\u001b[?1000;1006h\u001b]2;claude\u0007".toByteArray()
         // The native library is missing on the host JVM.
         shouldThrow<LinkageError> { engine.feed(bytes, 0, bytes.size) }
         engine.isBracketedPasteEnabled shouldBe true
+        engine.isAlternateScreen shouldBe true
+        engine.mouseReporting shouldBe MouseReporting.SGR
         engine.title.value shouldBe "claude"
         val events = mutableListOf<ShellEvent>()
         engine.onShellEvent = { events += it }

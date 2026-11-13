@@ -326,7 +326,8 @@ an `InputDispatcher` together for one screen.
      (for example Caps Lock to Esc).
 - **Gestures:** a vertical swipe scrolls local scrollback on the main screen.
   On the alt screen it sends mouse-wheel events, which tmux turns into copy
-  mode when `mouse on`. Pinch zooms the font. Two-finger horizontal swipe
+  mode when `mouse on`, or Up/Down keys when the program has not asked for
+  the mouse. Pinch zooms the font. Two-finger horizontal swipe
   switches tmux windows (`prefix n/p`, sent as keys). Long-press selects text.
   Tapping a URL opens it.
 - **Acceptance test:** Claude Code's TUI must render correctly. That covers

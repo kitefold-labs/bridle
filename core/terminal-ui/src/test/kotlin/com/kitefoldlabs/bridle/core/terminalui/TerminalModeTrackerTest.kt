@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.core.terminalui
 
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
@@ -18,7 +19,44 @@ class TerminalModeTrackerTest {
     fun `starts with every mode off and no title`() {
         tracker.isBracketedPasteEnabled shouldBe false
         tracker.isApplicationCursorKeys shouldBe false
+        tracker.isAlternateScreen shouldBe false
+        tracker.mouseReporting shouldBe MouseReporting.OFF
         tracker.title.value shouldBe ""
+    }
+
+    @Test
+    fun `follows the alternate screen and mouse reporting`() {
+        feed("\u001b[?1049h")
+        tracker.isAlternateScreen shouldBe true
+        feed("\u001b[?1049l\u001b[?47h")
+        tracker.isAlternateScreen shouldBe true
+        feed("\u001b[?47l\u001b[?1047h")
+        tracker.isAlternateScreen shouldBe true
+        feed("\u001b[?1047l")
+        tracker.isAlternateScreen shouldBe false
+
+        feed("\u001b[?1006h")
+        tracker.mouseReporting shouldBe MouseReporting.OFF // SGR alone turns nothing on
+        feed("\u001b[?1000h")
+        tracker.mouseReporting shouldBe MouseReporting.SGR
+        feed("\u001b[?1006l")
+        tracker.mouseReporting shouldBe MouseReporting.X10
+        feed("\u001b[?1000l\u001b[?1002h")
+        tracker.mouseReporting shouldBe MouseReporting.X10
+        feed("\u001b[?1002l\u001b[?1003h")
+        tracker.mouseReporting shouldBe MouseReporting.X10
+        feed("\u001b[?1003l")
+        tracker.mouseReporting shouldBe MouseReporting.OFF
+    }
+
+    @Test
+    fun `DECSTR turns the mouse off but only RIS leaves the alternate screen`() {
+        feed("\u001b[?1049h\u001b[?1000;1006h\u001b[!p")
+        tracker.isAlternateScreen shouldBe true
+        tracker.mouseReporting shouldBe MouseReporting.OFF
+        feed("\u001b[?1000;1006h\u001bc")
+        tracker.isAlternateScreen shouldBe false
+        tracker.mouseReporting shouldBe MouseReporting.OFF
     }
 
     @Test

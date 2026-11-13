@@ -2,6 +2,7 @@ package com.kitefoldlabs.bridle.core.terminalui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
@@ -36,6 +37,15 @@ public interface TerminalEngine : AutoCloseable {
 
     /** True while the remote program has application cursor keys on (DECCKM, `CSI ? 1 h`). */
     public val isApplicationCursorKeys: Boolean
+
+    /**
+     * True while the remote program is on the alternate screen (`CSI ? 1049 h` and friends),
+     * where nothing reaches the engine's scrollback.
+     */
+    public val isAlternateScreen: Boolean
+
+    /** How the remote program wants mouse events (`CSI ? 1000 h` and friends), if at all. */
+    public val mouseReporting: MouseReporting
 
     /** What the shell integration (OSC 133 and OSC 7) has reported. */
     public val shellPrompt: StateFlow<ShellPrompt>

@@ -23,6 +23,7 @@ import com.kitefoldlabs.bridle.core.ssh.ExecResult
 import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.ShellChannel
 import com.kitefoldlabs.bridle.core.ssh.SshConnection
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import com.kitefoldlabs.bridle.core.terminalui.CellMetrics
@@ -56,6 +57,8 @@ class FakeEngine(
 
     @Volatile override var isBracketedPasteEnabled = true
     override val isApplicationCursorKeys = false
+    override val isAlternateScreen = false
+    override val mouseReporting = MouseReporting.OFF
 
     @Volatile override var onRemoteInput: ((ByteArray) -> Unit)? = null
 
