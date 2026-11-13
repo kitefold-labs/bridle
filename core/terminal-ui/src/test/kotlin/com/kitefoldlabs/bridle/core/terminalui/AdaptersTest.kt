@@ -11,6 +11,7 @@ import com.kitefoldlabs.bridle.core.terminal.KeyAction
 import com.kitefoldlabs.bridle.core.terminal.Modifiers
 import com.kitefoldlabs.bridle.core.terminal.StickyModifier
 import com.kitefoldlabs.bridle.core.terminal.StickyModifiers
+import com.kitefoldlabs.bridle.core.terminal.StickyState
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,11 +59,12 @@ class AdaptersTest {
         sticky.tap(StickyModifier.SHIFT, 0)
         bridge.isCtrlActive() shouldBe true
         bridge.isAltActive() shouldBe true
-        bridge.isShiftActive() shouldBe true
+        // Sticky Shift stays on the key bar: libvterm would drop it or turn Space into CSI-u.
+        bridge.isShiftActive() shouldBe false
         bridge.clearTransients()
         bridge.isCtrlActive() shouldBe false
         bridge.isAltActive() shouldBe false
-        bridge.isShiftActive() shouldBe false
+        sticky.state shouldBe StickyState()
     }
 
     @Test

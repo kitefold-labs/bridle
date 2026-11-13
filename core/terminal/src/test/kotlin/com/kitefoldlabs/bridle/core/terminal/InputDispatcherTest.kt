@@ -37,7 +37,7 @@ class InputDispatcherTest {
     }
 
     @Test
-    fun `sticky shift upper-cases the next typed letter and modifies the next key`() {
+    fun `sticky shift applies to the next character or key only`() {
         action(shift)
         String(input.type("c"), Charsets.ISO_8859_1) shouldBe "C"
         String(input.type("c"), Charsets.ISO_8859_1) shouldBe "c"

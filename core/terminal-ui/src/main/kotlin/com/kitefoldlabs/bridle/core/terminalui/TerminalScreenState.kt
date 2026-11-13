@@ -101,7 +101,7 @@ public class TerminalScreenState(
 
     override val stickyModifiers: StickyModifiers get() = dispatcher.sticky
 
-    /** The sticky Ctrl/Alt state, for the key bar to render. */
+    /** The sticky modifier state, for the key bar to render. */
     public var sticky: StickyState by mutableStateOf(dispatcher.sticky.state)
         private set
 
@@ -186,7 +186,7 @@ public class TerminalScreenState(
         suggestions?.accept(suggestion)?.let(connection::send)
     }
 
-    /** Turns sticky Ctrl/Alt off, e.g. when leaving the screen. */
+    /** Turns the sticky modifiers off, e.g. when leaving the screen. */
     public fun resetModifiers() {
         dispatcher.sticky.reset()
     }

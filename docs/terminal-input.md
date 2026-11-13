@@ -71,13 +71,15 @@ before sending a multi-line paste.
 
 The key bar's SHIFT, CTRL and ALT keys are sticky:
 
-- **Tap** once: the modifier applies to the next key (on the bar or the keyboard), then turns off.
-  Tap again (slowly) to cancel.
+- **Tap** once: the modifier applies to the next key, then turns off. Tap again (slowly) to
+  cancel.
 - **Double-tap**: the modifier stays on until you tap it again.
 
-Sticky modifiers combine with modifiers held on a hardware keyboard. They apply to keys,
-characters and single-character text keys; longer text keys and macros are sent exactly as
-written.
+CTRL and ALT apply to the next key on the bar or on the soft or hardware keyboard, and combine
+with modifiers held on a hardware keyboard. SHIFT applies to the bar's own keys only (for
+example SHIFT then TAB sends Shift+Tab, SHIFT then an arrow extends a selection in editors);
+the keyboards have their own Shift. On the bar, sticky modifiers apply to keys, characters and
+single-character text keys; longer text keys and macros are sent exactly as written.
 
 ## Customising the key bar
 
