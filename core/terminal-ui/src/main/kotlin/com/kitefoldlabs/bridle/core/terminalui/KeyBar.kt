@@ -56,7 +56,7 @@ private val SwipeUpThreshold = 20.dp
 
 /**
  * The extra-keys bar: renders [layout] (one row per layout row, keys sharing the width), shows
- * sticky Ctrl/Alt from [sticky], and reports each tap or swipe-up alternate to [onAction]
+ * the sticky modifiers from [sticky], and reports each tap or swipe-up alternate to [onAction]
  * (normally [TerminalScreenState.onKeyBarAction]).
  *
  * Keys fire on release, so a key can be swiped up instead; a key's alternate label is shown in

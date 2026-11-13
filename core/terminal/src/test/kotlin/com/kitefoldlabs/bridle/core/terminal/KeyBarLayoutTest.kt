@@ -28,9 +28,23 @@ class KeyBarLayoutTest {
     @Test
     fun `default layout has the Termux-style keys`() {
         labels(KeyBarLayout.DEFAULT) shouldContainAll
-            listOf("ESC", "TAB", "CTRL", "ALT", "←", "↓", "↑", "→", "|", "~", "/", "-")
+            listOf("ESC", "SHIFT", "TAB", "CTRL", "ALT", "←", "↓", "↑", "→", "|", "~", "/")
         actions(KeyBarLayout.DEFAULT) shouldContainAll
-            listOf(KeyAction.Toggle(StickyModifier.CTRL), KeyAction.Toggle(StickyModifier.ALT))
+            listOf(
+                KeyAction.Toggle(StickyModifier.SHIFT),
+                KeyAction.Toggle(StickyModifier.CTRL),
+                KeyAction.Toggle(StickyModifier.ALT),
+            )
+    }
+
+    @Test
+    fun `default layout keeps the up arrow above the down arrow`() {
+        val rows = KeyBarLayout.DEFAULT.rows
+        rows.map { it.size }.distinct().size shouldBe 1
+        val up = rows[0].indexOfFirst { it.action == KeyAction.Press(Key.Up) }
+        val down = rows[1].indexOfFirst { it.action == KeyAction.Press(Key.Down) }
+        up shouldBe down
+        rows[0].last().action shouldBe KeyAction.Text("~")
     }
 
     @Test

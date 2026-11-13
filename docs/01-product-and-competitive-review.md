@@ -110,7 +110,7 @@ makes (2) and (3) one-tap operations without giving up a full terminal.
   a key mismatch blocks the connection.
 - Mobile-friendly terminal: true color, Unicode, selection, pinch zoom,
   URL tap, OSC 52 clipboard.
-- **Extra-keys bar** (Esc, Tab, Ctrl, Alt, arrows, `| ~ / -`), configurable.
+- **Extra-keys bar** (Esc, Shift, Tab, Ctrl, Alt, arrows, `/ | ~`), configurable.
 - **Compose box:** a native multi-line text field (autocorrect, voice dictation)
   that sends its contents with bracketed paste. This matters a lot for writing
   Claude prompts.

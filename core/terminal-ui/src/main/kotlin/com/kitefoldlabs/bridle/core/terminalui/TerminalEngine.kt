@@ -95,7 +95,7 @@ public interface TerminalViewHost {
     /** True when the terminal should show the soft keyboard. */
     public val showSoftKeyboard: Boolean
 
-    /** The key bar's sticky Ctrl/Alt, which also apply to soft- and hardware-keyboard keys. */
+    /** The key bar's sticky modifiers. Ctrl and Alt also apply to soft- and hardware-keyboard keys. */
     public val stickyModifiers: StickyModifiers
 
     /** The user tapped the terminal (not a link, not while selecting). */
