@@ -14,6 +14,7 @@ class InputDispatcherTest {
 
     private val ctrl = KeyAction.Toggle(StickyModifier.CTRL)
     private val alt = KeyAction.Toggle(StickyModifier.ALT)
+    private val shift = KeyAction.Toggle(StickyModifier.SHIFT)
 
     @Test
     fun `defaults`() {
@@ -33,6 +34,15 @@ class InputDispatcherTest {
         action(ctrl)
         String(input.type("c"), Charsets.ISO_8859_1) shouldBe "\u0003"
         String(input.type("c"), Charsets.ISO_8859_1) shouldBe "c"
+    }
+
+    @Test
+    fun `sticky shift upper-cases the next typed letter and modifies the next key`() {
+        action(shift)
+        String(input.type("c"), Charsets.ISO_8859_1) shouldBe "C"
+        String(input.type("c"), Charsets.ISO_8859_1) shouldBe "c"
+        action(shift)
+        action(KeyAction.Press(Key.Tab)) shouldBe "\u001b[Z"
     }
 
     @Test

@@ -55,11 +55,14 @@ class AdaptersTest {
         bridge.isShiftActive() shouldBe false
         sticky.tap(StickyModifier.CTRL, 0)
         sticky.tap(StickyModifier.ALT, 0)
+        sticky.tap(StickyModifier.SHIFT, 0)
         bridge.isCtrlActive() shouldBe true
         bridge.isAltActive() shouldBe true
+        bridge.isShiftActive() shouldBe true
         bridge.clearTransients()
         bridge.isCtrlActive() shouldBe false
         bridge.isAltActive() shouldBe false
+        bridge.isShiftActive() shouldBe false
     }
 
     @Test
@@ -78,6 +81,7 @@ class AdaptersTest {
         KeyDescriptions.describe(KeyAction.Chord("c", Modifiers.CTRL)) shouldBe "Control C"
         KeyDescriptions.describe(KeyAction.Toggle(StickyModifier.CTRL)) shouldBe "Control"
         KeyDescriptions.describe(KeyAction.Toggle(StickyModifier.ALT)) shouldBe "Alt"
+        KeyDescriptions.describe(KeyAction.Toggle(StickyModifier.SHIFT)) shouldBe "Shift"
         KeyDescriptions.describe(KeyAction.Text("/")) shouldBe "/"
         KeyDescriptions.describe(
             KeyAction.Macro(listOf(KeyAction.Text("/compact"), KeyAction.Press(Key.Enter))),
