@@ -69,15 +69,17 @@ before sending a multi-line paste.
 
 ## Sticky modifiers
 
-The key bar's CTRL and ALT keys are sticky:
+The key bar's SHIFT, CTRL and ALT keys are sticky:
 
-- **Tap** once: the modifier applies to the next key (on the bar or the keyboard), then turns off.
-  Tap again (slowly) to cancel.
+- **Tap** once: the modifier applies to the next key, then turns off. Tap again (slowly) to
+  cancel.
 - **Double-tap**: the modifier stays on until you tap it again.
 
-Sticky modifiers combine with modifiers held on a hardware keyboard. They apply to keys,
-characters and single-character text keys; longer text keys and macros are sent exactly as
-written.
+CTRL and ALT apply to the next key on the bar or on the soft or hardware keyboard, and combine
+with modifiers held on a hardware keyboard. SHIFT applies to the bar's own keys only (for
+example SHIFT then TAB sends Shift+Tab, SHIFT then an arrow extends a selection in editors);
+the keyboards have their own Shift. On the bar, sticky modifiers apply to keys, characters and
+single-character text keys; longer text keys and macros are sent exactly as written.
 
 ## Customising the key bar
 
@@ -114,7 +116,7 @@ for swiping up on the key.
 |--------|--------|------|
 | `key` | `key`, optional `modifiers` | Presses a named key: `Enter`, `Tab`, `Backspace`, `Escape`, `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `PageUp`, `PageDown`, `Insert`, `Delete`, `F1`–`F12` |
 | `char` | `char` (one character), optional `modifiers` | Presses a character with modifiers, e.g. Ctrl+C |
-| `modifier` | `modifier`: `CTRL` or `ALT` | Taps a sticky modifier |
+| `modifier` | `modifier`: `CTRL`, `ALT` or `SHIFT` | Taps a sticky modifier |
 | `text` | `text` | Types the text |
 | `macro` | `actions`: a list of `key`, `char` and `text` actions | Runs the actions in order |
 
@@ -134,8 +136,9 @@ A layout that breaks a rule is rejected with a message naming the field, for exa
 
 ### Presets
 
-- **Default**: ESC, `/`, `-`, `|`, `~`, ↑ on the first row and TAB, CTRL, ALT, ←, ↓, → on the
-  second. Swipe up on the arrows for PgUp/PgDn/Home/End, and on TAB for Shift+Tab.
+- **Default**: ESC, SHIFT, `/`, `|`, ↑, `~` on the first row and TAB, CTRL, ALT, ←, ↓, → on the
+  second, so ↑ sits above ↓. Swipe up on the arrows for PgUp/PgDn/Home/End, on TAB for
+  Shift+Tab, and on `/`, `|`, `~` for `\`, `&`, `` ` ``.
 - **Claude**: ESC (swipe up for ESC ESC, which rewinds), ⇧TAB (cycle permission mode), ^C, `/`,
   ↑, Enter on the first row; `y`, `n`, `/compact`, `/clear`, `/resume`, ↓ on the second.
 

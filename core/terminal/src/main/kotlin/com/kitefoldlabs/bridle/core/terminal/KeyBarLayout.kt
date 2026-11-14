@@ -160,17 +160,20 @@ public data class KeyBarLayout(
         private fun command(slash: String) =
             KeyBarKey(slash, KeyAction.Macro(listOf(KeyAction.Text(slash), KeyAction.Press(Key.Enter))))
 
-        /** General-purpose layout modeled on Termux's default extra keys. */
+        /**
+         * General-purpose layout modeled on Termux's default extra keys. The arrows form an
+         * inverted T: ↑ sits directly above ↓, between ← and →.
+         */
         public val DEFAULT: KeyBarLayout =
             KeyBarLayout(
                 listOf(
                     listOf(
                         press("ESC", Key.Escape),
+                        toggle(StickyModifier.SHIFT),
                         text("/", swipeUp = "\\"),
-                        text("-", swipeUp = "_"),
                         text("|", swipeUp = "&"),
-                        text("~", swipeUp = "`"),
                         press("↑", Key.Up, swipeUp = KeyAction.Press(Key.PageUp), swipeUpLabel = "PGUP"),
+                        text("~", swipeUp = "`"),
                     ),
                     listOf(
                         press(

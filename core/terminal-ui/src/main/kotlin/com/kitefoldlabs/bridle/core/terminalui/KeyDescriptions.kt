@@ -35,6 +35,7 @@ internal object KeyDescriptions {
         when (modifier) {
             StickyModifier.CTRL -> "Control"
             StickyModifier.ALT -> "Alt"
+            StickyModifier.SHIFT -> "Shift"
         }
 
     private fun withModifiers(

@@ -316,7 +316,7 @@ an `InputDispatcher` together for one screen.
 - **Input stack, bottom to top:**
   1. The soft keyboard (IME), with a "raw" `InputConnection` so autocorrect
      does not mangle commands. Users can toggle this per tab.
-  2. The **extra-keys bar**: configurable rows. Ctrl/Alt are sticky (tap once
+  2. The **extra-keys bar**: configurable rows. Shift/Ctrl/Alt are sticky (tap once
      for one keypress, double-tap to lock). Swipe up on a key for its
      alternate. Has a Claude preset.
   3. The **compose box**: a full native text field. Send wraps the text in

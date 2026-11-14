@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 public enum class StickyModifier {
     CTRL,
     ALT,
+    SHIFT,
 }
 
 /** The state of one on-screen modifier key. */
@@ -25,17 +26,24 @@ public enum class ModifierState {
 public data class StickyState(
     val ctrl: ModifierState = ModifierState.OFF,
     val alt: ModifierState = ModifierState.OFF,
+    val shift: ModifierState = ModifierState.OFF,
 ) {
     /** The state of [modifier]. */
     public operator fun get(modifier: StickyModifier): ModifierState =
         when (modifier) {
             StickyModifier.CTRL -> ctrl
             StickyModifier.ALT -> alt
+            StickyModifier.SHIFT -> shift
         }
 
     /** The modifiers the next key press would get. */
     public val modifiers: Modifiers
-        get() = Modifiers(ctrl = ctrl != ModifierState.OFF, alt = alt != ModifierState.OFF)
+        get() =
+            Modifiers(
+                ctrl = ctrl != ModifierState.OFF,
+                alt = alt != ModifierState.OFF,
+                shift = shift != ModifierState.OFF,
+            )
 
     internal fun with(
         modifier: StickyModifier,
@@ -44,11 +52,12 @@ public data class StickyState(
         when (modifier) {
             StickyModifier.CTRL -> copy(ctrl = state)
             StickyModifier.ALT -> copy(alt = state)
+            StickyModifier.SHIFT -> copy(shift = state)
         }
 }
 
 /**
- * The state machine behind the key bar's sticky Ctrl/Alt keys (Termux-style):
+ * The state machine behind the key bar's sticky Ctrl/Alt/Shift keys (Termux-style):
  *
  * ```
  * OFF ──tap──▶ ONCE ──key press──▶ OFF
@@ -98,7 +107,7 @@ public class StickyModifiers(
      */
     public fun consume(hardware: Modifiers = Modifiers.NONE): Modifiers {
         val effective = hardware + state.modifiers
-        update(StickyState(ctrl = release(state.ctrl), alt = release(state.alt)))
+        update(StickyState(ctrl = release(state.ctrl), alt = release(state.alt), shift = release(state.shift)))
         return effective
     }
 

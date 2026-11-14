@@ -61,6 +61,14 @@ class StickyModifiersTest {
     }
 
     @Test
+    fun `sticky shift applies to the next key only`() {
+        sticky.tap(StickyModifier.SHIFT, nowMillis = 0)
+        sticky.state.shift shouldBe ModifierState.ONCE
+        sticky.consume() shouldBe Modifiers.SHIFT
+        sticky.state shouldBe StickyState()
+    }
+
+    @Test
     fun `hardware modifiers are combined with sticky ones`() {
         sticky.tap(StickyModifier.CTRL, nowMillis = 0)
         sticky.consume(Modifiers.SHIFT) shouldBe Modifiers(ctrl = true, shift = true)
