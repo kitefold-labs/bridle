@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     name: Build release artifacts
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, kitefold-ghost, ephemeral]
     timeout-minutes: 45
     # Holds the signing secrets; restrict it to `v*` tags and add required reviewers.
     environment: release
@@ -84,7 +84,7 @@ jobs:
     name: Create draft release
     needs: build
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, kitefold-ghost, ephemeral]
     timeout-minutes: 10
     permissions:
       contents: write # only this job, which runs no project code, can write
