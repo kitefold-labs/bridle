@@ -9,7 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +46,14 @@ public class CommandLineSuggestions(
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val line = PromptLine()
-    private val snapshots = MutableStateFlow(line.snapshot)
+
+    /**
+     * Every change of the line, latest kept. Not a StateFlow: that skips a value equal to the
+     * last one collected, so the same text typed at the next prompt (line → "" → same text, with
+     * the "" never collected) would not be looked up again after the prompt invalidated the cache.
+     */
+    private val snapshots =
+        MutableSharedFlow<PromptLine.Snapshot>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val mutableSuggestions = MutableStateFlow(LineSuggestions())
 
     /** Suggestions for the line as last seen; empty while it is unknown or suggestions are off. */
@@ -63,7 +72,8 @@ public class CommandLineSuggestions(
     public val enabled: MutableStateFlow<Boolean> = MutableStateFlow(true)
 
     init {
-        line.onChange = { snapshots.value = it }
+        snapshots.tryEmit(line.snapshot)
+        line.onChange = { snapshots.tryEmit(it) }
         engine.onShellEvent = { event ->
             // The last command may have changed files.
             if (event is ShellEvent.PromptStart) completer.invalidate()
