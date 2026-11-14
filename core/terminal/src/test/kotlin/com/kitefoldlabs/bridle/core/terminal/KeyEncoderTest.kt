@@ -29,6 +29,15 @@ class KeyEncoderTest {
     ) = encoder.encodeChar(c.code, modifiers).latin1()
 
     @Test
+    fun `wheel notches follow the mouse reporting mode`() {
+        encoder.encodeWheel(up = true, column = 1, row = 1, MouseReporting.OFF) shouldBe ByteArray(0)
+        encoder.encodeWheel(up = true, column = 12, row = 3, MouseReporting.SGR).latin1() shouldBe "\u001b[<64;12;3M"
+        encoder.encodeWheel(up = false, column = 300, row = 0, MouseReporting.SGR).latin1() shouldBe "\u001b[<65;300;1M"
+        encoder.encodeWheel(up = true, column = 1, row = 1, MouseReporting.X10).latin1() shouldBe "\u001b[M\u0060!!"
+        encoder.encodeWheel(up = false, column = 300, row = 0, MouseReporting.X10).latin1() shouldBe "\u001b[Ma\u00ff!"
+    }
+
+    @Test
     fun `unmodified keys in normal mode`() {
         val expected =
             mapOf(

@@ -276,8 +276,11 @@ public object TmuxScripts {
                 LaunchMode.DIRECT -> listOf(tmux("set-option", "-w", "-t", "=$name:", "remain-on-exit", "on"))
             }
         val record = if (profile.env.isEmpty()) emptyList() else listOf(recordEnvironment(profile))
+        // Session options, not global ones, so the user's tmux.conf and other sessions are untouched.
+        // mouse on: the app's scroll gesture arrives as wheel events, which open copy mode.
         return start + record + run +
-            "${tmux("set-option", "-w", "-t", "=$name:", "window-size", "latest")} 2>/dev/null || true"
+            "${tmux("set-option", "-w", "-t", "=$name:", "window-size", "latest")} 2>/dev/null || true" +
+            tmux("set-option", "-t", pane(name), "mouse", "on")
     }
 
     private fun typeCommand(

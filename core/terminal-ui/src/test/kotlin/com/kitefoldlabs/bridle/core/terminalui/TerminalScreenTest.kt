@@ -22,6 +22,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.terminal.ComposeHistory
@@ -143,6 +146,57 @@ class TerminalScreenTest {
         rule.onAllNodesWithContentDescription("Close compose box").onFirst().performClick()
         rule.onNodeWithText("Message to send").assertDoesNotExist()
         state.isComposeOpen shouldBe false
+    }
+
+    private fun terminal() = rule.onNodeWithTag(FakeTerminalEngine.TERMINAL_TAG)
+
+    @Test
+    fun `a vertical drag on the alternate screen sends cursor keys`() {
+        show()
+        engine.isAlternateScreen = true
+        // The fake engine's cells are 20px tall; a 200px drag is ten lines.
+        terminal().performTouchInput { swipeDown(startY = centerY - 100f, endY = centerY + 100f) }
+        rule.waitForIdle()
+        connection.sentText() shouldBe "\u001b[A".repeat(10)
+        connection.sent.clear()
+        terminal().performTouchInput { swipeUp(startY = centerY + 100f, endY = centerY - 100f) }
+        rule.waitForIdle()
+        connection.sentText() shouldBe "\u001b[B".repeat(10)
+        state.isKeyboardVisible shouldBe false // a drag is not a tap
+    }
+
+    @Test
+    fun `a vertical drag on the main screen is left to the engine`() {
+        show()
+        terminal().performTouchInput { swipeDown(startY = centerY - 100f, endY = centerY + 100f) }
+        rule.waitForIdle()
+        connection.sent.shouldBeEmpty()
+    }
+
+    @Test
+    fun `horizontal swipes, long presses, pinches and selection drags are not scroll gestures`() {
+        show()
+        engine.isAlternateScreen = true
+        engine.isSelecting = true
+        terminal().performTouchInput { swipeDown(startY = centerY - 100f, endY = centerY + 100f) }
+        engine.isSelecting = false
+        terminal().performTouchInput { swipeLeft() }
+        terminal().performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, 200f))
+            up()
+        }
+        terminal().performTouchInput {
+            down(0, center)
+            down(1, center + Offset(40f, 0f))
+            moveBy(0, Offset(0f, 200f))
+            moveBy(1, Offset(0f, 200f))
+            up(0)
+            up(1)
+        }
+        rule.waitForIdle()
+        connection.sent.shouldBeEmpty()
     }
 
     @Test

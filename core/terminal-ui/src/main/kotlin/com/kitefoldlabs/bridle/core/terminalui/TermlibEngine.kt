@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,9 @@ public class TermlibEngine(
     override val title: StateFlow<String> get() = modes.title
     override val isBracketedPasteEnabled: Boolean get() = modes.isBracketedPasteEnabled
     override val isApplicationCursorKeys: Boolean get() = modes.isApplicationCursorKeys
+    override val isAlternateScreen: Boolean get() = modes.isAlternateScreen
+    override val mouseReporting: MouseReporting get() = modes.mouseReporting
+    override val isSelecting: Boolean get() = selection?.isSelectionActive == true
     override val shellPrompt: StateFlow<ShellPrompt> get() = modes.shellPrompt
     override var onShellEvent: ((ShellEvent) -> Unit)?
         get() = modes.onShellEvent

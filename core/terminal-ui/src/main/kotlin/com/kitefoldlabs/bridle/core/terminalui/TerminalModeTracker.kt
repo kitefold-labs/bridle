@@ -1,5 +1,6 @@
 package com.kitefoldlabs.bridle.core.terminalui
 
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellEvents
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
@@ -10,14 +11,17 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Follows the few terminal modes the input layer needs, by watching the remote output stream:
  * bracketed paste (`CSI ? 2004 h/l`), application cursor keys (DECCKM, `CSI ? 1 h/l`), the
- * window title (OSC 0 / OSC 2), and the shell integration's prompt marks (OSC 133) and working
- * directory (OSC 7).
+ * alternate screen (`CSI ? 1047 / 1049 h/l`; libvterm ignores 47), mouse reporting (`CSI ? 1000 / 1002 / 1003`
+ * and `1006 h/l`), the window title (OSC 0 / OSC 2), and the shell integration's prompt marks
+ * (OSC 133) and working directory (OSC 7).
  *
  * termlib keeps these inside libvterm without exposing them, so the engine feeds every output
  * byte through this tracker as well. It is a small VT500-style parser: sequences split across
  * chunks are handled, DCS/SOS/PM/APC strings (including tmux passthrough) are skipped, CAN and
- * SUB abort a sequence, and RIS (`ESC c`) and DECSTR (`CSI ! p`) reset both modes, as libvterm
- * does. OSC strings and CSI parameters are capped, so hostile output cannot grow memory.
+ * SUB abort a sequence, and RIS (`ESC c`) and DECSTR (`CSI ! p`) reset the modes, as libvterm
+ * does. Neither switches libvterm's screen buffer, but RIS clears its alternate-screen flag, and
+ * so does this tracker. OSC strings and CSI parameters are capped, so hostile output cannot
+ * grow memory.
  *
  * [feed] must be called from one thread at a time, which is also the thread [onShellEvent] runs
  * on; the modes, [title] and [shellPrompt] can be read anywhere.
@@ -44,6 +48,26 @@ public class TerminalModeTracker {
     @Volatile
     public var isApplicationCursorKeys: Boolean = false
         private set
+
+    /** True while the remote program is on the alternate screen (vim, less, an attached tmux). */
+    @Volatile
+    public var isAlternateScreen: Boolean = false
+        private set
+
+    @Volatile
+    private var mouseTracking: Boolean = false
+
+    @Volatile
+    private var sgrMouse: Boolean = false
+
+    /** How the remote program wants mouse events, if at all. */
+    public val mouseReporting: MouseReporting
+        get() =
+            when {
+                !mouseTracking -> MouseReporting.OFF
+                sgrMouse -> MouseReporting.SGR
+                else -> MouseReporting.X10
+            }
 
     private var state = State.GROUND
     private var escapeIntermediate = false
@@ -109,6 +133,7 @@ public class TerminalModeTracker {
             b == 'P'.code || b == 'X'.code || b == '^'.code || b == '_'.code -> state = State.STRING
             b == 'c'.code -> {
                 resetModes()
+                isAlternateScreen = false
                 state = State.GROUND
             }
             b < SPACE -> Unit // C0 controls inside an escape are executed; nothing to track
@@ -158,6 +183,9 @@ public class TerminalModeTracker {
                     when (params[i]) {
                         MODE_APPLICATION_CURSOR -> isApplicationCursorKeys = on
                         MODE_BRACKETED_PASTE -> isBracketedPasteEnabled = on
+                        MODE_ALT_SCREEN_CLEAR, MODE_ALT_SCREEN_SAVE_CURSOR -> isAlternateScreen = on
+                        MODE_MOUSE_PRESS, MODE_MOUSE_DRAG, MODE_MOUSE_ANY -> mouseTracking = on
+                        MODE_MOUSE_SGR -> sgrMouse = on
                     }
                 }
             }
@@ -203,9 +231,12 @@ public class TerminalModeTracker {
         onShellEvent?.invoke(event)
     }
 
+    /** The modes both RIS and DECSTR turn off; only RIS clears the alternate-screen flag. */
     private fun resetModes() {
         isBracketedPasteEnabled = false
         isApplicationCursorKeys = false
+        mouseTracking = false
+        sgrMouse = false
     }
 
     private enum class State { GROUND, ESCAPE, CSI, OSC, OSC_ESCAPE, STRING, STRING_ESCAPE }
@@ -226,6 +257,12 @@ public class TerminalModeTracker {
         private const val NO_INTERMEDIATE = 0
         private const val MODE_APPLICATION_CURSOR = 1
         private const val MODE_BRACKETED_PASTE = 2004
+        private const val MODE_ALT_SCREEN_CLEAR = 1047
+        private const val MODE_ALT_SCREEN_SAVE_CURSOR = 1049
+        private const val MODE_MOUSE_PRESS = 1000
+        private const val MODE_MOUSE_DRAG = 1002
+        private const val MODE_MOUSE_ANY = 1003
+        private const val MODE_MOUSE_SGR = 1006
 
         private const val BYTE_MASK = 0xFF
         private const val BEL = 0x07
