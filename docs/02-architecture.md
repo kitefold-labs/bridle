@@ -326,7 +326,8 @@ an `InputDispatcher` together for one screen.
      (for example Caps Lock to Esc).
 - **Gestures:** a vertical swipe scrolls local scrollback on the main screen.
   On the alt screen it sends mouse-wheel events, which tmux turns into copy
-  mode when `mouse on`. Pinch zooms the font. Two-finger horizontal swipe
+  mode when `mouse on`, or Up/Down keys when the program has not asked for
+  the mouse. Pinch zooms the font. Two-finger horizontal swipe
   switches tmux windows (`prefix n/p`, sent as keys). Long-press selects text.
   Tapping a URL opens it.
 - **Acceptance test:** Claude Code's TUI must render correctly. That covers
@@ -370,7 +371,10 @@ All agentless. Every operation is one `exec` on the shared connection.
   `window-size latest`, so the window follows whichever client was used most
   recently and the phone's small size doesn't shrink the desktop view
   permanently. It sets this on the session's window with `set-option -w`, so the user's
-  `~/.tmux.conf` is never edited.
+  `~/.tmux.conf` is never edited. It also sets `mouse on` on the session, so the
+  phone's scroll gesture (sent as mouse-wheel events) opens copy mode and scrolls
+  tmux's history. A desktop client attached to that session gets mouse mode too
+  (wheel scrolls history, Shift-drag for the terminal's own selection).
 - **Agentless Claude detection:** if `pane_current_command` is `claude` or
   `node` and the cwd matches the profile, the card shows a "Claude running"
   badge with the age of the last activity. Optionally, a regex over the

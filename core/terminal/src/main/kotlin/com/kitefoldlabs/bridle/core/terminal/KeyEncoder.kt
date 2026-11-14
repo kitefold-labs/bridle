@@ -106,6 +106,33 @@ public class KeyEncoder(
     /** Encodes typed [text] (for example an IME commit) as UTF-8, without modifiers. */
     public fun encodeText(text: String): ByteArray = text.toByteArray(Charsets.UTF_8)
 
+    /**
+     * Encodes one mouse-wheel notch ([up] or down) at the 1-based cell [column], [row], as a
+     * program that asked for [reporting] expects it; empty when reporting is off.
+     *
+     * Reference: xterm ctlseqs, "Mouse Tracking". Wheel up is button 64, wheel down 65. The X10
+     * encoding adds 32 to each value and is limited to 223 columns and rows; SGR sends decimals.
+     */
+    public fun encodeWheel(
+        up: Boolean,
+        column: Int,
+        row: Int,
+        reporting: MouseReporting,
+    ): ByteArray {
+        val button = if (up) WHEEL_UP else WHEEL_DOWN
+        return when (reporting) {
+            MouseReporting.OFF -> ByteArray(0)
+            MouseReporting.SGR -> ascii("$CSI<$button;${column.coerceAtLeast(1)};${row.coerceAtLeast(1)}M")
+            MouseReporting.X10 ->
+                ascii("${CSI}M") +
+                    byteArrayOf(
+                        (X10_OFFSET + button).toByte(),
+                        (X10_OFFSET + column.coerceIn(1, X10_MAX)).toByte(),
+                        (X10_OFFSET + row.coerceIn(1, X10_MAX)).toByte(),
+                    )
+        }
+    }
+
     private fun backspaceByte(ctrl: Boolean): Byte {
         // xterm: Ctrl+Backspace sends the "other" erase character.
         val sendsDel = (backspace == BackspaceMode.DEL) != ctrl
@@ -120,6 +147,11 @@ public class KeyEncoder(
         const val DEL: Byte = 0x7f
         const val CSI: String = "\u001b["
         const val SS3: String = "\u001bO"
+
+        private const val WHEEL_UP = 64
+        private const val WHEEL_DOWN = 65
+        private const val X10_OFFSET = 32
+        private const val X10_MAX = 223
 
         private const val INSERT = 2
         private const val DELETE = 3

@@ -190,15 +190,18 @@ public class PromptLine {
         val SUBMIT_BYTES = setOf('\r'.code, '\n'.code, 0x03)
 
         /**
-         * Replies the emulator sends on the keystroke path: cursor position and device
-         * attribute reports, mode reports, focus events, window reports, and OSC/DCS replies
-         * (colours, XTVERSION).
+         * Bytes on the keystroke path that never reach the line: the emulator's replies (cursor
+         * position and device attribute reports, mode reports, focus events, window reports,
+         * OSC/DCS replies such as colours and XTVERSION) and mouse events (X10 `CSI M b x y` and
+         * SGR `CSI < b ; x ; y M/m`), which only a program that asked for the mouse receives.
+         * A scroll gesture sends several mouse events in one write.
          */
         val TERMINAL_REPLY =
             Regex(
-                "\u001b\\[(?:\\d+;\\d+R|[?>=][\\d;]*c|\\??\\d+;\\d+\\\$y|[IO]|[\\d;]*t)" +
+                "(?:\u001b\\[(?:\\d+;\\d+R|[?>=][\\d;]*c|\\??\\d+;\\d+\\\$y|[IO]|[\\d;]*t)" +
+                    "|\u001b\\[(?:M[\\s\\S]{3}|<\\d+;\\d+;\\d+[Mm])" +
                     "|\u001b\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)" +
-                    "|\u001bP[^\u001b]*\u001b\\\\",
+                    "|\u001bP[^\u001b]*\u001b\\\\)+",
             )
 
         fun isTerminalReply(bytes: ByteArray): Boolean = TERMINAL_REPLY.matches(String(bytes, Charsets.ISO_8859_1))

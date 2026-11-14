@@ -67,6 +67,18 @@ If the remote program has **not** enabled bracketed paste, every line break in a
 Enter, so each line runs as soon as it arrives. Bridle detects this case so it can warn you
 before sending a multi-line paste.
 
+## Scrolling
+
+A one-finger vertical drag scrolls the terminal's own scrollback. On the alternate screen (vim,
+less, an attached tmux) there is no local scrollback, so Bridle sends the drag to the remote
+program instead, one notch per line:
+
+- as mouse-wheel events (SGR or X10 encoding, whichever the program asked for) when it has
+  mouse reporting on. tmux then enters copy mode and scrolls its history, which is where the
+  output of an attached session lives. Sessions Bridle launches get `mouse on` (which a desktop
+  client attached to them sees too); for others, put `set -g mouse on` in `tmux.conf`;
+- as Up and Down keys otherwise, like a desktop terminal.
+
 ## Sticky modifiers
 
 The key bar's CTRL and ALT keys are sticky:

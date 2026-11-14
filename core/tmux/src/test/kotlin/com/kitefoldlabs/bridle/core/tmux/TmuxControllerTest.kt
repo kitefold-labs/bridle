@@ -94,6 +94,8 @@ class TmuxControllerTest {
             tmux.launch(profile()) shouldBe LaunchResult.ALREADY_RUNNING
             // The phone's size mustn't stick to a desktop client attached to the same window.
             shell.exec("tmux show-options -wv -t '=claude-app:' window-size").stdout.trim() shouldBe "latest"
+            // So the phone's scroll gesture (sent as wheel events) scrolls tmux's history.
+            shell.exec("tmux show-options -v -t '=claude-app:' mouse").stdout.trim() shouldBe "on"
 
             val screen = screenOf("claude-app", "fake-claude started")
             screen shouldContain "model=[it's-fine]"

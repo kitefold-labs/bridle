@@ -11,6 +11,7 @@ import com.kitefoldlabs.bridle.core.session.TerminalState
 import com.kitefoldlabs.bridle.core.ssh.RemoteFile
 import com.kitefoldlabs.bridle.core.ssh.SftpSession
 import com.kitefoldlabs.bridle.core.ssh.TransferProgress
+import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
 import com.kitefoldlabs.bridle.core.terminal.ShellPrompt
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,12 @@ class FakeTerminalEngine(
     @Volatile override var isBracketedPasteEnabled = false
 
     @Volatile override var isApplicationCursorKeys = false
+
+    @Volatile override var isAlternateScreen = false
+
+    @Volatile override var mouseReporting = MouseReporting.OFF
+
+    @Volatile override var isSelecting = false
 
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
