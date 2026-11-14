@@ -39,13 +39,16 @@ public interface TerminalEngine : AutoCloseable {
     public val isApplicationCursorKeys: Boolean
 
     /**
-     * True while the remote program is on the alternate screen (`CSI ? 1049 h` and friends),
+     * True while the remote program is on the alternate screen (`CSI ? 1049 h` or `1047 h`),
      * where nothing reaches the engine's scrollback.
      */
     public val isAlternateScreen: Boolean
 
     /** How the remote program wants mouse events (`CSI ? 1000 h` and friends), if at all. */
     public val mouseReporting: MouseReporting
+
+    /** True while the user has text selected in the view (a drag then moves a selection handle). */
+    public val isSelecting: Boolean
 
     /** What the shell integration (OSC 133 and OSC 7) has reported. */
     public val shellPrompt: StateFlow<ShellPrompt>

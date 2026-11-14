@@ -157,7 +157,8 @@ private suspend fun PointerInputScope.detectVerticalDrag(
  * Waits for [down] to travel past the touch slop, more vertically than horizontally, before the
  * long-press timeout, and returns that change. Returns null when the gesture turns out to be
  * something else: a lift (tap), a second finger (pinch), a long press (selection) or a
- * horizontal swipe.
+ * horizontal swipe. Like termlib, it does not classify in the first [SECOND_TOUCH_GRACE_MILLIS],
+ * so a pinch whose first finger moves before the second lands is not taken for a drag.
  */
 private suspend fun AwaitPointerEventScope.awaitVerticalDrag(down: PointerInputChange): PointerInputChange? {
     val slop = viewConfiguration.touchSlop
@@ -171,6 +172,7 @@ private suspend fun AwaitPointerEventScope.awaitVerticalDrag(down: PointerInputC
                 event.changes.count { it.pressed } == 1 &&
                 change.uptimeMillis - down.uptimeMillis < longPressMillis
         if (!stillOneFinger) return null
+        if (change.uptimeMillis - down.uptimeMillis < SECOND_TOUCH_GRACE_MILLIS) continue
         val dx = abs(change.position.x - down.position.x)
         val dy = abs(change.position.y - down.position.y)
         when {
@@ -179,6 +181,9 @@ private suspend fun AwaitPointerEventScope.awaitVerticalDrag(down: PointerInputC
         }
     }
 }
+
+/** termlib's `WAIT_FOR_SECOND_TOUCH_MS`. */
+private const val SECOND_TOUCH_GRACE_MILLIS = 40L
 
 /**
  * Watches for a pinch without consuming it (the engine sees the same events) and reports the

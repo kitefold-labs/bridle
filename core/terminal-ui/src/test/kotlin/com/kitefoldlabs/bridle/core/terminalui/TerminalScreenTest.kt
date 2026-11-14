@@ -174,9 +174,12 @@ class TerminalScreenTest {
     }
 
     @Test
-    fun `horizontal swipes, long presses and pinches are not scroll gestures`() {
+    fun `horizontal swipes, long presses, pinches and selection drags are not scroll gestures`() {
         show()
         engine.isAlternateScreen = true
+        engine.isSelecting = true
+        terminal().performTouchInput { swipeDown(startY = centerY - 100f, endY = centerY + 100f) }
+        engine.isSelecting = false
         terminal().performTouchInput { swipeLeft() }
         terminal().performTouchInput {
             down(center)

@@ -53,6 +53,7 @@ public class TermlibEngine(
     override val isApplicationCursorKeys: Boolean get() = modes.isApplicationCursorKeys
     override val isAlternateScreen: Boolean get() = modes.isAlternateScreen
     override val mouseReporting: MouseReporting get() = modes.mouseReporting
+    override val isSelecting: Boolean get() = selection?.isSelectionActive == true
     override val shellPrompt: StateFlow<ShellPrompt> get() = modes.shellPrompt
     override var onShellEvent: ((ShellEvent) -> Unit)?
         get() = modes.onShellEvent

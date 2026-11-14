@@ -28,9 +28,9 @@ class TerminalModeTrackerTest {
     fun `follows the alternate screen and mouse reporting`() {
         feed("\u001b[?1049h")
         tracker.isAlternateScreen shouldBe true
-        feed("\u001b[?1049l\u001b[?47h")
-        tracker.isAlternateScreen shouldBe true
-        feed("\u001b[?47l\u001b[?1047h")
+        feed("\u001b[?1049l\u001b[?47h") // 47: libvterm does not switch screens for it
+        tracker.isAlternateScreen shouldBe false
+        feed("\u001b[?1047h")
         tracker.isAlternateScreen shouldBe true
         feed("\u001b[?1047l")
         tracker.isAlternateScreen shouldBe false

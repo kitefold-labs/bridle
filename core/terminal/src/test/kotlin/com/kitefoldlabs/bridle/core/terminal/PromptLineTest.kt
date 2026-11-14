@@ -149,9 +149,14 @@ class PromptLineTest {
             "\u001b]11;rgb:0000/0000/0000\u001b\\",
             "\u001b]10;rgb:ffff/ffff/ffff\u0007",
             "\u001bP>|termlib 0.3\u001b\\",
+            "\u001b[<64;7;4M",
+            "\u001b[<65;7;4M\u001b[<65;7;4M\u001b[<65;7;5M", // one scroll gesture, several notches
+            "\u001b[M\u0060!!",
         )) {
             type(reply)
         }
+        // X10 coordinates past column 95 are bytes above 0x7f, which are not UTF-8.
+        line.onInput("\u001b[Ma\u00ff!\u001b[Ma\u00ff!".toByteArray(Charsets.ISO_8859_1))
         text shouldBe "ab"
     }
 

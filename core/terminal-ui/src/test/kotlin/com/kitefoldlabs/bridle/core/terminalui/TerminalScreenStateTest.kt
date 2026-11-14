@@ -94,6 +94,8 @@ class TerminalScreenStateTest {
             state.takesScrollGesture shouldBe false
             engine.isAlternateScreen = true
             state.takesScrollGesture shouldBe true
+            engine.isSelecting = true // a drag moves a selection handle
+            state.takesScrollGesture shouldBe false
         }
 
     @Test

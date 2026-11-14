@@ -178,9 +178,10 @@ public class TerminalScreenState(
     /**
      * True when a one-finger vertical drag should go to the remote program instead of the
      * engine's scrollback: on the alternate screen (vim, less, an attached tmux) the engine
-     * has nothing to scroll, and the program keeps its own history.
+     * has nothing to scroll, and the program keeps its own history. Not while text is
+     * selected, when a drag moves a selection handle.
      */
-    public val takesScrollGesture: Boolean get() = engine.isAlternateScreen
+    public val takesScrollGesture: Boolean get() = engine.isAlternateScreen && !engine.isSelecting
 
     /**
      * A vertical drag of [lines] whole lines (positive when the finger moved down, i.e. towards

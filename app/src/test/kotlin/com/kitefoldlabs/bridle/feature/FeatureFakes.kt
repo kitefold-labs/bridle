@@ -59,6 +59,7 @@ class FakeEngine(
     override val isApplicationCursorKeys = false
     override val isAlternateScreen = false
     override val mouseReporting = MouseReporting.OFF
+    override val isSelecting = false
 
     @Volatile override var onRemoteInput: ((ByteArray) -> Unit)? = null
 

@@ -42,6 +42,8 @@ class FakeTerminalEngine(
 
     @Volatile override var mouseReporting = MouseReporting.OFF
 
+    @Volatile override var isSelecting = false
+
     override val size = MutableStateFlow(initial)
     override val title = MutableStateFlow("")
     override val shellPrompt = MutableStateFlow(ShellPrompt())

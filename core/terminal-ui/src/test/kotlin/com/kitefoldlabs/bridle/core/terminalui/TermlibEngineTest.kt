@@ -98,9 +98,12 @@ class TermlibEngineTest {
     @Test
     fun `copies termlib's selection when there is one`() {
         val engine = TermlibEngine()
+        engine.isSelecting shouldBe false
         engine.selection = FakeSelection("")
+        engine.isSelecting shouldBe false
         engine.copySelection().shouldBeNull()
         engine.selection = FakeSelection("ls -la")
+        engine.isSelecting shouldBe true
         engine.copySelection() shouldBe "ls -la"
     }
 

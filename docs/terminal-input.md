@@ -75,8 +75,8 @@ program instead, one notch per line:
 
 - as mouse-wheel events (SGR or X10 encoding, whichever the program asked for) when it has
   mouse reporting on. tmux then enters copy mode and scrolls its history, which is where the
-  output of an attached session lives. Sessions Bridle launches get `mouse on`; for others,
-  put `set -g mouse on` in `tmux.conf`;
+  output of an attached session lives. Sessions Bridle launches get `mouse on` (which a desktop
+  client attached to them sees too); for others, put `set -g mouse on` in `tmux.conf`;
 - as Up and Down keys otherwise, like a desktop terminal.
 
 ## Sticky modifiers
