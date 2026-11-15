@@ -186,12 +186,12 @@ class BackupMergeTest {
                     hosts = listOf(host(1, group = 1), host(2, group = 3), host(3, group = 4)),
                 ),
             )
-        plan.groups shouldContainExactly listOf(Group(id = -1, name = "Home"))
-        plan.hosts.map { it.groupId } shouldBe listOf(10L, -1L, null)
+        // "Home" and "HOME" only match each other, not the device, so both are restored.
+        plan.groups shouldContainExactly listOf(Group(id = -1, name = "Home"), Group(id = -2, name = "HOME"))
+        plan.hosts.map { it.groupId } shouldBe listOf(10L, -2L, null)
         plan.issues shouldContainExactly
             listOf(
                 Duplicate(EntityKind.GROUP, " work "),
-                Duplicate(EntityKind.GROUP, "HOME"),
                 Invalid(EntityKind.GROUP, "  ", Validation.Invalid("label", Validation.Reason.BLANK)),
                 ReferenceCleared(EntityKind.HOST, "h3", "groupId"),
             )
@@ -274,26 +274,57 @@ class BackupMergeTest {
                 ),
             )
         plan.hosts.map { it.label to it.jumpHostId } shouldBe listOf("h3" to 50L, "h1" to null)
-        plan.launchProfiles.map { it.hostId to it.sessionName } shouldBe listOf(50L to "claude-b")
-        plan.portForwards.map { it.hostId to it.bindPort } shouldBe listOf(50L to 5432)
-        plan.portForwards.single().id shouldBe 0L
+        // Only the device's profile and forward are duplicates; backup entries that share a key
+        // with each other are both restored.
+        plan.launchProfiles.map { it.hostId to it.workingDir } shouldBe listOf(50L to "~/b", 50L to "~/c")
+        plan.portForwards.map { it.hostId to it.destHost } shouldBe listOf(50L to "db", 50L to "DB")
+        plan.portForwards.forEach { it.id shouldBe 0L }
         plan.issues shouldContainExactly
             listOf(
                 Duplicate(EntityKind.HOST, "h1"),
                 Duplicate(EntityKind.HOST, "h1"),
                 Duplicate(EntityKind.LAUNCH_PROFILE, "Claude · a"),
-                Duplicate(EntityKind.LAUNCH_PROFILE, "Claude · c"),
                 Duplicate(EntityKind.PORT_FORWARD, "dynamic :1080"),
-                Duplicate(EntityKind.PORT_FORWARD, "local :5432"),
             )
     }
 
     @Test
-    fun `duplicates inside the backup resolve to the first copy`() {
-        val hosts = listOf(host(1), host(2, name = "h1"), host(3, jump = 2))
-        val plan = BackupMerge.plan(ExistingData(), backup(hosts = hosts))
-        plan.hosts.map { it.id to it.jumpHostId } shouldBe listOf(-1L to null, -2L to -1L)
-        plan.issues shouldContainExactly listOf(Duplicate(EntityKind.HOST, "h1"))
+    fun `hosts at the same address inside the backup are all restored`() {
+        // Same hostname, port and username, differing in jump host and identity: the editor allows
+        // this, so a restore on an empty device must keep both, and references stay distinct.
+        val hosts = listOf(host(1), host(2, name = "h1", jump = 1, identity = 7), host(3, jump = 2))
+        val plan =
+            BackupMerge.plan(
+                ExistingData(identities = listOf(existingIdentity(40, filler = 9))),
+                backup(hosts = hosts, identities = listOf(identity(7, filler = 9))),
+            )
+        plan.hosts.map { Triple(it.id, it.jumpHostId, it.identityId) } shouldBe
+            listOf(Triple(-1L, null, null), Triple(-2L, -1L, 40L), Triple(-3L, -2L, null))
+        plan.issues.shouldBeEmpty()
+    }
+
+    @Test
+    fun `profiles and forwards with the same key inside the backup are all restored`() {
+        val plan =
+            BackupMerge.plan(
+                ExistingData(),
+                backup(
+                    hosts = listOf(host(1)),
+                    launchProfiles =
+                        listOf(
+                            LaunchProfile.claude(1, "~/a", "claude"),
+                            LaunchProfile.claude(1, "~/b", "claude").copy(command = "claude --resume"),
+                        ),
+                    portForwards =
+                        listOf(
+                            PortForward(hostId = 1, type = PortForwardType.DYNAMIC, bindPort = 1080),
+                            PortForward(hostId = 1, type = PortForwardType.DYNAMIC, bindPort = 1080, autoStart = true),
+                        ),
+                ),
+            )
+        plan.launchProfiles.map { it.hostId to it.workingDir } shouldBe listOf(-1L to "~/a", -1L to "~/b")
+        plan.portForwards.map { it.hostId to it.autoStart } shouldBe listOf(-1L to false, -1L to true)
+        plan.issues.shouldBeEmpty()
     }
 
     @Test
@@ -400,10 +431,10 @@ class BackupMergeTest {
                         ),
                 ),
             )
-        plan.snippets shouldContainExactly listOf(Snippet(id = 0, name = "Disk", body = "df -i"))
+        val imported = Snippet(id = 0, name = "Disk", body = "df -i")
+        plan.snippets shouldContainExactly listOf(imported, imported)
         plan.issues shouldContainExactly
             listOf(
-                Duplicate(EntityKind.SNIPPET, "Disk"),
                 Duplicate(EntityKind.SNIPPET, "Disk"),
                 Invalid(EntityKind.SNIPPET, " ", Validation.Invalid("name", Validation.Reason.BLANK)),
             )

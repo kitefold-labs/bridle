@@ -24,7 +24,9 @@ import java.util.Base64
  * - **Duplicates keep the existing entity.** Groups match by name (ignoring case), hosts by
  *   hostname (ignoring case) + port + username, profiles by host + tmux session name, snippets by
  *   name + body, port forwards by host + type + ports + destination, known hosts by host + port +
- *   key type.
+ *   key type. Only entities already on the device count: two backup entries with the same key
+ *   (say two hosts at one address with different jump hosts) coexisted on the source device and
+ *   are both restored.
  * - **Identities are matched, never created.** A backup identity maps to an existing identity
  *   with the same public key (type and base64, ignoring the comment); otherwise it is reported as
  *   [ImportIssue.MissingIdentity].
@@ -110,7 +112,7 @@ private class Planner(
     }
 
     private fun planGroups(): List<Group> {
-        val byName = existing.groups.associateBy({ groupKey(it.name) }, { it.id }).toMutableMap()
+        val byName = existing.groups.associateBy({ groupKey(it.name) }, { it.id })
         val planned = mutableListOf<Group>()
         backup.groups.forEach { group ->
             val problem =
@@ -128,7 +130,6 @@ private class Planner(
                 else -> {
                     val id = provisional(planned.size)
                     groupIds.putIfAbsent(group.id, id)
-                    byName[groupKey(group.name)] = id
                     planned +=
                         group.copy(
                             id = id,
@@ -142,7 +143,7 @@ private class Planner(
     }
 
     private fun planHosts(): List<Host> {
-        val byKey = existing.hosts.associateBy(::hostKey) { it.id }.toMutableMap()
+        val byKey = existing.hosts.associateBy(::hostKey) { it.id }
         // New hosts with their *backup* jump-host reference, resolved once every host has an id.
         val pending = mutableListOf<Host>()
         backup.hosts.forEach { host ->
@@ -157,7 +158,6 @@ private class Planner(
                 else -> {
                     val id = provisional(pending.size)
                     hostIds.putIfAbsent(host.id, id)
-                    byKey[hostKey(host)] = id
                     pending +=
                         host.copy(
                             id = id,
@@ -215,7 +215,7 @@ private class Planner(
     }
 
     private fun planProfiles(): List<LaunchProfile> {
-        val seen = existing.launchProfiles.mapTo(mutableSetOf()) { it.hostId to it.sessionName }
+        val onDevice = existing.launchProfiles.mapTo(mutableSetOf()) { it.hostId to it.sessionName }
         return backup.launchProfiles.mapNotNull { profile ->
             val hostId = owner(profile.hostId, EntityKind.LAUNCH_PROFILE, profile.name)
             val mapped = hostId?.let { profile.copy(id = 0, hostId = it) }
@@ -226,7 +226,7 @@ private class Planner(
                     issues += ImportIssue.Invalid(EntityKind.LAUNCH_PROFILE, profile.name, problem)
                     null
                 }
-                !seen.add(mapped.hostId to mapped.sessionName) -> {
+                (mapped.hostId to mapped.sessionName) in onDevice -> {
                     issues += ImportIssue.Duplicate(EntityKind.LAUNCH_PROFILE, profile.name)
                     null
                 }
@@ -236,7 +236,7 @@ private class Planner(
     }
 
     private fun planSnippets(): List<Snippet> {
-        val seen = existing.snippets.mapTo(mutableSetOf()) { it.name to it.body }
+        val onDevice = existing.snippets.mapTo(mutableSetOf()) { it.name to it.body }
         return backup.snippets.mapNotNull { snippet ->
             when {
                 snippet.name.isBlank() -> {
@@ -248,7 +248,7 @@ private class Planner(
                         )
                     null
                 }
-                !seen.add(snippet.name to snippet.body) -> {
+                (snippet.name to snippet.body) in onDevice -> {
                     issues += ImportIssue.Duplicate(EntityKind.SNIPPET, snippet.name)
                     null
                 }
@@ -258,7 +258,7 @@ private class Planner(
     }
 
     private fun planPortForwards(): List<PortForward> {
-        val seen = existing.portForwards.mapTo(mutableSetOf(), ::forwardKey)
+        val onDevice = existing.portForwards.mapTo(mutableSetOf(), ::forwardKey)
         return backup.portForwards.mapNotNull { forward ->
             val label = "${forward.type.name.lowercase()} :${forward.bindPort}"
             val mapped =
@@ -270,7 +270,7 @@ private class Planner(
                     issues += ImportIssue.Invalid(EntityKind.PORT_FORWARD, label, problem)
                     null
                 }
-                !seen.add(forwardKey(mapped)) -> {
+                forwardKey(mapped) in onDevice -> {
                     issues += ImportIssue.Duplicate(EntityKind.PORT_FORWARD, label)
                     null
                 }

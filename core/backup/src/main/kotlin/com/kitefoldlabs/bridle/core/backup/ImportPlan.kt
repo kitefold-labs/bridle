@@ -30,7 +30,7 @@ public sealed interface ImportIssue {
     public val kind: EntityKind
     public val label: String
 
-    /** An equivalent entity already exists (or appears earlier in the backup); the existing one is kept. */
+    /** An equivalent entity already exists on this device; the existing one is kept. */
     public data class Duplicate(
         override val kind: EntityKind,
         override val label: String,
