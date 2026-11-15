@@ -21,8 +21,8 @@ android {
 
     defaultConfig {
         applicationId = "com.kitefoldlabs.bridle"
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // termlib ships four ABIs; 32-bit devices are out of scope (ADR-0002).
         ndk.abiFilters += setOf("arm64-v8a", "x86_64")
