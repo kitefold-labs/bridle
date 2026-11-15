@@ -129,6 +129,29 @@ class SftpAndForwardingTest {
         }
 
     @Test
+    fun `saving through a symbolic link changes its target and keeps the link`() =
+        runBlocking<Unit> {
+            val real = home.resolve("dotfiles/bashrc")
+            Files.createDirectories(real.parent)
+            real.writeText("old")
+            Files.createSymbolicLink(home.resolve(".bashrc"), Path.of("dotfiles/bashrc"))
+            Files.createSymbolicLink(home.resolve("dangling"), Path.of("dotfiles/missing"))
+            conn.openSftp().use { sftp ->
+                val (text, opened) = sftp.readText("/.bashrc")
+                text shouldBe "old"
+                sftp.writeText("/.bashrc", "new", opened)
+                real.readText() shouldBe "new"
+                sftp.upload("newer".byteInputStream(), "/.bashrc", overwrite = true)
+                sftp.upload("made".byteInputStream(), "/dangling")
+            }
+            Files.isSymbolicLink(home.resolve(".bashrc")) shouldBe true
+            real.readText() shouldBe "newer"
+            Files.isSymbolicLink(home.resolve("dangling")) shouldBe true
+            home.resolve("dotfiles/missing").readText() shouldBe "made"
+            Files.list(home.resolve("dotfiles")).use { it.count() } shouldBe 2 // no temp file left behind
+        }
+
+    @Test
     fun `a cancelled upload leaves no temp file behind`() =
         runBlocking<Unit> {
             val reading = CompletableDeferred<Unit>()

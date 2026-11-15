@@ -91,7 +91,10 @@ public interface SftpSession : AutoCloseable {
     /**
      * Uploads [source] to [path] atomically: data goes to a temporary sibling that is renamed
      * over the target only after the transfer completes, so an interrupted upload never leaves a
-     * truncated file behind.
+     * truncated file behind. A symbolic link is written through, as a shell redirection would:
+     * the file it points to is replaced (or created) and the link stays a link.
+     *
+     * @throws IOException if [path] is a symbolic link whose target can't be resolved.
      */
     public suspend fun upload(
         source: InputStream,
@@ -210,13 +213,16 @@ internal class SshjSftpSession(
         progress: TransferProgress,
     ): Long =
         withContext(io) {
-            val existing = client.statExistence(path)
+            // Replacing a symlink by renaming over it would turn it into a regular file and leave
+            // its target untouched (a dotfile kept in a repository, say): write to the target.
+            val target = resolveLink(path)
+            val existing = client.statExistence(target)
             if (!overwrite && existing != null) {
                 throw IOException("$path already exists")
             }
             // A fresh, unpredictable name opened with EXCL: never another upload's file, and never
             // a planted symlink (O_EXCL does not follow one), even in a shared directory.
-            val temp = "$path.${UUID.randomUUID().toString().take(TEMP_ID_LENGTH)}${Sftp.TEMP_SUFFIX}"
+            val temp = "$target.${UUID.randomUUID().toString().take(TEMP_ID_LENGTH)}${Sftp.TEMP_SUFFIX}"
             val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.EXCL)
             // A replacement stays private while it is written and gets the target's mode before the
             // rename, so saving a 0600 file never exposes it and a script stays executable.
@@ -232,7 +238,7 @@ internal class SshjSftpSession(
                         }
                     }
                 existing?.mode?.let { client.chmod(temp, it.permissionsMask and Sftp.PERMISSION_BITS) }
-                replace(temp, path) { targetRemoved = true }
+                replace(temp, target) { targetRemoved = true }
                 written
             } catch (
                 @Suppress("TooGenericExceptionCaught") e: Throwable,
@@ -297,6 +303,33 @@ internal class SshjSftpSession(
         }
     }
 
+    /**
+     * The file [path] ultimately names: itself, or, for a symbolic link, its target (following a
+     * chain of links). Resolved here from `readlink`, since not every server's `realpath`
+     * follows a final link. Not suspending: called on [io] by [upload].
+     */
+    private fun resolveLink(path: String): String {
+        var current = path
+        repeat(MAX_LINK_HOPS) {
+            if (!isLink(current)) return current
+            val target =
+                try {
+                    client.readlink(current)
+                } catch (e: SFTPException) {
+                    throw IOException("$path is a symbolic link whose target can't be resolved", e)
+                }
+            current = if (target.startsWith("/")) target else Sftp.parent(current).trimEnd('/') + "/" + target
+        }
+        throw IOException("$path is a symbolic link whose target can't be resolved")
+    }
+
+    private fun isLink(path: String): Boolean =
+        try {
+            client.lstat(path).mode?.type == FileMode.Type.SYMLINK
+        } catch (e: SFTPException) {
+            if (e.statusCode == Response.StatusCode.NO_SUCH_FILE) false else throw e
+        }
+
     /** Like [stat] but does not follow a final symbolic link. */
     private suspend fun lstat(path: String): RemoteFile? =
         call {
@@ -344,6 +377,9 @@ internal class SshjSftpSession(
 
     private companion object {
         const val TEMP_ID_LENGTH = 8
+
+        /** Longer chains of symbolic links are treated as unresolvable (Linux stops at 40). */
+        const val MAX_LINK_HOPS = 32
         val privateFile: FileAttributes = FileAttributes.Builder().withPermissions(Sftp.TEMP_MODE).build()
     }
 }

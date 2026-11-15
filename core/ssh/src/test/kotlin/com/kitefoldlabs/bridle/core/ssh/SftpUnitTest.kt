@@ -17,6 +17,12 @@ import net.schmizz.sshj.sftp.SFTPException
 import org.junit.jupiter.api.Test
 
 class SftpUnitTest {
+    /** A relaxed client where every path is a plain entry (no symbolic links). */
+    private fun clientWithoutLinks() =
+        mockk<SFTPClient>(relaxed = true).also {
+            every { it.lstat(any()) } throws SFTPException(Response.StatusCode.NO_SUCH_FILE, "none")
+        }
+
     private fun attrs(typeBits: Int?) =
         FileAttributes
             .Builder()
@@ -51,7 +57,7 @@ class SftpUnitTest {
     @Test
     fun `upload replaces an existing target when plain rename refuses`() =
         runBlocking<Unit> {
-            val client = mockk<SFTPClient>(relaxed = true)
+            val client = clientWithoutLinks()
             every { client.statExistence(any()) } returns null
             every { client.rename(match { it.startsWith("/f.") }, "/f") } throws
                 SFTPException(Response.StatusCode.FAILURE, "exists") andThen Unit
@@ -69,7 +75,7 @@ class SftpUnitTest {
     @Test
     fun `a failed replace keeps the temp file once the old target is gone`() =
         runBlocking<Unit> {
-            val client = mockk<SFTPClient>(relaxed = true)
+            val client = clientWithoutLinks()
             every { client.statExistence(any()) } returns null
             every { client.rename(match { it.startsWith("/h.") }, "/h") } throws
                 SFTPException(Response.StatusCode.FAILURE, "exists")
@@ -79,6 +85,42 @@ class SftpUnitTest {
             verify { client.rm("/h") }
             // The temp file is the only copy of the data now: it must not be deleted.
             verify(exactly = 0) { client.rm(match { it.startsWith("/h.") }) }
+        }
+
+    @Test
+    fun `upload writes through symbolic links and reports ones it can't resolve`() =
+        runBlocking<Unit> {
+            val client = clientWithoutLinks()
+            val link = attrs(FileMode.Type.SYMLINK.toMask())
+            every { client.lstat("/d/link") } returns link
+            every { client.readlink("/d/link") } returns "../real"
+            every { client.lstat("/d/../real") } returns link
+            every { client.readlink("/d/../real") } returns "/abs/real"
+            every { client.statExistence("/abs/real") } returns attrs(FileMode.Type.REGULAR.toMask())
+            val sftp = SshjSftpSession(client, Dispatchers.IO)
+            sftp.upload(ByteArray(0).inputStream(), "/d/link", overwrite = true)
+            verify { client.rename(match { it.startsWith("/abs/real.") }, "/abs/real") }
+            verify(exactly = 0) { client.rename(any(), "/d/link") }
+            verify(exactly = 0) { client.rm("/d/link") }
+
+            every { client.lstat("/dangling") } returns link
+            every { client.readlink("/dangling") } returns "missing"
+            every { client.statExistence("/missing") } returns null
+            sftp.upload(ByteArray(0).inputStream(), "/dangling") // creates the target, as a shell would
+            verify { client.rename(match { it.startsWith("/missing.") }, "/missing") }
+
+            every { client.lstat("/loop") } returns link
+            every { client.readlink("/loop") } returns "loop"
+            shouldThrow<java.io.IOException> { sftp.upload(ByteArray(0).inputStream(), "/loop") }
+                .message shouldBe "/loop is a symbolic link whose target can't be resolved"
+
+            every { client.lstat("/unreadable") } returns link
+            every { client.readlink("/unreadable") } throws SFTPException(Response.StatusCode.PERMISSION_DENIED, "no")
+            shouldThrow<java.io.IOException> { sftp.upload(ByteArray(0).inputStream(), "/unreadable") }
+                .message shouldBe "/unreadable is a symbolic link whose target can't be resolved"
+
+            every { client.lstat("/locked") } throws SFTPException(Response.StatusCode.PERMISSION_DENIED, "no")
+            shouldThrow<SFTPException> { sftp.upload(ByteArray(0).inputStream(), "/locked") }
         }
 
     @Test
