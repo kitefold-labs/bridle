@@ -117,6 +117,25 @@ class PathWordTest {
     }
 
     @Test
+    fun `names outside the basic multilingual plane are escaped whole`() {
+        // U+1D538 is a letter, U+1F600 is not: each is one unit, never two escaped surrogates.
+        parse("cd ")!!.insertion("\uD835\uDD38.txt", isDirectory = false) shouldBe "\uD835\uDD38.txt"
+        parse("cd ")!!.insertion("\uD83D\uDE00.txt", isDirectory = false) shouldBe "\\\uD83D\uDE00.txt"
+        parse("cd \"")!!.insertion("\uD83D\uDE00.txt", isDirectory = false) shouldBe "\uD83D\uDE00.txt"
+        parse("cd ")!!.insertion("\uD83D.txt", isDirectory = false).shouldBeNull() // unpaired surrogate
+        parse("cd ")!!.insertion("a\uFFFDb", isDirectory = false).shouldBeNull()
+    }
+
+    @Test
+    fun `a dangling backslash inside double quotes refuses the word`() {
+        // "foo\ plus an inserted \" would read as "foo\\", closing the quote: nothing is suggested.
+        parse("ls \"foo\\").shouldBeNull()
+        parse("ls \"foo\\\\\\").shouldBeNull()
+        parse("ls \"foo\\\\") shouldBe PathWord("foo\\", Quote.DOUBLE)
+        parse("ls \"foo\\x") shouldBe PathWord("foo\\x", Quote.DOUBLE)
+    }
+
+    @Test
     fun `an inserted name reads back as itself`() =
         runBlocking<Unit> {
             val names = Arb.string(1..12).filter { name -> name.none { it.isISOControl() || it == '\uFFFD' } }
@@ -157,9 +176,10 @@ class PathWordTest {
         assumeTrue(path != null, "$shell is not installed")
         val expected = mutableListOf<String>()
         val script = StringBuilder()
-        for (line in listOf("printf '%s\\n' ", "printf '%s\\n' '", "printf '%s\\n' \"")) {
+        val lines = listOf("printf '%s\\n' ", "printf '%s\\n' '", "printf '%s\\n' \"", "printf '%s\\n' \"x\\\\")
+        for (line in lines) {
             val word = PathWord.parse(line)!!
-            for (name in TRICKY_NAMES) {
+            for (name in TRICKY_NAMES.map { word.prefix + it }) {
                 val typed = word.insertion(name, isDirectory = false) ?: continue
                 val close =
                     when (word.quote) {
@@ -213,6 +233,9 @@ class PathWordTest {
                 "-dash",
                 "%pct",
                 "back`tick",
+                "\"; echo INJECTED",
+                "\uD83D\uDE00moji",
+                "\uD835\uDD38math",
             )
     }
 }

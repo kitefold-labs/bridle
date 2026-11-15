@@ -57,11 +57,11 @@ public data class PathWord(
         name: String,
         isDirectory: Boolean,
     ): String? {
-        if (!name.startsWith(prefix) || name.any { it.isISOControl() || it == '�' }) return null
+        if (!name.startsWith(prefix) || !isTypeable(name)) return null
         val rest = name.substring(prefix.length)
         val escaped =
             when (quote) {
-                Quote.NONE -> rest.map { if (isPlain(it)) "$it" else "\\$it" }.joinToString("")
+                Quote.NONE -> escapeUnquoted(rest)
                 Quote.SINGLE -> rest.replace("'", "'\\''")
                 Quote.DOUBLE -> if ('!' in rest) return null else rest.replace(DOUBLE_SPECIAL) { "\\${it.value}" }
             }
@@ -75,15 +75,43 @@ public data class PathWord(
         private const val REDIRECTIONS = "<>"
         private const val EXPANSIONS = "$`*?[{!"
 
-        /** Characters typed unquoted as themselves; everything else gets a backslash. */
-        private fun isPlain(c: Char): Boolean =
-            c in 'a'..'z' ||
-                c in 'A'..'Z' ||
-                c in '0'..'9' ||
-                c in PLAIN_PUNCTUATION ||
-                (c.code > ASCII_MAX && c.isLetterOrDigit())
+        /**
+         * Control characters can't be typed, U+FFFD means the host's name wasn't valid UTF-8 (the
+         * bytes typed back would differ), and an unpaired surrogate can't be encoded at all.
+         */
+        private fun isTypeable(name: String): Boolean =
+            name.codePoints().noneMatch { cp ->
+                Character.isISOControl(cp) || cp == REPLACEMENT || cp in MIN_SURROGATE..MAX_SURROGATE
+            }
+
+        /**
+         * Backslash-escapes [text] for an unquoted word. Escaping goes by code point, so a
+         * character outside the BMP (an emoji, say) gets one backslash before its whole
+         * encoding, never one before each of its UTF-16 halves.
+         */
+        private fun escapeUnquoted(text: String): String =
+            buildString(text.length) {
+                text.codePoints().forEach { cp ->
+                    if (!isPlain(cp)) append('\\')
+                    appendCodePoint(cp)
+                }
+            }
+
+        /** Code points typed unquoted as themselves; everything else gets a backslash. */
+        private fun isPlain(cp: Int): Boolean =
+            cp in LOWER ||
+                cp in UPPER ||
+                cp in DIGITS ||
+                (cp <= ASCII_MAX && cp.toChar() in PLAIN_PUNCTUATION) ||
+                (cp > ASCII_MAX && Character.isLetterOrDigit(cp))
 
         private const val ASCII_MAX = 0x7F
+        private const val REPLACEMENT = 0xFFFD
+        private const val MIN_SURROGATE = 0xD800
+        private const val MAX_SURROGATE = 0xDFFF
+        private val LOWER = 'a'.code..'z'.code
+        private val UPPER = 'A'.code..'Z'.code
+        private val DIGITS = '0'.code..'9'.code
 
         private fun join(
             base: String,
@@ -117,7 +145,7 @@ public data class PathWord(
                 i =
                     when (quote) {
                         Quote.SINGLE -> single(c, i + 1)
-                        Quote.DOUBLE -> double(c, i + 1)
+                        Quote.DOUBLE -> double(c, i + 1) ?: return null
                         Quote.NONE -> none(c, i + 1) ?: return null
                     }
             }
@@ -152,15 +180,17 @@ public data class PathWord(
 
         /**
          * Handles [c] inside double quotes, where a backslash escapes only `$`, a backtick, `"`
-         * and itself. Returns the next index.
+         * and itself. Returns the next index, or null for a dangling `\`: the escaping of an
+         * inserted name would merge with it (`"a\` + `\"` reads as `"a\\"`, closing the quote).
          */
         private fun double(
             c: Char,
             next: Int,
-        ): Int {
+        ): Int? {
             when {
                 c == '"' -> quote = Quote.NONE
-                c == '\\' && next < line.length && line[next] in "$`\"\\" -> {
+                c == '\\' && next >= line.length -> return null
+                c == '\\' && line[next] in "$`\"\\" -> {
                     take(line[next])
                     return next + 1
                 }
