@@ -168,7 +168,10 @@ private fun OpenTerminalsCard(
     }
 }
 
-/** Connecting, reconnecting or failed (with Retry), the last read error, and progress while busy. */
+/**
+ * Connecting, reconnecting, failed (with Retry) or disconnected (with Reconnect), the last read
+ * error, and progress while busy.
+ */
 @Composable
 private fun ConnectionStatus(
     status: HostStatus,
@@ -193,6 +196,12 @@ private fun ConnectionStatus(
             }
         connection is HostConnectionState.Reconnecting ->
             Text(stringResource(R.string.sessions_reconnecting, connection.attempt))
+        // Idle after the host was read once: "Disconnect all" closed it, and it stays closed until asked.
+        connection is HostConnectionState.Idle && status.loaded ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.sessions_disconnected), modifier = Modifier.weight(1f))
+                TextButton(onClick = actions::reconnect) { Text(stringResource(R.string.sessions_reconnect)) }
+            }
         connection !is HostConnectionState.Connected -> Text(stringResource(R.string.sessions_connecting))
         error != null ->
             Text(

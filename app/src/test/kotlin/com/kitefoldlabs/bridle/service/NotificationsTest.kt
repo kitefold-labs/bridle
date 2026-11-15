@@ -14,6 +14,7 @@ import com.kitefoldlabs.bridle.feature.terminal.TerminalModule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldMatch
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -51,11 +52,26 @@ class NotificationsTest {
     }
 
     @Test
-    fun `permission prompts get approve and deny actions`() {
+    fun `permission prompts get approve and deny actions bound to the prompt`() {
         val notifier = ClaudeNotifier(context, SessionLinks(context))
-        val n = notifier.build(event(ClaudeState.WAITING_PERMISSION), "devbox")!!
+        val n = notifier.build(event(ClaudeState.WAITING_PERMISSION), "devbox", prompt = "0123abcd")!!
         NotificationCompat.getContentTitle(n).toString() shouldContain "claude-api · devbox"
         n.actions.map { it.title.toString() } shouldBe listOf("Approve", "Deny")
+        n.actions.map {
+            shadowOf(
+                it.actionIntent,
+            ).savedIntent.getStringExtra(SessionActionReceiver.EXTRA_PROMPT)
+        } shouldBe
+            listOf("0123abcd", "0123abcd")
+        n.actions.map {
+            shadowOf(
+                it.actionIntent,
+            ).savedIntent.getStringExtra(SessionActionReceiver.EXTRA_SESSION)
+        } shouldBe
+            listOf("claude-api", "claude-api")
+        // The screen couldn't be read: nothing to bind an answer to, so the prompt can only be opened.
+        val unread = notifier.build(event(ClaudeState.WAITING_PERMISSION), "devbox")!!
+        (unread.actions?.size ?: 0) shouldBe 0
         for (state in listOf(ClaudeState.WAITING_INPUT, ClaudeState.IDLE, ClaudeState.EXITED)) {
             val other = notifier.build(event(state), "devbox")!!
             (other.actions?.size ?: 0) shouldBe 0
@@ -65,8 +81,39 @@ class NotificationsTest {
     }
 
     @Test
+    fun `prompt fingerprints identify the last screenful, ignoring trailing whitespace`() {
+        val prompt = "Bash command\n  make clean\n Do you want to proceed?\n ❯ 1. Yes\n   2. No"
+        val fingerprint = ClaudeNotifier.promptFingerprint(prompt)
+        fingerprint shouldMatch Regex("[0-9a-f]{16}")
+        ClaudeNotifier.promptFingerprint("$prompt   \n\n") shouldBe fingerprint
+        ClaudeNotifier.promptFingerprint(prompt.replace("\n", "  \n")) shouldBe fingerprint
+        // Only the last lines count (those ClaudeScreen classifies); scrollback above them doesn't.
+        val scrolled = "old output\n".repeat(30) + prompt
+        val tail = ClaudeNotifier.promptFingerprint(scrolled)
+        ClaudeNotifier.promptFingerprint("earlier output\n$scrolled") shouldBe tail
+        ClaudeNotifier.promptFingerprint(scrolled) shouldNotBe fingerprint
+        ClaudeNotifier.promptFingerprint(prompt.replace("make clean", "rm -rf /")) shouldNotBe fingerprint
+        ClaudeNotifier.promptFingerprint("") shouldNotBe fingerprint
+    }
+
+    @Test
+    fun `cancelling takes down the sessions' notifications`() {
+        Notifications.createChannels(context)
+        val notifier = ClaudeNotifier(context, SessionLinks(context))
+        notifier.post(event(ClaudeState.IDLE), "devbox") shouldBe true
+        notifier.post(event(ClaudeState.IDLE).copy(session = "web"), "devbox") shouldBe true
+        shadowOf(manager).allNotifications.size shouldBe 2
+        notifier.cancel(7, listOf("claude-api", "never-posted"))
+        shadowOf(manager).allNotifications.size shouldBe 1
+        notifier.cancel(7, emptyList())
+        shadowOf(manager).allNotifications.size shouldBe 1
+    }
+
+    @Test
     fun `claude notifications hide their details on the lock screen and need an unlock to answer`() {
-        val n = ClaudeNotifier(context, SessionLinks(context)).build(event(ClaudeState.WAITING_PERMISSION), "devbox")!!
+        val n =
+            ClaudeNotifier(context, SessionLinks(context))
+                .build(event(ClaudeState.WAITING_PERMISSION), "devbox", prompt = "0123abcd")!!
         n.visibility shouldBe android.app.Notification.VISIBILITY_PRIVATE
         val public = n.publicVersion!!
         NotificationCompat.getContentTitle(public).toString() shouldBe "Claude Code status changed"

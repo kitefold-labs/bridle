@@ -12,6 +12,7 @@ import com.kitefoldlabs.bridle.core.model.LaunchProfile
 import com.kitefoldlabs.bridle.core.session.AttachSpec
 import com.kitefoldlabs.bridle.core.session.ClaudeStatusEvent
 import com.kitefoldlabs.bridle.core.session.HostConnectionState
+import com.kitefoldlabs.bridle.core.ssh.ConnectionState
 import com.kitefoldlabs.bridle.core.tmux.ClaudeState
 import com.kitefoldlabs.bridle.core.tmux.StatusSource
 import com.kitefoldlabs.bridle.feature.FakeSession
@@ -20,6 +21,7 @@ import com.kitefoldlabs.bridle.feature.awaitUntil
 import com.kitefoldlabs.bridle.feature.terminal.TerminalNavigator
 import com.kitefoldlabs.bridle.service.ClaudeNotifier
 import com.kitefoldlabs.bridle.service.Notifications
+import com.kitefoldlabs.bridle.service.SessionActionReceiver
 import com.kitefoldlabs.bridle.service.SessionLinks
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -30,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -146,29 +149,77 @@ class ClaudeStatusHubTest {
             hub.refresh(999) // not watched: ignored
         }
 
-    @Test
-    fun `claude transitions post notifications`() =
-        runBlocking<Unit> {
-            host.helper = "bridle-helper 1"
-            host.sessions = listOf(FakeSession("api", command = "node"))
-            host.helperStates = state("api", "working", 10)
-            val id = world.addHost()
-            world.data.launchProfiles.upsert(LaunchProfile.claude(id, "~/api", "api"))
-            val (job, seen) = observe(id)
-            awaitUntil {
-                seen
-                    .lastOrNull()
-                    ?.sessions
-                    ?.singleOrNull()
-                    ?.claudeRunning == true
-            }
+    private val prompt = "Bash command\n  make clean\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
 
-            host.helperStates = state("api", "waiting_permission", 20, "Claude needs your permission to use Bash")
+    /** Watches a Claude session on a new host until the hub has seen it running. */
+    private suspend fun watchClaude(): Pair<Long, Pair<Job, CopyOnWriteArrayList<HostStatus>>> {
+        host.helper = "bridle-helper 1"
+        host.sessions = listOf(FakeSession("api", command = "node"))
+        host.helperStates = state("api", "working", 10)
+        host.screens = mapOf("api" to prompt)
+        val id = world.addHost()
+        world.data.launchProfiles.upsert(LaunchProfile.claude(id, "~/api", "api"))
+        val observed = observe(id)
+        awaitUntil {
+            observed.second
+                .lastOrNull()
+                ?.sessions
+                ?.singleOrNull()
+                ?.claudeRunning == true
+        }
+        return id to observed
+    }
+
+    private fun askPermission(id: Long) {
+        host.helperStates = state("api", "waiting_permission", 20, "Claude needs your permission to use Bash")
+        hub.refresh(id)
+        awaitUntil { shadowOf(manager).allNotifications.size == 1 }
+    }
+
+    @Test
+    fun `claude transitions post notifications bound to the prompt, taken down on disconnect all`() =
+        runBlocking<Unit> {
+            val (id, observed) = watchClaude()
+            val (job, seen) = observed
+            askPermission(id)
+            val notification = shadowOf(manager).allNotifications.single()
+            NotificationCompat.getContentTitle(notification).toString() shouldContain "api · devbox"
+            val approve = shadowOf(notification.actions.first().actionIntent).savedIntent
+            approve.getStringExtra(SessionActionReceiver.EXTRA_PROMPT) shouldBe ClaudeNotifier.promptFingerprint(prompt)
+
+            // "Disconnect all" closes the connection for good: the prompt can no longer be answered
+            // from the shade, and the host stays disconnected until a refresh asks for a new one.
+            val probes = host.scriptsContaining("printf 'tmux=%s").size
+            world.coordinator.disconnectAll()
+            awaitUntil { seen.last().connection is HostConnectionState.Idle }
+            awaitUntil { shadowOf(manager).allNotifications.isEmpty() }
+            delay(200)
+            world.connections.activeHosts().shouldBeEmpty()
+            seen.last().connection shouldBe HostConnectionState.Idle
             hub.refresh(id)
-            awaitUntil { shadowOf(manager).allNotifications.size == 1 }
-            NotificationCompat.getContentTitle(shadowOf(manager).allNotifications.single()).toString() shouldContain
-                "api · devbox"
+            awaitUntil {
+                // The fake is one shared connection, marked disconnected when closed: it comes back.
+                host.state.value = ConnectionState.CONNECTED
+                seen.last().connection is HostConnectionState.Connected &&
+                    host.scriptsContaining("printf 'tmux=%s").size > probes
+            }
+            awaitUntil { seen.last().loaded && seen.last().sessions.size == 1 }
+            world.connections.activeHosts() shouldBe setOf(id)
+            shadowOf(manager).allNotifications.shouldBeEmpty() // the first poll only sets a baseline
             job.cancel()
+            awaitUntil { runBlocking { world.connections.activeHosts() }.isEmpty() }
+        }
+
+    @Test
+    fun `an unreadable prompt can only be opened, and stopping the watch takes its notification down`() =
+        runBlocking<Unit> {
+            host.failPreview = true
+            val (id, observed) = watchClaude()
+            askPermission(id)
+            val notification = shadowOf(manager).allNotifications.single()
+            (notification.actions?.size ?: 0) shouldBe 0
+            observed.first.cancel()
+            awaitUntil { shadowOf(manager).allNotifications.isEmpty() }
         }
 
     @Test
@@ -185,32 +236,42 @@ class ClaudeStatusHubTest {
 
             fun posted() = shadowOf(manager).size()
 
-            hub.notify(event("a", to = ClaudeState.WORKING))
+            hub.notify(event("a", to = ClaudeState.WORKING)) { prompt } shouldBe false
             world.data.settings.setNotificationEventEnabled(NotificationEvent.PERMISSION_REQUEST, false)
-            hub.notify(event("a"))
+            hub.notify(event("a")) { prompt } shouldBe false
             posted() shouldBe 0
             world.data.settings.setNotificationEventEnabled(NotificationEvent.PERMISSION_REQUEST, true)
 
             val shell = world.coordinator.openTab(id, "shell", AttachSpec.Shell, { _, _ -> })
             navigator.setVisibleTab(shell.id)
-            hub.notify(event("plain"))
+            hub.notify(event("plain")) { prompt } shouldBe true
             posted() shouldBe 1 // a shell tab is not that session
+            shadowOf(manager)
+                .allNotifications
+                .single()
+                .actions
+                .map {
+                    shadowOf(
+                        it.actionIntent,
+                    ).savedIntent.getStringExtra(SessionActionReceiver.EXTRA_PROMPT)
+                } shouldBe
+                List(2) { ClaudeNotifier.promptFingerprint(prompt) }
             val tab = world.coordinator.openTab(id, "api", AttachSpec.Tmux("api"), { _, _ -> })
             navigator.setVisibleTab(tab.id)
-            hub.notify(event("api"))
+            hub.notify(event("api")) { prompt } shouldBe false
             posted() shouldBe 1 // the user is looking at it
-            hub.notify(event("web"))
+            hub.notify(event("web")) { null } shouldBe true
             posted() shouldBe 2
-            hub.notify(event("api", hostId = other))
+            hub.notify(event("api", hostId = other)) { prompt } shouldBe true
             posted() shouldBe 3
             visible.value = false
-            hub.notify(event("api"))
+            hub.notify(event("api")) { prompt } shouldBe true
             posted() shouldBe 4
             visible.value = true
             navigator.setVisibleTab("closed")
-            hub.notify(event("idle", to = ClaudeState.IDLE))
+            hub.notify(event("idle", to = ClaudeState.IDLE)) { prompt } shouldBe true
             posted() shouldBe 5
-            hub.notify(event("gone", hostId = 999))
+            hub.notify(event("gone", hostId = 999)) { prompt } shouldBe false
             posted() shouldBe 5
         }
 

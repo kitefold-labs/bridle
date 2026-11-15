@@ -226,7 +226,9 @@ class SessionsViewModel
 
         override fun reconnect() {
             val hostId = selectedHost.value ?: return
+            // After a failure the connection is retried; after "Disconnect all" the hub takes a new one.
             viewModelScope.launch { coordinator.connections.reconnect(hostId) }
+            hub.refresh(hostId)
         }
 
         override fun showTerminals() {

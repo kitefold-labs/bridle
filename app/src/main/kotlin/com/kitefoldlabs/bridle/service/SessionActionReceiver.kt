@@ -44,6 +44,9 @@ class SessionActionReceiver : BroadcastReceiver() {
         const val EXTRA_HOST: String = "host"
         const val EXTRA_SESSION: String = "session"
 
+        /** [ClaudeNotifier.promptFingerprint] of the prompt an Approve/Deny is for. */
+        const val EXTRA_PROMPT: String = "prompt"
+
         fun disconnectAll(context: Context): PendingIntent = broadcast(context, ACTION_DISCONNECT_ALL, 0)
 
         fun claudeAction(
@@ -51,6 +54,7 @@ class SessionActionReceiver : BroadcastReceiver() {
             action: String,
             hostId: EntityId,
             session: String,
+            prompt: String,
         ): PendingIntent =
             broadcast(
                 context,
@@ -59,6 +63,7 @@ class SessionActionReceiver : BroadcastReceiver() {
             ) {
                 putExtra(EXTRA_HOST, hostId)
                 putExtra(EXTRA_SESSION, session)
+                putExtra(EXTRA_PROMPT, prompt)
             }
 
         private fun broadcast(

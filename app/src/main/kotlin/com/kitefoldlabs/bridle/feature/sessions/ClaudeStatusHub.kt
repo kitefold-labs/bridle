@@ -43,10 +43,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -104,7 +106,8 @@ data class HostStatus(
  * Status transitions that pass [com.kitefoldlabs.bridle.core.session.NotificationPolicy] (the
  * monitor applies it) post a [ClaudeNotifier] notification when the user's settings allow that
  * kind of event, unless the session is on screen in a terminal tab. There is no push: nothing is
- * watched once the connections close.
+ * watched once the connections close, and a host's notifications are taken down when its monitoring
+ * stops (they would only go stale).
  */
 @Singleton
 class ClaudeStatusHub
@@ -157,12 +160,25 @@ class ClaudeStatusHub
             }
         }
 
-        /** Posts the notification for [event] if the settings allow it and the session is not on screen. */
-        internal suspend fun notify(event: ClaudeStatusEvent) {
-            val kind = notificationEvent(event.to) ?: return
-            if (!settings.settings.first().notifies(kind) || isOnScreen(event)) return
-            val label = hosts.get(event.hostId)?.label ?: return
-            notifier.post(event, label)
+        /**
+         * Posts the notification for [event] if the settings allow it and the session is not on
+         * screen; returns whether one was posted. For a permission request, [screen] captures the
+         * session's pane (null if it can't be read) so the notification's Approve/Deny are bound to
+         * the prompt showing now.
+         */
+        internal suspend fun notify(
+            event: ClaudeStatusEvent,
+            screen: suspend () -> String?,
+        ): Boolean {
+            val kind = notificationEvent(event.to) ?: return false
+            if (!settings.settings.first().notifies(kind) || isOnScreen(event)) return false
+            val label = hosts.get(event.hostId)?.label ?: return false
+            val asking = event.to == ClaudeState.WAITING_PERMISSION
+            return notifier.post(
+                event,
+                label,
+                prompt = if (asking) screen()?.let(ClaudeNotifier::promptFingerprint) else null,
+            )
         }
 
         private fun isOnScreen(event: ClaudeStatusEvent): Boolean {
@@ -209,6 +225,9 @@ class ClaudeStatusHub
             @Volatile private var helperActive = false
 
             @Volatile private var claudeSessions = emptySet<String>()
+
+            /** Sessions with a notification up, to take down when monitoring ends. */
+            private val notified: MutableSet<String> = ConcurrentHashMap.newKeySet()
             private val job: Job = scope.launch(start = CoroutineStart.LAZY) { run() }
 
             fun start() {
@@ -219,15 +238,31 @@ class ClaudeStatusHub
                 job.cancel()
             }
 
+            /**
+             * Monitors over a lease on the host's connection. "Disconnect all" (closeAll) shuts the
+             * connection down for good and leaves the lease Idle (never seen otherwise: acquiring
+             * starts connecting at once). The host then stays disconnected, as the user asked, until
+             * a [refresh] (Refresh or Reconnect on the sessions screen) takes a new lease.
+             */
             private suspend fun run() {
-                val lease = coordinator.connections.acquire(hostId)
-                try {
-                    lease.state.collectLatest { state ->
-                        status.update { it.copy(connection = state) }
-                        if (state is HostConnectionState.Connected) monitor(TmuxController(state.connection))
+                while (true) {
+                    val lease = coordinator.connections.acquire(hostId)
+                    try {
+                        lease.state
+                            .transformWhile { state ->
+                                emit(state)
+                                state !is HostConnectionState.Idle
+                            }.collectLatest { state ->
+                                status.update { it.copy(connection = state) }
+                                if (state is HostConnectionState.Connected) monitor(TmuxController(state.connection))
+                            }
+                    } finally {
+                        lease.close()
+                        notifier.cancel(hostId, notified)
+                        notified.clear()
                     }
-                } finally {
-                    lease.close()
+                    refresh.tryReceive() // asked before the disconnect: not a request to undo it
+                    refresh.receive()
                 }
             }
 
@@ -240,7 +275,11 @@ class ClaudeStatusHub
                             useHelper = { helperActive },
                             claudeHint = { it in claudeSessions },
                         )
-                    launch { monitor.events.collect { notify(it) } }
+                    launch {
+                        monitor.events.collect { event ->
+                            if (notify(event) { capture(tmux, event.session) }) notified += event.session
+                        }
+                    }
                     var reprobe = true
                     var failures = 0
                     while (true) {
@@ -290,6 +329,21 @@ class ClaudeStatusHub
                 ) {
                     status.update { it.copy(loaded = true, error = e.describe()) }
                     false
+                }
+
+            /** [session]'s pane, or null if it can't be read right now. */
+            private suspend fun capture(
+                tmux: TmuxController,
+                session: String,
+            ): String? =
+                try {
+                    tmux.preview(session)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") ignored: Exception,
+                ) {
+                    null
                 }
 
             /** The last lines of up to [MAX_PREVIEWS] sessions, fetched in one round trip. */

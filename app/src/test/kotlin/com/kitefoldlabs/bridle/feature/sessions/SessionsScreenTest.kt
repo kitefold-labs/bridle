@@ -369,6 +369,11 @@ class SessionsScreenTest {
         state = full.copy(status = HostStatus(HostConnectionState.Failed(IllegalStateException(), false)))
         rule.onNodeWithText("Couldn't connect: IllegalStateException").assertExists()
 
+        // Idle after a load is "Disconnect all": the host stays off until Reconnect is pressed.
+        state = full.copy(status = HostStatus(HostConnectionState.Idle, loaded = true))
+        rule.onNodeWithText("Disconnected").assertExists()
+        rule.onNodeWithText("Reconnect").performClick()
+
         state =
             full.copy(
                 status = HostStatus(connected, loaded = true, error = "tmux command failed"),
@@ -380,7 +385,7 @@ class SessionsScreenTest {
         rule.onNodeWithText("No tmux sessions on this host.").assertExists()
         rule.onNodeWithText(string(R.string.sessions_no_profiles)).assertExists()
         rule.onNodeWithText("Show").assertDoesNotExist()
-        actions.calls shouldBe listOf("reconnect")
+        actions.calls shouldBe listOf("reconnect", "reconnect") // Retry, then Reconnect
     }
 
     @Test

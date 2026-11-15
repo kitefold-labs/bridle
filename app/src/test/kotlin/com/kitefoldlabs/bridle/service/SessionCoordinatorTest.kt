@@ -251,11 +251,16 @@ class SessionCoordinatorTest {
             val context = ApplicationProvider.getApplicationContext<Application>()
             val receiver = SessionActions(coordinator)
 
-            fun intent(action: String) =
-                Intent(
-                    action,
-                ).putExtra(SessionActionReceiver.EXTRA_HOST, 1L).putExtra(SessionActionReceiver.EXTRA_SESSION, "api")
-            connection.screen = "Bash command\n  make clean\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
+            val prompt = "Bash command\n  make clean\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n"
+
+            fun intent(
+                action: String,
+                fingerprint: String? = ClaudeNotifier.promptFingerprint(prompt),
+            ) = Intent(action)
+                .putExtra(SessionActionReceiver.EXTRA_HOST, 1L)
+                .putExtra(SessionActionReceiver.EXTRA_SESSION, "api")
+                .putExtra(SessionActionReceiver.EXTRA_PROMPT, fingerprint)
+            connection.screen = prompt
             receiver.handle(context, intent(SessionActionReceiver.ACTION_APPROVE))
             connection.scripts.dropLast(1).last() shouldContain "capture-pane -p -J -t '=api:'"
             connection.scripts.last() shouldContain "send-keys -t '=api:' -- 1"
@@ -269,6 +274,13 @@ class SessionCoordinatorTest {
             receiver.handle(context, intent(SessionActionReceiver.ACTION_DENY))
             connection.scripts.drop(checked).none { "send-keys" in it } shouldBe true
             connection.scripts.size shouldBe checked + 2
+
+            // Claude is asking about something else now: the old notification must not answer it.
+            connection.screen = prompt.replace("make clean", "rm -rf build")
+            receiver.handle(context, intent(SessionActionReceiver.ACTION_APPROVE))
+            receiver.handle(context, intent(SessionActionReceiver.ACTION_DENY, fingerprint = null))
+            connection.scripts.drop(checked).none { "send-keys" in it } shouldBe true
+            connection.scripts.size shouldBe checked + 4
             val before = connection.scripts.size
             receiver.handle(
                 context,

@@ -11,6 +11,8 @@
     <string name="sessions_reconnecting">Connection lost. Reconnecting (attempt %1$d)…</string>
     <string name="sessions_failed">Couldn\'t connect: %1$s</string>
     <string name="sessions_retry">Retry</string>
+    <string name="sessions_disconnected">Disconnected</string>
+    <string name="sessions_reconnect">Reconnect</string>
     <string name="sessions_read_error">Couldn\'t read sessions: %1$s</string>
     <string name="sessions_refresh">Refresh</string>
     <string name="sessions_profiles">Launch profiles</string>

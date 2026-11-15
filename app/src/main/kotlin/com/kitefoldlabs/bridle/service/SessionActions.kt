@@ -40,7 +40,7 @@ class SessionActions
                     if (hostId < 0) return
                     // Claude Code's permission menu: "1" selects "Yes"; Escape declines.
                     val key = if (intent.action == SessionActionReceiver.ACTION_APPROVE) "1" else "Escape"
-                    answer(hostId, session, key)
+                    answer(hostId, session, key, intent.getStringExtra(SessionActionReceiver.EXTRA_PROMPT))
                     context
                         .getSystemService<NotificationManager>()
                         ?.cancel(ClaudeNotifier.notificationId(hostId, session))
@@ -58,9 +58,12 @@ class SessionActions
             hostId: Long,
             session: String,
             key: String,
+            prompt: String?,
         ) {
             try {
-                withTimeoutOrNull(timeout) { coordinator.withTmux(hostId) { answerIfStillAsking(it, session, key) } }
+                withTimeoutOrNull(timeout) {
+                    coordinator.withTmux(hostId) { answerIfStillAsking(it, session, key, prompt) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -69,16 +72,21 @@ class SessionActions
         }
 
         /**
-         * Sends [key] only if [session]'s screen still shows a permission prompt. The notification
-         * may be minutes old: the prompt may have been answered at the desk, or Claude may have
-         * moved on, and a stray `1` or Escape would then land in whatever is on screen now.
+         * Sends [key] only if [session]'s screen still shows the permission prompt the notification
+         * was for ([prompt] is its [ClaudeNotifier.promptFingerprint]). The notification may be
+         * hours old: that prompt may have been answered at the desk and Claude may be asking about
+         * something else now, or a stray `1` or Escape would land in whatever is on screen.
          */
         private suspend fun answerIfStillAsking(
             tmux: TmuxController,
             session: String,
             key: String,
+            prompt: String?,
         ) {
-            if (ClaudeScreen.classify(tmux.preview(session)).state == ClaudeState.WAITING_PERMISSION) {
+            val screen = tmux.preview(session)
+            if (ClaudeScreen.classify(screen).state == ClaudeState.WAITING_PERMISSION &&
+                ClaudeNotifier.promptFingerprint(screen) == prompt
+            ) {
                 tmux.sendKeys(session, key)
             }
         }
