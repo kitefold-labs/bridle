@@ -123,10 +123,7 @@ class ForwardsViewModel
             mutable.update { it.copy(draft = null) }
             viewModelScope.launch {
                 val id = repository.upsert(forward)
-                if (state.value.statuses.containsKey(id)) {
-                    manager.stop(id)
-                    manager.start(forward.copy(id = id))
-                }
+                if (state.value.statuses.containsKey(id)) manager.restart(forward.copy(id = id))
             }
         }
 

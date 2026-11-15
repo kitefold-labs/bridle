@@ -244,6 +244,71 @@ class ForwardsTest {
     }
 
     @Test
+    fun `two starts racing for the same forward run one job`() {
+        val forward = local(freePort(), id = 8)
+        val asked = AtomicInteger()
+        // The first start has passed its "already running" check when a second one (another tab
+        // opening on the host) registers and starts its job; the first must back off without
+        // taking the port or a connection lease.
+        lateinit var wanted: () -> Boolean
+        wanted = {
+            if (asked.getAndIncrement() == 0) forwards.start(forward, wanted)
+            true
+        }
+        forwards.start(forward, wanted)
+        eventually { forwards.statuses.value[8]?.phase == ForwardStatus.Phase.RUNNING }
+        forwards.statuses.value
+            .getValue(8)
+            .localPort shouldBe forward.bindPort
+        // Asked by each start, then once more by the single job that holds the lease.
+        asked.get() shouldBe 3
+        forwards.stop(8)
+        // A leaked loser would keep the host connected.
+        eventually { forwards.statuses.value.isEmpty() && runBlocking { manager.activeHosts() }.isEmpty() }
+        asked.get() shouldBe 3
+    }
+
+    @Test
+    fun `a job that is no longer wanted leaves a forward handed to another job alone`() {
+        val forward = local(freePort(), id = 9)
+        val asked = AtomicInteger()
+        forwards.start(forward) {
+            when (asked.getAndIncrement()) {
+                0 -> true
+                1 -> {
+                    // The first job holds its lease; the user stops and starts the forward meanwhile.
+                    forwards.stop(9)
+                    forwards.start(forward)
+                    false
+                }
+                else -> true
+            }
+        }
+        eventually { forwards.statuses.value[9]?.phase == ForwardStatus.Phase.RUNNING }
+        asked.get() shouldBe 2
+    }
+
+    @Test
+    fun `restart binds the same port again and starts a stopped forward`() {
+        val forward = local(freePort(), id = 10)
+        runBlocking { forwards.restart(forward) } // not running: simply started
+        eventually { forwards.statuses.value[10]?.phase == ForwardStatus.Phase.RUNNING }
+        val changed = forward.copy(destPort = 4000)
+        runBlocking { forwards.restart(changed) }
+        // Rebinding goes through a new lease and listener: slow when the whole build runs tests at once.
+        eventually(timeoutMillis = SLOW_TIMEOUT_MS) {
+            val status = forwards.statuses.value[10]
+            check(status?.phase != ForwardStatus.Phase.FAILED) { "restart failed: ${status?.error}" }
+            status?.phase == ForwardStatus.Phase.RUNNING
+        }
+        forwards.statuses.value
+            .getValue(10)
+            .localPort shouldBe forward.bindPort
+        forwards.stop(10)
+        eventually { forwards.statuses.value.isEmpty() }
+    }
+
+    @Test
     fun `rejected credentials are reported`() {
         next = { throw AuthenticationFailedException("denied") }
         forwards.start(local(freePort(), id = 5))
@@ -254,5 +319,9 @@ class ForwardsTest {
         forwards.stop(5)
         forwards.stop(5)
         forwards.statuses.value shouldBe emptyMap()
+    }
+
+    private companion object {
+        const val SLOW_TIMEOUT_MS = 60_000L
     }
 }
