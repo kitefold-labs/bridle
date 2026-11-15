@@ -8,8 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.kitefoldlabs.bridle.core.session.TerminalState
+import com.kitefoldlabs.bridle.core.ssh.ConnectionState
+import com.kitefoldlabs.bridle.core.ssh.DuplexStream
+import com.kitefoldlabs.bridle.core.ssh.ExecResult
+import com.kitefoldlabs.bridle.core.ssh.PtySpec
 import com.kitefoldlabs.bridle.core.ssh.RemoteFile
 import com.kitefoldlabs.bridle.core.ssh.SftpSession
+import com.kitefoldlabs.bridle.core.ssh.ShellChannel
+import com.kitefoldlabs.bridle.core.ssh.SshConnection
 import com.kitefoldlabs.bridle.core.ssh.TransferProgress
 import com.kitefoldlabs.bridle.core.terminal.MouseReporting
 import com.kitefoldlabs.bridle.core.terminal.ShellEvent
@@ -19,7 +25,9 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import kotlin.time.Duration
 
 /** An engine that records what it is fed and renders a tappable box. */
 class FakeTerminalEngine(
@@ -122,6 +130,55 @@ class FakeConnection(
     }
 
     fun sentText(): String = sent.joinToString("") { it.toString(Charsets.UTF_8) }
+}
+
+/** An SSH connection whose shell prints nothing and swallows what is typed, so a session can open. */
+class FakeSshConnection : SshConnection {
+    override val state = MutableStateFlow(ConnectionState.CONNECTED)
+
+    override suspend fun exec(
+        command: String,
+        timeout: Duration,
+    ): ExecResult = ExecResult(0, "", "")
+
+    override suspend fun runScript(
+        script: String,
+        timeout: Duration,
+    ): ExecResult = ExecResult(0, "", "")
+
+    override suspend fun openShell(
+        pty: PtySpec,
+        command: String?,
+    ): ShellChannel = SilentShell()
+
+    override suspend fun openDirectTcpip(
+        host: String,
+        port: Int,
+    ): DuplexStream = throw UnsupportedOperationException()
+
+    override fun close() = Unit
+}
+
+/** A shell channel that stays open, silent, until closed. */
+class SilentShell : ShellChannel {
+    private val closed = CountDownLatch(1)
+    override val input: InputStream =
+        object : InputStream() {
+            override fun read(): Int {
+                closed.await()
+                return -1
+            }
+        }
+    override val output: OutputStream = OutputStream.nullOutputStream()
+    override val isOpen: Boolean get() = closed.count > 0
+    override val exitStatus: Int? = null
+
+    override suspend fun resize(
+        columns: Int,
+        rows: Int,
+    ) = Unit
+
+    override fun close() = closed.countDown()
 }
 
 /** Runs queued tasks only when told to. */

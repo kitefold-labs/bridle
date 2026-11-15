@@ -143,12 +143,16 @@ class CommandLineSuggestionsTest {
 
                 override fun close() = Unit
             }
-        val session = TerminalSession(lease, AttachSpec.Shell, { _, _ -> }, scope)
+        val session = TerminalSession(lease, AttachSpec.Shell, { _, _ -> }, scope).also { it.start() }
         suggestions.follow(session)
         Thread.sleep(50) // following resets the line while the session is still connecting
+        session.send("cd s".toByteArray()) // nowhere to type yet: dropped, so not seen either
+        lease.state.value = HostConnectionState.Connected(FakeSshConnection())
+        eventually { session.state.value == TerminalState.Open }
         prompt()
         session.send("cd w".toByteArray())
         eventually { names() == listOf("work", "wiki.txt") }
+        session.close()
         scope.cancel()
     }
 

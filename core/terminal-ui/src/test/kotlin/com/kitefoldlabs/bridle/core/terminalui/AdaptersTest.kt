@@ -34,7 +34,7 @@ class AdaptersTest {
             val session = TerminalSession(lease, AttachSpec.Shell, { _, _ -> }, backgroundScope)
             val connection = session.asTerminalConnection()
             connection.state.value shouldBe TerminalState.Connecting
-            connection.send("ls\r".toByteArray()) // queued until a channel opens
+            connection.send("ls\r".toByteArray()) // dropped: no channel to type into yet
             connection.resize(100, 40) // remembered for the channel
         }
 

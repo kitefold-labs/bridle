@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +85,12 @@ public class TerminalSession(
     @Volatile private var size: PtySpec = initialSize
 
     @Volatile private var channel: ShellChannel? = null
-    private val input = Channel<ByteArray>(Channel.UNLIMITED)
+
+    // Bounded: the writer blocks while the server's window is exhausted (a host that stops
+    // reading), and a hostile host can make the emulator answer a stream of queries. Beyond
+    // the bound, input is dropped rather than queued without limit; [send] isn't a suspend
+    // function (it is called from the main thread), so it can't apply back-pressure.
+    private val input = Channel<ByteArray>(INPUT_CAPACITY, onBufferOverflow = BufferOverflow.DROP_LATEST)
     private var job: Job? = null
 
     /** Built (and so validated) up front: a bad session name fails here, not inside [scope]. */
@@ -121,9 +127,12 @@ public class TerminalSession(
     @Volatile
     public var onInput: ((ByteArray) -> Unit)? = null
 
-    /** Sends keystrokes/paste bytes to the remote side. Ignored when not open. */
+    /**
+     * Sends keystrokes/paste bytes to the remote side. Ignored when the tab is not open (while
+     * connecting, reattaching or after it ended), like keys typed at a terminal with no shell.
+     */
     public fun send(bytes: ByteArray) {
-        if (bytes.isEmpty()) return
+        if (bytes.isEmpty() || mutableState.value != TerminalState.Open) return
         onInput?.invoke(bytes)
         input.trySend(bytes)
     }
@@ -250,5 +259,8 @@ public class TerminalSession(
 
     private companion object {
         const val BUFFER_SIZE = 32 * 1024
+
+        /** Queued input chunks (keystrokes, pastes, query replies) before new ones are dropped. */
+        const val INPUT_CAPACITY = 1024
     }
 }

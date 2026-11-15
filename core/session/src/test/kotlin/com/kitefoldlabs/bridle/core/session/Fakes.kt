@@ -23,6 +23,9 @@ class FakeShell : ShellChannel {
     val sizes = mutableListOf<Pair<Int, Int>>()
 
     @Volatile var open = true
+
+    /** Makes writes hang, like a server whose channel window is exhausted. */
+    @Volatile var blockWrites = false
     override var exitStatus: Int? = null
     var failResize = false
 
@@ -67,6 +70,7 @@ class FakeShell : ShellChannel {
     override val output: OutputStream =
         object : OutputStream() {
             override fun write(b: Int) {
+                while (blockWrites && open) Thread.sleep(BLOCKED_POLL_MS)
                 if (!open) throw IOException("closed")
                 synchronized(written) { written.write(b) }
             }
@@ -92,6 +96,7 @@ class FakeShell : ShellChannel {
     private companion object {
         val EOF = Any()
         val BROKEN = Any()
+        const val BLOCKED_POLL_MS = 5L
     }
 }
 

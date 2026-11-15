@@ -77,6 +77,36 @@ class TerminalSessionTest {
         }
 
     @Test
+    fun `input is dropped while the tab is not open, and queued input is bounded`() =
+        runBlocking<Unit> {
+            val (session, connector) = setUp(AttachSpec.Tmux("t"))
+            val seen = mutableListOf<String>()
+            session.onInput = { seen += it.toString(Charsets.UTF_8) }
+            session.send("early".toByteArray()) // still connecting: nowhere to type
+            withTimeout(5.seconds) { session.state.first { it == TerminalState.Open } }
+            val shell =
+                connector.made
+                    .single()
+                    .shells
+                    .single()
+
+            // A host that stops reading: the writer hangs on the first chunk and the rest queue
+            // up to the bound; what comes after is dropped instead of growing the queue forever.
+            shell.blockWrites = true
+            session.send("x".toByteArray())
+            eventually { seen.isNotEmpty() }
+            delay(50.milliseconds) // let the writer take the first chunk
+            repeat(QUEUE_BOUND + EXTRA) { session.send("x".toByteArray()) }
+            shell.blockWrites = false
+            eventually { shell.writtenText().length >= QUEUE_BOUND }
+            delay(100.milliseconds)
+            shell.writtenText().length shouldBe QUEUE_BOUND + 1
+            seen.first() shouldBe "x"
+            seen.size shouldBe QUEUE_BOUND + EXTRA + 1
+            session.close()
+        }
+
+    @Test
     fun `input is seen before it is written, and SFTP opens on the live connection`() =
         runBlocking<Unit> {
             val (session, connector) = setUp(AttachSpec.Shell)
@@ -264,4 +294,10 @@ class TerminalSessionTest {
             session.close()
             manager.closeAll()
         }
+
+    private companion object {
+        /** TerminalSession's input bound (INPUT_CAPACITY). */
+        const val QUEUE_BOUND = 1024
+        const val EXTRA = 100
+    }
 }
